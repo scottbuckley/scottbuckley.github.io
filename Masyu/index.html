@@ -1,0 +1,932 @@
+<html>
+  <head>
+    <!-- <link rel="stylesheet" href="style.css" type="text/css"/> -->
+    <script src="jquery-3.3.1.js"></script>
+    <script type="text/javascript">
+      // CONSTANTS
+      const UNK = 0;
+      const OFF = 1;
+      const ON = 2;
+
+
+      // some example mastus
+      const data_test1   = "0001000002001000000000000201010101200001000000000112020000000010000011001000001000212000";
+      const data_test2   = "0010100000010100011012000000010000001000000001012020100020001202001101010000100000000100";
+      const kakuro_10    = "g0b00a00a0b0d0f1a1a0e1b0a00a0n1b0e1c1a0b0g1d0d";
+      const kakuro_15    = "1b0b0b0b1i10a0c00a1c1q1a0b0b1c00d1c0c0j0b0g10f1b11a0f0i0c0b0a0g1d0d1a1f00a0a0c1a0a1h0b1g0a1d01c10d0b0a";
+      const data_default = data_test1; // this one will be loaded automatically.
+      const data_kakuro = kakuro_15;
+
+      const width  = 15;
+      const height = 15;
+
+      const bgColor = randomPastel();
+
+      var table = [];
+      var vertLinks = [];
+      var horiLinks = [];
+      var cells = [];
+      var lineNumbers = [];
+
+      var circleSize = 10;
+
+      var ctx = undefined;
+      var boxWidth = 0;
+      var boxHeight = 0;
+
+      function onReady() {
+        console.log("starting");
+        // initTableData(data_test1);
+        initTableDataKakuro(data_kakuro);
+        drawTable();
+        // meowButton();
+        function step() {
+          if (makeProgress()) {
+            drawTable();
+            setTimeout(step, 50);
+          }
+        }
+        step();
+      }
+
+      function meowButton() {
+        makeProgress();
+        drawTable();
+      }
+
+      function refresh() {
+        drawTable();
+      }
+
+
+      function makeProgress() {
+        // console.log("taking step");
+        for (var c=0; c<cells.length; c++) {
+          var cell = cells[c];
+          if (!cell.decided) {
+            if (cell.type===1) {
+              // white cells
+              if (attemptToDecideWhite(cell))
+                return true;
+            }
+            if (cell.type===2) {
+              // black cells
+              if (attemptToDecideBlack(cell))
+                return true;
+            }
+          } else if (!cell.useless) {
+            if (cell.type===1) {
+              if (considerUsefulWhite(cell))
+                return true;
+            }
+          }
+        }
+        if (considerPoints())
+          return true;
+        if (considerLoops()) {
+          return true;
+        }
+      }
+
+      function eqPos(a, b) {
+        if (a===b && a!==0) return true;
+        else return false;
+      }
+
+      function considerLoops() {
+        var changed = false;
+        numberLines();
+        // block horizontal links that cause bad loops
+        for (var x=0; x<width-1; x++) {
+          for (var y=0; y<height; y++) {
+            if (horiLinks[y][x]===0) {
+              if (eqPos(lineNumbers[y][x], lineNumbers[y][x+1])) {
+                horiLinks[y][x] = 1;
+                changed = true;
+              }
+            }
+          }
+        }
+
+        // block vertical links that cause bad loops
+        for (var x=0; x<width; x++) {
+          for (var y=0; y<height-1; y++) {
+            if (vertLinks[y][x]===0) {
+              if (eqPos(lineNumbers[y][x], lineNumbers[y+1][x])) {
+                vertLinks[y][x] = 1;
+                changed = true;
+              }
+            }
+          }
+        }
+        return changed;
+      }
+
+      function numberLines() {
+        lineNumbers = makeZeroesArray(width, height);
+        var currentLine = 1;
+        for (var x=0; x<width; x++) {
+          for (var y=0; y<height; y++) {
+            if (maybeStartLine(x,y,currentLine))
+              currentLine++;
+          }
+        }
+      }
+
+      function maybeStartLine(x, y, lineNum) {
+        if (lineNumbers[y][x]!==0) return false;
+        var [up,down,left,right] = isUpDownLeftRight(x,y);
+        if (up || down || left || right) {
+          lineNumbers[y][x] = lineNum;
+          if (up)    maybeStartLine(x,y-1,lineNum);
+          if (down)  maybeStartLine(x,y+1,lineNum);
+          if (left)  maybeStartLine(x-1,y,lineNum);
+          if (right) maybeStartLine(x+1,y,lineNum);
+          return true;
+        }
+        return false;;
+      }
+
+      // function isUpOnly(x, y) {
+      //   if (getUp(x,y)!==2)    return false;
+      //   if (getDown(x,y)===2)  return false;
+      //   if (getLeft(x,y)===2)  return false;
+      //   if (getRight(x,y)===2) return false;
+      //   return true;
+      // }
+      // function isDownOnly(x, y) {
+      //   if (getUp(x,y)===2)    return false;
+      //   if (getDown(x,y)!==2)  return false;
+      //   if (getLeft(x,y)===2)  return false;
+      //   if (getRight(x,y)===2) return false;
+      //   return true;
+      // }
+      // function isLeftOnly(x, y) {
+      //   if (getUp(x,y)===2)    return false;
+      //   if (getDown(x,y)===2)  return false;
+      //   if (getLeft(x,y)!==2)  return false;
+      //   if (getRight(x,y)===2) return false;
+      //   return true;
+      // }
+      // function isRightOnly(x, y) {
+      //   if (getUp(x,y)===2)    return false;
+      //   if (getDown(x,y)===2)  return false;
+      //   if (getLeft(x,y)===2)  return false;
+      //   if (getRight(x,y)!==2) return false;
+      //   return true;
+      // }
+
+      function isUp(x,y) {
+        return getUp(x,y)===2;
+      }
+      function isDown(x,y) {
+        return getDown(x,y)===2;
+      }
+      function isLeft(x,y) {
+        return getLeft(x,y)===2;
+      }
+      function isRight(x,y) {
+        return getRight(x,y)===2;
+      }
+
+      function isUpDownLeftRight(x,y) {
+        return [isUp(x,y), isDown(x,y), isLeft(x,y), isRight(x,y)];
+      }
+
+      function canGoUpDownLeftRight(x,y) {
+        return [canGoUp(x,y), canGoDown(x,y), canGoLeft(x,y), canGoRight(x,y)];
+      }
+
+      function hasDanglingLine(x,y) {
+        var [up,down,left,right] = isUpDownLeftRight(x,y);
+        if (up && !down && !left && !right) return 'up';
+        if (!up && down && !left && !right) return 'down';
+        if (!up && !down && left && !right) return 'left';
+        if (!up && !down && !left && right) return 'right';
+        return '';
+      }
+
+      function getNecessaryDirection(current,up,down,left,right) {
+        if (current==='up') {
+          if (!left && !right) return 'down';
+          if (!left && !down)  return 'right';
+          if (!right && !down) return 'left';
+        } else if (current==='down') {
+          if (!left && !right) return 'up';
+          if (!left && !up)    return 'right';
+          if (!right && !up)   return 'left';
+        } else if (current==='left') {
+          if (!up && !down)    return 'right';
+          if (!up && !right)   return 'down';
+          if (!down && !right) return 'up';
+        } else if (current==='right') {
+          if (!up && !down)   return 'left';
+          if (!up && !left)   return 'down';
+          if (!down && !left) return 'up';
+        }
+        return '';
+      }
+
+      function twoDirs(x,y) {
+        var [up,down,left,right] = isUpDownLeftRight(x,y);
+        if (up && down)
+          return or(setLeft(x,y,1), setRight(x,y,1));
+        if (left && right)
+          return or(setUp(x,y,1), setDown(x,y,1));
+        if (up && left)
+          return or(setDown(x,y,1), setRight(x,y,1));
+        if (up && right)
+          return or(setDown(x,y,1), setLeft(x,y,1));
+        if (down && left)
+          return or(setUp(x,y,1), setRight(x,y,1));
+        if (down && right)
+          return or(setUp(x,y,1), setLeft(x,y,1));
+        return false;
+      }
+
+      function threeBlocks(x,y) {
+        var count = 0;
+        if (!canGoUp(x,y))    count++;
+        if (!canGoDown(x,y))  count++;
+        if (!canGoLeft(x,y))  count++;
+        if (!canGoRight(x,y)) count++;
+        if (count===3)
+        return or(
+          setUp(x,y,1),
+          setDown(x,y,1),
+          setLeft(x,y,1),
+          setRight(x,y,1),
+        );
+        return false;
+      }
+
+      function considerPoint(x,y) {
+        // if there are two lines coming out of this point,
+        // block out the other two directions
+        if (twoDirs(x,y)) return true;
+
+        // if you can't go three ways, then you also can't
+        // go the fourth way.
+        if (threeBlocks(x,y)) return true;
+
+        // if there is a dangling line and it can only go one
+        // way, go that way!
+        var dangling = hasDanglingLine(x,y);
+        if (dangling!=='') {
+          var newDir = getNecessaryDirection(dangling, ...canGoUpDownLeftRight(x,y));
+          if (newDir!=='') {
+            if (newDir==='up'    && setUp(x,y,2))    return true;
+            if (newDir==='down'  && setDown(x,y,2))  return true;
+            if (newDir==='left'  && setLeft(x,y,2))  return true;
+            if (newDir==='right' && setRight(x,y,2)) return true;
+          }
+        }
+        return false;
+      }
+
+      function considerPoints() {
+        for (var y=0; y<height; y++) {
+          for (var x=0; x<width; x++) {
+            if (considerPoint(x, y))
+              return true;
+          }
+        }
+        return false;
+      }
+
+      function considerUsefulWhite(cell) {
+        if (cell.getUp()===2 && cell.getTwoUp()===2) {
+          if (cell.getTwoDown()!==1) {
+            cell.setTwoDown(1);
+            cell.useless = true;
+            return true;
+          } 
+        }
+        if (cell.getDown()===2 && cell.getTwoDown()===2) {
+          if (cell.getTwoUp()!==1) {
+            cell.setTwoUp(1);
+            cell.useless = true;
+            return true;
+          }
+        }
+        if (cell.getLeft()===2 && cell.getTwoLeft()===2) {
+          if (cell.getTwoRight()!==1) {
+            cell.setTwoRight(1);
+            cell.useless = true;
+            return true;
+          }
+        }
+        if (cell.getRight()===2 && cell.getTwoRight()===2) {
+          if (cell.getTwoRight()!==1) {
+            cell.setTwoLeft(1);
+            cell.useless = true;
+            return true;
+          }
+        }
+        return false;
+      }
+
+      function attemptToDecideWhite(cell) {
+        if (!cell.canGoLeft() || !cell.canGoRight() || cell.getUp()===2 || cell.getDown()===2) {
+          if (cell.confirmVertical()) {
+            console.log("Cell at "+cell.pos()+" must be vertical.");
+            return true;
+          } 
+        } else if (!cell.canGoUp() || !cell.canGoDown() || cell.getLeft()===2 || cell.getRight()===2) {
+          if (cell.confirmHorizontal()) {
+            console.log("Cell at "+cell.pos()+" must be horizontal.");
+            return true;
+          }
+        }
+        
+        if (isWhite(cell.x+1,cell.y)) {
+          // there is also a white directly to my right
+          if (isLeft(cell.x-1,cell.y) || isRight(cell.x+2,cell.y))
+            if (cell.confirmVertical()) {
+              console.log("Two whites horizontally adjacent at "+cell.pos()+" and "+pos(cell.x+1,cell.y)+", with a horizontal line nearby that would break the white's spacing rules if they were horizontal.");
+              return true;
+            }
+        }
+        if (isWhite(cell.x,cell.y+1)) {
+          // there is also a white directly below me
+          if (isUp(cell.x,cell.y-1) || isDown(cell.x,cell.y+2))
+            if (cell.confirmHorizontal()) {
+              console.log("Two whites vertically adjacent at "+cell.pos()+" and "+pos(cell.x,cell.y+1)+", with a vertical line nearby that would break the white's spacing rules if they were vertical.");
+              return true;
+            }
+        }
+        return false;
+      }
+
+      function attemptToDecideBlack(cell) {
+        // if you can't take two steps in one direction,
+        // you must be going in the other direction.
+        if (!cell.canGoTwoUp()) {
+          if (or(
+            cell.confirmTwoDown(),
+            cell.setUp(1),
+          )) return true;
+        }
+        if (!cell.canGoTwoDown()) {
+          if (or(
+            cell.confirmTwoUp(),
+            cell.setDown(1),
+          )) return true;
+        }
+        if (!cell.canGoTwoLeft()) {
+          if (or(
+            cell.confirmTwoRight(),
+            cell.setLeft(1),
+          )) return true;
+        }
+        if (!cell.canGoTwoRight()) {
+          if (or(
+            cell.confirmTwoLeft(),
+            cell.setRight(1),
+          )) return true;
+        }
+
+        // if you're already going in one direction,
+        // you can't go back.
+        if (cell.getUp()===2) {
+          if (cell.setDown(1)) return true;
+        }
+        if (cell.getDown()===2) {
+          if (cell.setUp(1)) return true;
+        }
+        if (cell.getLeft()===2) {
+          if (cell.setRight(1)) return true;
+        }
+        if (cell.getRight()===2) {
+          if (cell.setLeft(1)) return true;
+        }
+
+        // if you're already going in two directions,
+        // you are decided (and now useless);
+        if (cell.getUp()===2 && cell.getLeft()===2) {
+          cell.decided = true;
+          cell.useless = true;
+          if (or(
+            cell.confirmTwoUp(),
+            cell.confirmTwoLeft(),
+            cell.setDown(1),
+            cell.setRight(1),
+          )) return true;
+        }
+        if (cell.getUp()===2 && cell.getRight()===2) {
+          cell.decided = true;
+          cell.useless = true;
+          if (or(
+            cell.confirmTwoUp(),
+            cell.confirmTwoRight(),
+            cell.setDown(1),
+            cell.setLeft(1),
+          )) return true;
+        }
+        if (cell.getDown()===2 && cell.getLeft()===2) {
+          cell.decided = true;
+          cell.useless = true;
+          if (or(
+            cell.confirmTwoDown(),
+            cell.confirmTwoLeft(),
+            cell.setUp(1),
+            cell.setRight(1),
+          )) return true;
+        }
+        if (cell.getDown()===2 && cell.getRight()===2) {
+          cell.decided = true;
+          cell.useless = true;
+          if (or(
+            cell.confirmTwoDown(),
+            cell.confirmTwoRight(),
+            cell.setUp(1),
+            cell.setLeft(1),
+          )) return true;
+        }
+        return false;
+      }
+
+      function or() {
+        for (var i=0; i<arguments.length; i++)
+          if (arguments[i]) return true;
+        return false;
+      }
+
+      function confirmVertical(x, y) {
+        // confirm that a white cell is vertical
+        return or(
+          setUp(x,y,2),
+          setDown(x,y,2),
+          setLeft(x,y,1),
+          setRight(x,y,1),
+        );
+      }
+
+      function confirmHorizontal(x, y) {
+        // confirm that a white cell is vertical
+        return or(
+          setLeft(x,y,2),
+          setRight(x,y,2),
+          setUp(x,y,1),
+          setDown(x,y,1),
+        );
+      }
+
+      function setUp(x, y, v) {
+        if (y===0 || vertLinks[y-1][x]===v) return false;
+        vertLinks[y-1][x] = v;
+        return true;
+      }
+
+      function setDown(x, y, v) {
+        if (y===height-1 || vertLinks[y][x]===v) return false;
+        vertLinks[y][x] = v;
+        return true;
+      }
+
+      function setLeft(x, y, v) {
+        if (x===0 || horiLinks[y][x-1]===v) return false;
+        horiLinks[y][x-1] = v;
+        return true;
+      }
+
+      function setRight(x, y, v) {
+        if (x===width-1 || horiLinks[y][x]===v) return false;
+        horiLinks[y][x] = v;
+        return true;
+      }
+
+      function setTwoUp(x, y, v) {
+        if (y===0 || vertLinks[y-2][x]===v) return false;
+        vertLinks[y-2][x] = v;
+        return true;
+      }
+
+      function setTwoDown(x, y, v) {
+        if (y===height-1 || vertLinks[y+1][x]===v) return false;
+        vertLinks[y+1][x] = v;
+        return true;
+      }
+
+      function setTwoLeft(x, y, v) {
+        if (x===0 || horiLinks[y][x-2]===v) return false;
+        horiLinks[y][x-2] = v;
+        return true;
+      }
+
+      function setTwoRight(x, y, v) {
+        if (x===width-1 || horiLinks[y][x+1]===v) return false;
+        horiLinks[y][x+1] = v;
+        return true;
+      }
+
+      function getUp(x,y) {
+        if (y===0) return 1;
+        return vertLinks[y-1][x];
+      }
+
+      function getDown(x,y) {
+        if (y===height-1) return 1;
+        return vertLinks[y][x];
+      }
+
+      function getLeft(x,y) {
+        if (x===0) return 1;
+        return horiLinks[y][x-1];
+      }
+
+      function getRight(x,y) {
+        if (x===width-1) return 1;
+        return horiLinks[y][x];
+      }
+
+      function getTwoUp(x,y) {
+        if (y<=1) return 1;
+        return vertLinks[y-2][x];
+      }
+
+      function getTwoDown(x,y) {
+        if (y>=height-2) return 1;
+        return vertLinks[y+1][x];
+      }
+
+      function getTwoLeft(x,y) {
+        if (x<=1) return 1;
+        return horiLinks[y][x-2];
+      }
+
+      function getTwoRight(x,y) {
+        if (x>=width-2) return 1;
+        return horiLinks[y][x+1];
+      }
+
+      function confirmTwoUp(x, y) {
+        confirmVertical(x,y-1);
+      }
+
+      function confirmTwoDown(x, y) {
+        confirmVertical(x,y+1);
+      }
+
+      function confirmTwoLeft(x, y) {
+        confirmHorizontal(x-1,y);
+      }
+
+      function confirmTwoRight(x, y) {
+        confirmHorizontal(x+1,y)
+      }
+
+
+      // check if this point can go left
+      function canGoLeft(x,y) {
+        if (getLeft(x,y)===1)
+          return false;
+        return true;
+      }
+
+      // check if this point can go right
+      function canGoRight(x,y) {
+        if (getRight(x,y)===1)
+          return false;
+        return true;
+      }
+
+      // check if this point can go up
+      function canGoUp(x,y) {
+        if (getUp(x, y)===1)
+          return false;
+        return true;
+      }
+
+      // check if this point can go down
+      function canGoDown(x,y) {
+        if (getDown(x,y)===1)
+          return false;
+        return true;
+      }
+
+      function canGoTwoUp(x,y) {
+        if (!canGoUp(x,y))   return false;
+        if (!canGoUp(x,y-1)) return false;
+        if (isLeft(x,y-1) || isRight(x,y-1)) return false;
+        if (isBlack(x,y-1)) return false;
+        return true;
+      }
+      function canGoTwoDown(x,y) {
+        if (!canGoDown(x,y))   return false;
+        if (!canGoDown(x,y+1)) return false;
+        if (isLeft(x,y+1) || isRight(x,y+1)) return false;
+        if (isBlack(x,y+1)) return false;
+        return true;
+      }
+      function canGoTwoLeft(x,y) {
+        if (!canGoLeft(x,y))   return false;
+        if (!canGoLeft(x-1,y)) return false;
+        if (isUp(x-1,y) || isDown(x-1,y)) return false;
+        if (isBlack(x-1,y)) return false;
+        return true;
+      }
+      function canGoTwoRight(x,y) {
+        if (!canGoRight(x,y))   return false;
+        if (!canGoRight(x+1,y)) return false;
+        if (isUp(x+1,y) || isDown(x+1,y)) return false;
+        if (isBlack(x+1,y)) return false;
+        return true;
+      }
+
+      function isBlack(x, y) {
+        if (x<0 || x>=width) return false;
+        if (y<0 || y>=height) return false;
+        return table[y][x]===2;
+      }
+
+      function isWhite(x, y) {
+        if (x<0 || x>=width) return false;
+        if (y<0 || y>=height) return false;
+        return table[y][x]===1;
+      }
+
+
+      function pos(x, y) {
+        return "("+x+", "+y+")";
+      }
+
+
+
+      function cellProto(obj = undefined) {
+        var that;
+        if (obj) {
+          that = obj;
+        } else {
+          that = this;
+        }
+        
+        function setXY(fn) {
+          that[fn.name] = () => fn(that.x, that.y);
+        }
+        function setXYV(fn) {
+          that[fn.name] = (v) => fn(that.x, that.y, v);
+        }
+
+        // provide easier access to cell.fn, where fn is a global function
+        // expecting x and y. uses this cell's x and y.
+        setXY(canGoUp);
+        setXY(canGoDown);
+        setXY(canGoLeft);
+        setXY(canGoRight);
+
+        setXY(confirmTwoUp);
+        setXY(confirmTwoDown);
+        setXY(confirmTwoLeft);
+        setXY(confirmTwoRight);
+
+        setXY(getUp);
+        setXY(getDown);
+        setXY(getLeft);
+        setXY(getRight);
+
+        setXY(getTwoUp);
+        setXY(getTwoDown);
+        setXY(getTwoLeft);
+        setXY(getTwoRight);
+
+        setXY(canGoTwoUp);
+        setXY(canGoTwoDown);
+        setXY(canGoTwoLeft);
+        setXY(canGoTwoRight);
+
+        setXYV(setUp);
+        setXYV(setDown);
+        setXYV(setLeft);
+        setXYV(setRight);
+
+        setXYV(setTwoUp);
+        setXYV(setTwoDown);
+        setXYV(setTwoLeft);
+        setXYV(setTwoRight);
+
+        setXY(pos);
+
+        that.confirmHorizontal = function() {
+          that.decided = true;
+          return confirmHorizontal(that.x, that.y);
+          
+        }
+        that.confirmVertical = function() {
+          that.decided = true;
+          return confirmVertical(that.x, that.y);
+        }
+
+        return that;
+      }
+
+      function replaceAll(str, search, replace) {
+        while (str.indexOf(search)!==-1)
+          str = str.replace(search,replace);
+        return str;
+      }
+
+      function initTableDataKakuro(data) {
+        initTableData(decompressKakuro(data));
+      }
+
+      function initTableData(data) {
+        initTableBlank();
+        if (typeof data !== "string") return;
+        for (var i=0; i<data.length; i++) {
+          var r = Math.floor(i/width);
+          var c = i % width;
+          var v = parseInt(data.charAt(i));
+          if (v > 0) {
+            table[r][c] = v;
+            var cell = new cellProto();
+            cell.y = r;
+            cell.x = c;
+            cell.type = v;
+            cell.decided = false;
+            cell.useless = false;
+            // cell.prototype = cellProto;
+            cells.push(cell);
+          }
+        }
+      }
+
+      function makeZeroesArray(w, h) {
+        var out = [];
+        for (var r=0; r<h; r++) {
+          var row = [];
+          for (var c=0; c<w; c++) {
+            row.push(0);
+          }
+          out.push(row);
+        }
+        return out;
+      }
+
+      function makeRandomArray(w, h) {
+        var out = [];
+        for (var r=0; r<h; r++) {
+          var row = [];
+          for (var c=0; c<w; c++) {
+            row.push(Math.floor(Math.random() * 3));
+          }
+          out.push(row);
+        }
+        return out;
+      }
+
+      function initTableBlank() {
+        table = makeZeroesArray(width,height);
+        vertLinks = makeZeroesArray(width,height-1);
+        horiLinks = makeZeroesArray(width-1,height);
+        cells = [];
+      }
+
+      function drawTable() {
+        var ratio = height / width;
+        var canvas = $("#canvas")[0];
+        ctx = canvas.getContext("2d");
+        canvas.height = window.innerHeight-20;
+        canvas.width  = canvas.height/ratio;
+        circleSize = (canvas.width/width)/5;
+
+        boxHeight = canvas.height/(height+1);
+        boxWidth  = canvas.width/(width+1);
+
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // draw links
+        for (var r=0; r<height; r++) {
+          for (var c=0; c<width; c++) {
+            var posx = (c+1)*boxWidth;
+            var posy = (r+1)*boxHeight;
+            if (r<height-1) {
+              // draw vertical links
+              var vert = vertLinks[r][c];
+              if (vert===2) {
+                drawVert(posx, posy);
+              } else if(vert===1) {
+                drawVertX(posx, posy);
+              }
+            }
+            if (c<width-1) {
+              //draw horizontal links
+              var hori = horiLinks[r][c];
+              if (hori===2) {
+                drawHori(posx, posy);
+              } else if(hori===1) {
+                drawHoriX(posx, posy);
+              }
+            }
+          }
+        }
+
+        //draw circles
+        for (var r=0; r<height; r++) {
+          for (var c=0; c<width; c++) {
+            var posx = (c+1)*boxWidth;
+            var posy = (r+1)*boxHeight;
+            var cell = table[r][c];
+            if (cell===0) {
+              drawDot(posx,posy,);
+            } else if (cell===1) {
+              drawWhite(posx, posy);
+            } else if (cell===2) {
+              drawBlack(posx,posy);
+            }
+          }
+        }
+      }
+
+      function drawVert(x, y) {
+        drawLine(x,y,x,y+boxHeight);
+      }
+
+      function drawHori(x, y) {
+        drawLine(x,y,x+boxWidth,y);
+      }
+
+      function drawVertX(x, y) {
+        drawCircle(x,y+boxHeight/2,'#F005',circleSize/3);
+      }
+
+      function drawHoriX(x, y) {
+        drawCircle(x+boxWidth/2,y,'#F005',circleSize/3);
+      }
+
+      function drawLine(x1, y1, x2, y2) {
+        ctx.lineWidth = circleSize/2.5;
+        ctx.strokeStyle = "#0005"
+        ctx.lineCap = "round";
+        ctx.beginPath();
+          ctx.moveTo(x1,y1);
+          ctx.lineTo(x2,y2);
+        ctx.stroke();
+      }
+
+      function randomPastel() {
+        return "hsl(" + 360 * Math.random() + ',' +
+                 (25 + 70 * Math.random()) + '%,' + 
+                 (80 + 5 * Math.random()) + '%)';
+      }
+
+      function drawWhite(x, y) {
+        drawCircle(x, y, '#FFFD', circleSize);
+      }
+
+      function drawBlack(x, y) {
+        drawCircle(x, y, '#000A', circleSize);
+      }
+
+      function drawDot(x, y) {
+        drawCircle(x,y,'#0006',circleSize/5)
+      }
+
+      function drawCircle(x, y, color, radius) {
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, 2 * Math.PI, false);
+        ctx.fillStyle = color;
+        ctx.fill();
+      }
+
+      function decompressKakuro(data) {
+        data = replaceAll(data,"1","2");
+        data = replaceAll(data,"0","1");
+        data = replaceAll(data,"a","0");
+        data = replaceAll(data,"b","00");
+        data = replaceAll(data,"c","000");
+        data = replaceAll(data,"d","0000");
+        data = replaceAll(data,"e","00000");
+        data = replaceAll(data,"f","000000");
+        data = replaceAll(data,"g","0000000");
+        data = replaceAll(data,"h","00000000");
+        data = replaceAll(data,"i","000000000");
+        data = replaceAll(data,"j","0000000000");
+        data = replaceAll(data,"k","00000000000");
+        data = replaceAll(data,"l","000000000000");
+        data = replaceAll(data,"m","0000000000000");
+        data = replaceAll(data,"n","00000000000000");
+        data = replaceAll(data,"o","000000000000000");
+        data = replaceAll(data,"p","0000000000000000");
+        data = replaceAll(data,"q","00000000000000000");
+        data = replaceAll(data,"r","000000000000000000");
+        data = replaceAll(data,"s","0000000000000000000");
+        data = replaceAll(data,"t","00000000000000000000");
+        data = replaceAll(data,"u","000000000000000000000");
+        data = replaceAll(data,"v","0000000000000000000000");
+        data = replaceAll(data,"w","00000000000000000000000");
+        data = replaceAll(data,"x","000000000000000000000000");
+        data = replaceAll(data,"y","0000000000000000000000000");
+        data = replaceAll(data,"z","00000000000000000000000000");
+        return data;
+      }
+
+      $(document).ready(onReady);
+    </script>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <button onclick="javascript:meowButton();">meow</button>
+  </body>
+</html>

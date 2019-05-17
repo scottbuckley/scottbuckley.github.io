@@ -1,0 +1,1801 @@
+<html>
+  <head>
+    <title>Slitherlink Squares</title>
+    <!-- <link rel="stylesheet" href="style.css" type="text/css"/> -->
+    <script src="jquery-3.3.1.js"></script>
+    <script type="text/javascript">
+
+
+
+  /*#####   ##        #######  ########     ###    ##        ######  
+  ##    ##  ##       ##     ## ##     ##   ## ##   ##       ##    ## 
+  ##        ##       ##     ## ##     ##  ##   ##  ##       ##       
+  ##   #### ##       ##     ## ########  ##     ## ##        ######  
+  ##    ##  ##       ##     ## ##     ## ######### ##             ## 
+  ##    ##  ##       ##     ## ##     ## ##     ## ##       ##    ## 
+   ######   ########  #######  ########  ##     ## ########  ######*/
+
+  const UNK = 0;
+  const OFF = 1;
+  const ON  = 2;
+
+  const SPOKE = 3; // for doubles
+
+  const IN  = 2
+  const OUT = 1;
+
+  const autosolve = true;
+  const autoSolveWait = 0;
+  const initialSolves = 0;
+
+  const showDoublesOnHalfKnowns = false;
+
+  const doZoneAnalysis = true;
+
+  // CONSTANTS
+  // some example slitherlinks
+  const data_test1  = "13--2--332122-3-0--------0-21-2322---2---12-3--12--2----0-1--22-211-2----2--1--2--1--21-1-1233-32-23"; // solved
+  const data_test2  = "--13-------31-2-2203-22--2-3-31----3----212--2-32--23---1222-222-2---3----2--10-23-3-1------23-33--2"; // solved
+  const data_test3  = "-21--1---2-2-02---2-3---0-23-2--1--3------2-1-33--2---2--1---313232--23---1--2---2-22------12--23223"; // solved
+  const data_test4  = "1--23---2----3-3122--31--2-3201-23-2----2--1--232--2--1----1----3311------2-2-----2-1---2-1-3-32-33-"; // solved
+  const data_test5  = "1-3--2-31--22213-32----3-----3-22-1--1--32----01-2--1-3--3-2---3-21----2----2-13-3-213---3---3-2---3"; // solved
+  const data_test6  = "-3-200-3---21--1-112-2--2----3-1--1--21--221----232--231-22---------2--33---3-2--2-2--0-1-23----21-3"; // solved
+  const data_test7  = "-32---3-233--1-2-3---3-1-1-12132-2--3-212-------1--22-2-1---1-11---2-22--2-21--1-1121-32--3-3--1-1-2"; // solved
+  const data_test8  = "3-2-2-2-23221--3-2------1----220--2---12----1--32--31-2-1--2--131-1-22-2-2-3-2-231---12---2-1-0-3-2-"; // solved
+  const data_test9  = "-1-3-31--33--22---2-2122--12-2--213-2--3---3---1--2-0-0--31-2-3--312-----22-223-2--1----2----2-2--2-"; // solved
+  const data_test10 = "2-22-21---23-2---3-31---221-222---22-1-----3----3-32-12331-3-23-1-22------2---1-22----23---32-232223"; // solved
+  const data_test11 = "-22----2231--01-3-----22--2-1--22-112----2--12----2--1--23-3-1---1-2--3--21-2-3-----101----12-1-0--3";
+  const data_test12 = "-01----1-1-3-13--2-0--13-1--1-1----2---1---111---2-11----1---------13--21--12-2-3222--1-12--3---01--";
+  const data_default = data_test11; // this one will be loaded automatically.
+
+  const allTests = [data_test1, data_test2, data_test3, data_test4, data_test5, data_test6, data_test7, data_test8, data_test9, data_test10];
+  const sideLength = 10;
+  var cellSize;
+
+  const colorProfile = randomColorProfile();
+  const bgColor = colorFromProfile(colorProfile);
+  const inColor = colorFromProfile(colorProfile, -40);
+  const outColor = colorFromProfile(colorProfile, +40);
+  const unkColor = colorFromProfile(colorProfile, 0);
+
+  var field = [];
+  var cols = [];
+  var allCells = [];
+  var allLinks = [];
+  var allPoints = [];
+  
+  var canvas;
+  var ctx = undefined;
+
+
+
+  /*     ## ####  ######   ##     ##         ##       ######## ##     ## ######## ##       
+  ##     ##  ##  ##    ##  ##     ##         ##       ##       ##     ## ##       ##       
+  ##     ##  ##  ##        ##     ##         ##       ##       ##     ## ##       ##       
+  #########  ##  ##   #### ######### ####### ##       ######   ##     ## ######   ##       
+  ##     ##  ##  ##    ##  ##     ##         ##       ##        ##   ##  ##       ##       
+  ##     ##  ##  ##    ##  ##     ##         ##       ##         ## ##   ##       ##       
+  ##     ## ####  ######   ##     ##         ######## ########    ###    ######## #######*/
+
+  function onReady() {
+    consoleLog("starting");
+
+    // set up canvas
+    canvas = $("#canvas")[0];
+    ctx = canvas.getContext("2d");
+    
+    // load puzzle
+    buildField(data_default);
+    drawField();
+
+    // perform starting solve actions
+    if (autosolve) {
+      doAutoSolve();
+    } else {
+      for (var i=0; i<initialSolves; i++)
+        makeProgress();
+      refresh();
+    }
+  }
+
+  function doAutoSolve() {
+    function step() {
+      if (makeProgress()) {
+        setTimeout(step, autoSolveWait);
+      } else {
+        var result = checkErrors(false);
+        if (result===INCOMPLETE) {
+          consoleError("Could not complete the puzzle.");
+        } else if (result===ERROR) {
+          consoleError("Made errors trying to complete the puzzle.");
+        } else if (result===COMPLETE) {
+          consoleWarn("Puzzle successfully completed without errors.");
+        } else {
+          console.error("weird error: ", result);
+        }
+      }
+      drawField();
+    }
+    step();
+  }
+
+  // disablable logging
+  var logging = true;
+  function consoleLog() { logging && console.log(...arguments); }
+  function consoleWarn() { logging && console.warn(...arguments); }
+  function consoleError() { logging && console.error(...arguments); }
+
+  // testing that all the tests in "allTests" can be solved
+  function regressionTest() {
+    logging = false;
+    var fails = 0;
+    for (var i=0; i<allTests.length; i++) {
+      testString = allTests[i];
+      buildField(testString);
+      while (makeProgress());
+      if (checkErrors(false)!==COMPLETE) {
+        console.error("Could not solve test number %i.", (i+1));
+        fails++;
+      }
+    }
+    logging = true;
+    if (fails===0) {
+      consoleWarn("Successfully solved all tests.");
+    } else {
+      consoleWarn("Some tests failed.");
+    }
+  }
+
+  // pressing R allows you to read in a new puzzle live
+  $(document).keypress('r', function(e){
+    if (String.fromCharCode(e.which)!=='r') return;
+    var input = prompt("Enter 100 characters, eg \"-1---2-33--0-...\"");
+    if (input) {
+      if (input.startsWith("c: \"")) input = input.substr(4); // if we are copying from the console from http://gopuzzles.appspot.com/
+      buildField(input);
+      doAutoSolve();
+    }
+  });
+
+
+  function buildField(data) {
+    field = [];
+    cols = [];
+    allCells = [];
+    allLinks = [];
+    allPoints = [];
+    
+    for (var i=0; i<sideLength; i++) {
+      field[i] = [];
+      cols[i] = [];
+    }
+
+    var i = 0;
+    for (var r=0; r<sideLength; r++) {
+      for (var c=0; c<sideLength; c++) {
+        var cell = new cellProto();
+        field[r][c] = cell;
+        cols[c][r] = cell;
+        allCells.push(cell);
+
+        // tell the cell where it is
+        cell.col = c;
+        cell.row = r;
+
+        // set the cell's ordinality
+        var ch = parseInt(data.charAt(i++));
+        if (ch !== NaN)
+          cell.ord = ch;
+        else
+          cell.ord = -1;
+      }
+    }
+
+    // initialise all cell links
+    for (var i=0; i<allCells.length; i++) {
+      allCells[i].buildLinks();
+    }
+
+    //get a list of all points
+    for (var i=0; i<allCells.length; i++) {
+      var cell = allCells[i];
+      // the quad at the TOP LEFT
+      var quadRight = cell.links[0];
+      var quadDown = cell.links[3];
+      var quadUp;
+      var quadLeft;
+
+      var tlpoint = undefined;
+      var trpoint = undefined;
+      var blpoint = undefined;
+      var brpoint = undefined;
+
+      // the top link of the quad at the top-left. might be an orphan.
+      if (cell.row===0)
+        quadUp = new linkProto(true);
+      else
+        quadUp = field[cell.row-1][cell.col].links[3];
+      
+      // the LEFT link of the quad at the top-left. might be an orphan.
+      if (cell.col===0)
+        quadLeft = new linkProto(true);
+      else
+        quadLeft = field[cell.row][cell.col-1].links[0];
+      
+      // push the TOPLEFT quad.
+      tlpoint = new pointProto(quadUp, quadRight, quadDown, quadLeft);
+
+      // the TOPRIGHT quad of the top-right corner cell
+      if (cell.row===0 && cell.col===sideLength-1) {
+        trpoint = new pointProto(new linkProto(true), new linkProto(true), cell.links[1], cell.links[0]);
+      }
+        
+
+      // the TOPRIGHT quad of the right edge
+      if (cell.col===sideLength-1 && cell.row!==0) {
+        trpoint = new pointProto(field[cell.row-1][cell.col].links[1],new linkProto(true),cell.links[1],cell.links[0]);
+      }
+      
+      // the BOTTOMLEFT of the bottom-left corner cell
+      if (cell.col===0 && cell.row===sideLength-1) {
+        var blpoint = new pointProto(cell.links[3],cell.links[2], new linkProto(true), new linkProto(true));
+      }
+
+      // the BOTTOMRIGHT quad of the bottom row
+      if (cell.row===sideLength-1 && cell.col!==sideLength-1) {
+        var brpoint = new pointProto(cell.links[1], field[cell.row][cell.col+1].links[2], new linkProto(true), cell.links[2]);
+      }
+        
+
+      // the BOTTOMRIGHT quad of the bottom-right corner cell
+      if (cell.col===sideLength-1 && cell.row===sideLength-1) {
+        var brpoint = new pointProto(cell.links[1], new linkProto(true), new linkProto(true), cell.links[2]);
+      }
+
+
+      // add the points to allPoints, and to the appropriate cells.
+      if (trpoint) {
+        allPoints.push(trpoint);
+                                  cell.points[0]                = trpoint;
+        if (cell.topCell())      cell.topCell().points[1]      = trpoint;
+        if (cell.topRightCell()) cell.topRightCell().points[2] = trpoint;
+        if (cell.rightCell())    cell.rightCell().points[3]    = trpoint; 
+      }
+      if (brpoint) {
+        allPoints.push(brpoint);
+        if (cell.bottomCell())      cell.bottomCell().points[0]      = brpoint;
+                                    cell.points[1]                   = brpoint;
+        if (cell.rightCell())       cell.rightCell().points[2]       = brpoint;
+        if (cell.bottomRightCell()) cell.bottomRightCell().points[3] = brpoint;
+      }
+      if (tlpoint) {
+        allPoints.push(tlpoint);
+        if (cell.leftCell())    cell.leftCell().points[0]    = tlpoint;
+        if (cell.topLeftCell()) cell.topLeftCell().points[1] = tlpoint;
+        if (cell.topCell())     cell.topCell().points[2]     = tlpoint;
+                                cell.points[3]               = tlpoint;
+      }
+      if (blpoint) {
+        allPoints.push(blpoint);
+        if (cell.bottomLeftCell()) cell.bottomLeftCell().points[0] = blpoint;
+        if (cell.leftCell())       cell.leftCell().points[1] = blpoint;
+                                    cell.points[2] = blpoint;
+        if (cell.bottomCell())     cell.bottomCell().points[3] = blpoint;
+      }
+    }
+
+    // tell all links what their adjacent links are.
+    // each link will have 4 adjacent links
+    for (var i=0; i<allPoints.length; i++) {
+      var [a,b,c,d] = allPoints[i].links;
+      a.adjs.push([b, c, d]);
+      b.adjs.push([a, c, d]);
+      c.adjs.push([a, b, d]);
+      d.adjs.push([a, b, c]);
+    }
+
+    // fill the list of all links
+    for (var c=0; c<allCells.length; c++) {
+      var cell = allCells[c];
+      for (var i=0; i<4; i++) {
+        if (i<2 && cell.cellAt(i)) continue;
+        allLinks.push(cell.links[i]);
+      }
+    }
+  }
+
+  function meowButton() {
+    // randomQuad();
+    // randomCell();
+    // if (makeProgress()) {
+      // setTimeout(meowButton, 10);
+    // }
+    makeProgress(true);
+    drawField();
+  }
+
+  function refresh() {
+    drawField();
+  }
+
+  function drawField() {
+    var canvasSize = Math.min(window.innerHeight, window.innerWidth)-20;
+    if (canvas.height!==canvasSize || canvas.width!==canvasSize) {
+      canvas.height = canvasSize;
+      canvas.width  = canvasSize;
+      canvasMid = canvasSize/2;
+      cellSize = (canvasSize/(sideLength+4));
+    }
+
+    // circleSize = (canvas.width/width)/5;
+    var center = canvas.width/2;
+
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (var i=0; i<allCells.length; i++)
+      allCells[i].drawBG();
+    for (var i=0; i<allCells.length; i++)
+      allCells[i].drawMe();
+    for (var i=0; i<allCells.length; i++)
+      allCells[i].drawPoints();
+  }
+
+
+  var drawLittleSpoke = function(x, y, i) {
+    var off = cellSize*0.1;
+    ctx.beginPath();
+    if (i%2===0) {
+      ctx.moveTo(x-off, y+off);
+      ctx.lineTo(x+off, y-off);
+    } else {
+      ctx.moveTo(x-off, y-off);
+      ctx.lineTo(x+off, y+off);
+    }
+    ctx.stroke();
+  }
+
+  var drawLittleDouble = function(x, y, i) {
+    var off = cellSize*0.1;
+    ctx.beginPath();
+    if (i===0) {
+      ctx.moveTo(x, y-off);
+      ctx.lineTo(x+off, y);
+    } else if (i===1) {
+      ctx.moveTo(x+off, y);
+      ctx.lineTo(x, y+off);
+    } else if (i===2) {
+      ctx.moveTo(x, y+off);
+      ctx.lineTo(x-off, y);
+    } else if (i===3) {
+      ctx.moveTo(x-off, y);
+      ctx.lineTo(x, y-off);
+    }
+    ctx.stroke();
+  }
+
+  function randomColorProfile() {
+    return [360 * Math.random()
+            ,(25 + 40 * Math.random())
+            ,(80 + 5 * Math.random())
+            ];
+  }
+
+  function colorFromProfile(profile, off=0) {
+    var [h, s, l] = profile;
+    h = (h+off)%360;
+    return "hsl("+h+","+s+"%,"+l+"%)";
+  }
+  
+
+
+
+   /*####  ##          ###     ######   ######  ########  ######  
+  ##    ## ##         ## ##   ##    ## ##    ## ##       ##    ## 
+  ##       ##        ##   ##  ##       ##       ##       ##       
+  ##       ##       ##     ##  ######   ######  ######    ######  
+  ##       ##       #########       ##       ## ##             ## 
+  ##    ## ##       ##     ## ##    ## ##    ## ##       ##    ## 
+   ######  ######## ##     ##  ######   ######  ########  ####*/
+
+  // SPOKE
+  function spokeProto() {
+    this.state = UNK;
+  }
+
+  //////////////////////////////////////////////////////////////////////////////////////////////////
+
+  // LINK
+  function linkProto(outside = false) {
+    this.state = UNK;
+    this.adjs = [];
+    this.allAdjs_cache = undefined;
+    this.isOutside = outside;
+    if (this.isOutside)
+      this.state = OFF;
+
+    this.allAdjs = function() {
+      if (this.allAdjs_cache===undefined) {
+        this.allAdjs_cache = [];
+        for (var i=0; i<this.adjs.length; i++)
+          for (var i2 = 0; i2 < this.adjs[i].length; i2++)
+            this.allAdjs_cache.push(this.adjs[i][i2]);
+      }
+      return this.allAdjs_cache;
+    }
+  }
+
+  //////////////////////////////////////////////////////////////////////////////////////////////////
+
+  // DOUBLE
+  function doubleProto(spokeRef) {
+    this.state = UNK;
+    this.spoke = spokeRef;
+    this.oppositeDouble = undefined;
+
+    this.setON = function() {
+      // if the spoke is already ON, do nothing
+      if (this.spoke.state===ON) return false;
+
+      if (this.state===UNK) {
+        this.state = ON;
+        return true;
+      } else if (this.state===OFF) {
+        // can't be OFF, can't be ON, must be an ON spoke.
+        this.state = SPOKE;
+        return this.setSpoke(ON);
+      }
+      return false;
+    }
+
+    this.setOFF = function() {
+      // if the spoke is already ON, do nothing
+      if (this.spoke.state===ON) return false;
+
+      if (this.state===UNK) {
+        this.state = OFF;
+        return true;
+      } else if (this.state===ON) {
+        // can't be ON, can't be OFF, must be an ON spoke.
+        this.state = SPOKE;
+        return this.setSpoke(ON);
+      }
+      return false;
+    }
+
+    this.setSpoke = function(state) {
+      this.state = SPOKE;
+      if (this.spoke.state!==state) {
+        this.spoke.state = state;
+        return true;
+      }
+      return false;
+    }
+  }
+
+  //////////////////////////////////////////////////////////////////////////////////////////////////
+
+  // POINT
+  function pointProto(a, b, c, d) {
+    this.links = [a, b, c, d];
+
+    var spokeRight = new spokeProto();
+    var spokeLeft = new spokeProto();
+    this.spokes = [spokeRight, spokeLeft, spokeRight, spokeLeft];
+
+    this.doubles = [new doubleProto(spokeRight), new doubleProto(spokeLeft), new doubleProto(spokeRight), new doubleProto(spokeLeft)];
+    for (var i=0; i<4; i++)
+      this.doubles[i].oppositeDouble = this.doubles[(i+2)%4];
+
+    this.drawSpokes = function(x, y) {
+      if (stateCount(this.links, UNK)===0) return;
+
+      for (var i=0; i<4; i++) {
+        var spokeState  = this.spokes[i].state;
+        var doubleState = this.doubles[i].state;
+
+        if (spokeState!==UNK) {
+          if (spokeState === OFF) {
+            ctx.strokeStyle = '#F003'; // light red
+          } else if (spokeState === ON) {
+            ctx.strokeStyle = '#0003'; // black
+          }
+          if (i<2) drawLittleSpoke(x, y, i);
+        }
+        
+        if (spokeState!==ON && doubleState!==UNK && doubleState!==SPOKE) {
+          if (doubleState === OFF) {
+            ctx.strokeStyle = '#F003'; // light red
+          } else if (doubleState === ON) {
+            ctx.strokeStyle = '#0003'; // black
+          }
+          var linkA = this.links[i];
+          var linkB = this.links[(i+1)%4];
+            if (showDoublesOnHalfKnowns || (linkA.state===UNK && linkB.state===UNK))
+              drawLittleDouble(x, y, i);
+        }
+      }
+    }
+
+    this.isFucked = function() {
+      var count = this.onCount();
+      if (count===2) return false;
+      if (count===0) return false;
+      return true;
+    }
+
+    this.onCount = function() {
+      var count = 0;
+      for (var i=0; i<4; i++)
+        if (this.links[i].state===ON)
+          count++;
+      return count;
+    }
+  }
+
+  //////////////////////////////////////////////////////////////////////////////////////////////////
+
+  // CELL
+  function cellProto(that = this) {
+    that.links = [];
+    that.points = [];
+    that.ord = -1;
+    that.row = 0;
+    that.col = 0;
+
+    that.zone = UNK;
+
+    that.useful = true;
+
+    that.isOrd = function() {
+      return (that.ord >= 0);
+    }
+
+    that.spokeAt = function(i) {
+      return that.points[i].spokes[i];
+    }
+
+    that.doubleIn = function(i) {
+      return that.points[i].doubles[(i+2)%4];
+    }
+
+    that.doubleOut = function(i) {
+      return that.points[i].doubles[i];
+    }
+
+    that.sideSpokeAt = function(i) {
+      return that.points[i].spokes[(i+1)%4];
+    }
+
+    that.drawBG = function() {
+      var [x, y] = that.getPos();
+      if (that.zone===IN) {
+        ctx.fillStyle = inColor;;
+      } else if (that.zone===UNK) {
+        ctx.fillStyle = unkColor;
+      } else if (that.zone===OUT) {
+        ctx.fillStyle = outColor;
+      }
+      ctx.fillRect(x, y, cellSize, cellSize);
+    }
+
+    that.drawMe = function() {
+      var [x, y] = that.getPos();
+
+      if (that.isOrd()) {
+        ctx.font = (cellSize*0.57)+"px Arial"
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle"; 
+        if (that.useful===true)
+          ctx.fillStyle = '#000';
+        else
+          ctx.fillStyle = '#0005';
+        ctx.fillText(that.ord, x+(cellSize/2), y+(cellSize/1.9));
+      }
+      that.drawLinks();
+    }
+
+    that.onCount       = () => stateCount(that.links, ON);
+    that.offCount      = () => stateCount(that.links, OFF);
+    that.unkCount      = () => stateCount(that.links, UNK);
+
+    that.availLinks = function() {
+      return 4-that.offCount();
+    }
+
+    that.getCornerPos = function(i) {
+      var [x, y] = that.getPos();
+      if (i===0) return [x+cellSize, y];
+      if (i===1) return [x+cellSize, y+cellSize];
+      if (i===2) return [x, y+cellSize];
+      if (i===3) return [x, y];
+    }
+
+    that.drawPoints = function() {
+      for (var i=0; i<4; i++) {
+        if (i===1 || (i===3&&(that.row===0||that.col===0)) || (i===0&&that.row===0&&that.col===sideLength-1) || (i===2&&that.col===0&&that.row===sideLength-1) ) {
+          var [x, y] = that.getCornerPos(i);
+          that.points[i].drawSpokes(x, y);
+        }
+      }
+    }
+
+    that.drawLinks = function() {
+      var [x, y] = that.getPos();
+      ctx.lineWidth = 3;
+      for (var i=0; i<4; i++) {
+        // do not re-draw interior lines
+        if (i<2 && that.cellAt(i)) continue;
+        // set the appropriate color for the link
+        var state = that.links[i].state;
+        ctx.lineCap = "round";
+        if (state === UNK) {
+          ctx.strokeStyle = '#0002'; // light grey
+        } else if (state === OFF) {
+          ctx.strokeStyle = '#F003'; // light red
+        } else if (state === ON) {
+          ctx.strokeStyle = '#000A'; // black
+        } else if (state === SPECIAL) {
+          ctx.strokeStyle = '#0FF'; // green?
+        }
+
+        // draw the link
+        ctx.beginPath();
+        if (i===0) {
+          ctx.moveTo(x, y);
+          ctx.lineTo(x+cellSize, y);
+        } else if (i===1) {
+          ctx.moveTo(x+cellSize, y);
+          ctx.lineTo(x+cellSize, y+cellSize);
+        } else if (i===2) {
+          ctx.moveTo(x+cellSize, y+cellSize);
+          ctx.lineTo(x, y+cellSize);
+        } else if (i===3) {
+          ctx.moveTo(x, y+cellSize);
+          ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+    }
+    
+    that.leftCell = function() {
+      if (that.col===0) return undefined;
+      return field[that.row][that.col-1];
+    }
+    that.rightCell = function() {
+      if (that.col===sideLength-1) return undefined;
+      return field[that.row][that.col+1];
+    }
+    that.topCell = function() {
+      if (that.row===0) return undefined;
+      return field[that.row-1][that.col];
+    }
+    that.bottomCell = function() {
+      if (that.row===sideLength-1) return undefined;
+      return field[that.row+1][that.col];
+    }
+
+    that.topRightCell = function() {
+      if (that.row===0 || that.col===sideLength-1) return undefined;
+      return field[that.row-1][that.col+1];
+    }
+    that.bottomRightCell = function() {
+      if (that.row===sideLength-1 || that.row===sideLength-1) return undefined;
+      return field[that.row+1][that.col+1];
+    }
+    that.bottomLeftCell = function() {
+      if (that.row===sideLength-1 || that.col===0) return undefined;
+      return field[that.row+1][that.col-1];
+    }
+    that.topLeftCell = function() {
+      if (that.row===0 || that.col===0) return undefined;
+      return field[that.row-1][that.col-1];
+    }
+
+
+    that.topRightCorner = function() {
+      var links = [];
+      if (that.topCell()) links.push( that.topCell().links[1] );
+      else                links.push( new linkProto(true)      );
+      if (that.rightCell()) links.push( that.rightCell().links[0] );
+      else                  links.push( new linkProto(true) );
+      return links;
+    }
+
+    that.topLeftCorner = function() {
+      var links = [];
+      if (that.topCell()) links.push( that.topCell().links[3] );
+      else                links.push( new linkProto(true)      );
+      if (that.leftCell()) links.push( that.leftCell().links[0] );
+      else                 links.push( new linkProto(true) );
+      return links;
+    }
+
+    that.bottomLeftCorner = function() {
+      var links = [];
+      if (that.bottomCell()) links.push( that.bottomCell().links[3] );
+      else                 links.push( new linkProto(true)      );
+      if (that.leftCell()) links.push( that.leftCell().links[2] );
+      else                 links.push( new linkProto(true) );
+      return links;
+    }
+
+    that.bottomRightCorner = function() {
+      var links = [];
+      if (that.bottomCell()) links.push( that.bottomCell().links[1] );
+      else                 links.push( new linkProto(true)      );
+      if (that.rightCell()) links.push( that.rightCell().links[2] );
+      else                  links.push( new linkProto(true) );
+      return links;
+    }
+
+    that.cornerAt = function(i) {
+      if (i===0) return that.topRightCorner();
+      if (i===1) return that.bottomRightCorner();
+      if (i===2) return that.bottomLeftCorner();
+      if (i===3) return that.topLeftCorner();
+      return undefined;
+    }
+
+    that.cellAt = function(ind) {
+      if (ind===0) return that.topCell();
+      if (ind===1) return that.rightCell();
+      if (ind===2) return that.bottomCell();
+      if (ind===3) return that.leftCell();
+      return undefined;
+    }
+
+    that.diagCellAt = function(i) {
+      if (i===0) return that.topRightCell();
+      if (i===1) return that.bottomRightCell();
+      if (i===2) return that.bottomLeftCell();
+      if (i===3) return that.topLeftCell();
+      return undefined;
+    }
+
+    that.zoneAt = function(i) {
+      var c = that.cellAt(i);
+      if (c) return c.zone;
+      return OUT;
+    }
+
+    that.diagZoneAt = function(i) {
+      var c = that.diagCellAt(i);
+      if (c) return c.zone;
+      return OUT;
+    }
+
+    that.countsOppositeCorner = function(i) {
+      var counts = emptyCounts();
+      counts[that.links[(i+2)%4].state] += 1;
+      counts[that.links[(i+3)%4].state] += 1;
+      return counts;
+    }
+
+    that.countsInCorner = function(i) {
+      var counts = emptyCounts();
+      counts[that.links[i].state] += 1;
+      counts[that.links[(i+1)%4].state] += 1;
+      return counts;
+    }
+
+    that.ensureSpoke = function(i) {
+      var corner = that.cornerAt(i);
+      var chg = false;
+      if (corner[0].state===OFF) {
+        chg = chg || corner[1].state!==ON;
+        corner[1].state = ON;
+      }
+      if (corner[1].state===OFF) {
+        chg = chg || corner[0].state!==ON;
+        corner[0].state = ON;
+      }
+      return chg;
+    }
+
+    // return the indexes of the adjacent cells with ord = "ord"
+    that.getAdjs = function(ord) {
+      var out = [];
+      for (var i=0; i<4; i++) {
+        var adj = that.cellAt(i);
+        if (adj && adj.ord === ord)
+          out.push(i);
+      }
+      return out;
+    }
+
+    that.getAdjOrds = function() {
+      var out = [];
+      for (var i=0; i<4; i++) {
+        var adj = that.cellAt(i);
+        if (adj && adj.isOrd())
+          out.push(i);
+      }
+      return out;
+    }
+
+    // return the indexes of the diagonally adjacent cells with ord = "ord"
+    that.getDiags = function(ord) {
+      var out = [];
+      for (var i=0; i<4; i++) {
+        var diag = that.diagCellAt(i);
+        if (diag && diag.ord === ord)
+          out.push(i);
+      }
+      return out;
+    }
+
+    that.buildLinks = function() {
+      // sometimes create top and left links
+      var leftLink;
+      if (that.col===0)
+        leftLink = new linkProto();
+      else
+        leftLink = field[that.row][that.col-1].links[1];
+
+      var topLink;
+      if (that.row===0)
+        topLink = new linkProto();
+      else
+        topLink = field[that.row-1][that.col].links[2];
+
+      var rightLink = new linkProto();
+      var bottomLink  = new linkProto();
+
+
+      // remember in this cell what my links are
+      that.links[0] = topLink;
+      that.links[1] = rightLink;
+      that.links[2] = bottomLink;
+      that.links[3] = leftLink;
+    }
+
+    that.getPos = function() {
+      var x = cellSize * (that.col + 2);
+      var y = cellSize * (that.row + 2);
+      return [x, y];
+    }
+  // end of cellProto definition
+  }
+
+
+
+ /*     ## ######## ##       ########  ######## ########   ######  
+ ##     ## ##       ##       ##     ## ##       ##     ## ##    ## 
+ ##     ## ##       ##       ##     ## ##       ##     ## ##       
+ ######### ######   ##       ########  ######   ########   ######  
+ ##     ## ##       ##       ##        ##       ##   ##         ## 
+ ##     ## ##       ##       ##        ##       ##    ##  ##    ## 
+ ##     ## ######## ######## ##        ######## ##     ##  #####*/
+
+
+  function emptyCounts() {
+    var out = [];
+    out[ON] = out[OFF] = out[UNK] = 0;
+    return out;
+  }
+
+  function pointCounts(pnt) {
+    var counts = [];
+    counts[ON]=counts[OFF]=counts[UNK]=0;
+    for (var i=0; i<4; i++)
+      counts[pnt.links[i].state]++;
+    return counts;
+  }
+
+  function stateCount(list, state) {
+    var count = 0;
+    for (var i=0; i<list.length; i++)
+      if (list[i].state === state) count++;
+    return count;
+  }
+
+  function allHaveState(links, state) {
+    for (var i=0; i<links.length; i++)
+      if (links[i].state!==state)
+        return false;
+    return true;
+  }
+
+  var allON  = (links) => allHaveState(links, ON);
+  var allOFF = (links) => allHaveState(links, OFF);
+  var allUNK = (links) => allHaveState(links, UNK);
+
+
+  function otherZone(zone) {
+    if (zone===IN) return OUT;
+    if (zone===OUT) return IN;
+    return UNK;
+  }
+
+  function knownDifferent(zoneA, zoneB) {
+    if (zoneA===UNK || zoneB===UNK) return false;
+    if (zoneA===zoneB) return false;
+    return true;
+  }
+
+  function knownSame(zoneA, zoneB) {
+    if (zoneA===UNK || zoneB===UNK) return false;
+    return (zoneA===zoneB);
+  }
+  
+  // LOOP DETECTION
+  function maybeStartLine(link, id) {
+    if (link.state!==ON) return false; // only numbering confirmed lines
+    if (link.lineID!==0) return false; // this link is already numbered
+    link.lineID = id;
+    for (var i=0; i<link.allAdjs().length; i++) {
+      maybeStartLine(link.allAdjs()[i], id);
+    }
+    return true;
+  }
+
+  function numberLines() {
+    // clear all loop IDs
+    for (var i=0; i<allLinks.length; i++) {
+      allLinks[i].lineID = 0;
+      // allLinks[i].UNKLineID = 0;
+    }
+    
+    // write new line IDs to the confirmed lines
+    var lineID = 1;
+    for (var i=0; i<allLinks.length; i++)
+      if (maybeStartLine(allLinks[i],lineID))
+        lineID = lineID+1;
+    
+    return lineID;
+  }
+
+
+  function everyPoint(fn) {
+    var chg = false;
+    for (var i=0; i<allPoints.length; i++) {
+      if (fn(allPoints[i]))
+        chg = true;
+    }
+    return chg;
+  }
+
+  function anyPoint(fn) {
+    for (var i=0; i<allPoints.length; i++) {
+      if (fn(allPoints[i]))
+        return true;
+    }
+    return false;
+  }
+
+  function anyCell(fn, onlyUseful=true, onlyOrd=true) {
+    for (var i=0; i<allCells.length; i++) {
+      var cell = allCells[i];
+      if (onlyUseful && !cell.useful) continue;
+      if (onlyOrd && !cell.isOrd()) continue;
+      if (fn(cell)) return true;
+    }
+    return false;
+  }
+
+  function anyCellByOrd(ord, fn, onlyUseful=true, onlyOrd=true) {
+    for (var i=0; i<allCells.length; i++) {
+      var cell = allCells[i];
+      if (cell.ord!==ord) continue;
+      if (onlyUseful && !cell.useful) continue;
+      if (onlyOrd && !cell.isOrd()) continue;
+      if (fn(cell)) return true;
+    }
+    return false;
+  }
+
+  function everyCell(fn, onlyUseful=true, onlyOrd=true) {
+    var chg = false;
+    for (var i=0; i<allCells.length; i++) {
+      var cell = allCells[i];
+      if (onlyUseful && !cell.useful) continue;
+      if (onlyOrd && !cell.isOrd()) continue;
+      if (fn(cell)) chg = true;
+    }
+    return chg;
+  }
+
+  function everyCellByOrd(ord, fn, onlyUseful=true, onlyOrd=true) {
+    var chg = false;
+    for (var i=0; i<allCells.length; i++) {
+      var cell = allCells[i];
+      if (cell.ord!==ord) continue;
+      if (onlyUseful && !cell.useful) continue;
+      if (onlyOrd && !cell.isOrd()) continue;
+      if (fn(cell)) chg = true;
+    }
+    return chg;
+  }
+  
+  function or(a, b) { return a || b; };
+
+  function BP(val, str) {
+    if (val) consoleLog(str);
+    return val;
+  }
+
+  function repeatWhileTrue(fn) {
+    var chg = false;
+    while (fn()) chg = true;
+    return chg;
+  }
+
+
+  const INCOMPLETE = 50;
+  const COMPLETE   = 100;
+  const ERROR      = 70;
+
+  function checkErrors(log = true) {
+    var isComplete = true;
+    for (var i=0; i<allCells.length; i++) {
+      if (allCells[i].unkCount()!==0)
+        isComplete = false;
+    }
+    
+    if (isComplete) {
+      var hasErrors = false;
+      // check that every cell has the right number of links
+      for (var i=0; i<allCells.length; i++) {
+        if (allCells[i].isOrd() && allCells[i].onCount()!==allCells[i].ord) {
+          hasErrors = true;
+        }
+      }
+      for (var i=0; i<allPoints.length; i++) {
+        if (allPoints[i].isFucked()) {
+          hasErrors = true;
+        }
+      }
+      if (numberLines()!==2) {
+        hasErrors = true;
+      }
+      if (hasErrors) {
+        log && consoleError("Puzzle completed, but with errors!");
+        return ERROR;
+      } else {
+        log && consoleWarn("Puzzle completed. No errors found.");
+        return COMPLETE;
+      }
+    } else {
+      log && consoleError("Puzzle could not be completed.");
+      return INCOMPLETE;
+    }
+  }
+
+
+
+
+
+
+  /*####   #######  ##       ##     ## #### ##    ##  ######   
+ ##    ## ##     ## ##       ##     ##  ##  ###   ## ##    ##  
+ ##       ##     ## ##       ##     ##  ##  ####  ## ##        
+  ######  ##     ## ##       ##     ##  ##  ## ## ## ##   #### 
+       ## ##     ## ##        ##   ##   ##  ##  #### ##    ##  
+ ##    ## ##     ## ##         ## ##    ##  ##   ### ##    ##  
+  ######   #######  ########    ###    #### ##    ##  #####*/
+
+
+function makeProgress(fromButton = false) {
+  // basic points analysis (continuing lines, turning off links, etc)
+  if (anyPoint(basicPoints)) return true;
+
+  // cell has enough ONs or OFFs to decide the rest
+  if (anyCell(processOrdinalComplete)) return true;
+
+  // basic zone movements
+  if (doZoneAnalysis && BP(repeatWhileTrue(() => everyCell(linksDictateZones, false, false)), "Updated zones based on known links.")) return true;
+
+  // use annotations
+  if (anyPoint(writeAnnotationsOnPoint)) return true;
+
+  // annotate points
+  if (BP(repeatWhileTrue(() => everyPoint(annotatePoint) || everyCell(writeDoubles)), "Updated point annotations.")) return true;
+
+  // annotate points
+  if (BP(repeatWhileTrue(() => everyPoint(propagateAnnotationsOnPoint)), "Propagated annotations.")) return true;
+
+  // annotations
+  if (everyCellByOrd(2, processTwoAnnotations)) return true;
+
+  // three cell has an ON spoke - sets far links to ON.
+  if (anyCell(processThreeSpokes)) return true;
+
+  // one cell has an ON spoke - sets far links to OFF.
+  if (anyCell(processOneSpokes)) return true;
+
+  // cell has two consecutive unknowns - enable a spoke.
+  if (anyCell(processTwoUnknowns)) return true;
+
+  // check if there is exactly one unknown spoke. This will be solved via parity.
+  if (anyCell(processOneUnknownSpoke, false, false)) return true;
+
+  // consider loops
+  if (considerLoops()) return true;
+
+  // zones can dictate link states
+  if (doZoneAnalysis && anyCell(zonesDictateLinks, false, false)) return true;
+
+  // zone colours can jump over spokes
+  if (doZoneAnalysis && anyCell(spokesDictateZones, false, false)) return true;
+
+  return false;
+}
+  
+
+  /*###  ###### #      #       ####
+  #    # #      #      #      #
+  #      #####  #      #       ####
+  #      #      #      #           #
+  #    # #      #      #      #    #
+   ####  ###### ###### ######  ##*/
+
+  function processOrdinalComplete(cell) {
+    // enough ONs already
+    if (cell.onCount()===cell.ord) {
+      cell.useful = false;
+      var chg = false;
+      for (var i=0; i<4; i++) {
+        if (cell.links[i].state===UNK) {
+          chg = true;
+          cell.links[i].state = OFF;
+        }
+      }
+      if (chg) {
+        consoleLog("A %i cell is completed.", cell.ord);
+        return true;
+      }
+    }
+
+    // enough OFFs already
+    if (cell.offCount()===4-cell.ord) {
+      cell.useful = false;
+      var chg = false;
+      for (var i=0; i<4; i++) {
+        if (cell.links[i].state===UNK) {
+          chg = true;
+          cell.links[i].state = ON;
+        }
+      }
+      if (chg) {
+        consoleLog("An ordinal cell is completed.");
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // write doubles where they are obvious
+  function writeDoubles(cell) {
+    if (!cell.isOrd()) return false;
+
+    var chg = false;
+    for (var i=0; i<4; i++) {
+      var countsHere = cell.countsInCorner(i);
+      var countsOpp  = cell.countsOppositeCorner(i);
+      var double     = cell.doubleIn(i);
+
+      if (countsHere[UNK]===2) {
+        // we can't have two (more) ONs here.
+        if (countsOpp[ON]+2 > cell.ord) {
+          if (double.setON())
+            chg = true;
+        }
+        // we can't have two (more) OFFs here.
+        else if (countsOpp[OFF]+2 > 4-cell.ord) {
+          if (double.setOFF())
+            chg = true;
+        }
+      }
+    }
+    return chg;
+  }
+
+  function processTwoUnknowns(cell) {
+    if (cell.unkCount()!==2) return false;
+    // check if the unknowns are consecutive
+    for (var i=0; i<4; i++) {
+      var i2 = (i+1)%4;
+      if (cell.links[i].state===UNK && cell.links[i2].state===UNK) {
+        // they are consecutive
+        if (cell.spokeAt(i).state===UNK) {
+          cell.spokeAt(i).state = ON;
+          consoleLog("An ordinal cell has exactly two consecutive unknowns. There must be a spoke between them.");
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function processLineReaching3(cell) {
+    if (cell.ord!==3) return false;
+    var chg = false;
+    for (var i=0; i<4; i++) {
+      var corner = cell.cornerAt(i);
+      if (stateCount(corner, ON)===1) {
+        // turn off the other corner option
+        for (var c=0; c<2; c++)
+          if (corner[c].state===UNK) {
+            chg = true;
+            corner[c].state = OFF;
+          }
+        for (var off=2; off<4; off++) {
+          var i2 = (i+off)%4;
+          chg = chg || cell.links[i2].state!==ON;
+          cell.links[i2].state = ON;
+        }
+      }
+    }
+    if (chg) {
+      consoleLog("A line reaching a three cell means the opposite edges must be ON.");
+      return true;
+    }
+    return false;
+  }
+
+  function processSpokes(cell) {
+    for (var i=0; i<4; i++) {
+      if (cell.spokeAt(i).state===ON) {
+        if (cell.links[i].state===UNK && cell.links[(i+1)%4].state===UNK) {
+          // spoke is not yet decided.
+          var counts = cell.countsOppositeCorner(i);
+          var chg = false;
+          if (counts[ON] + 1 === cell.ord) {
+            // this spoke will complete the cell's allowed ONs
+            chg = chg || cell.links[(i+2)%4].state===UNK || cell.links[(i+3)%4].state===UNK;
+            if (cell.links[(i+2)%4].state===UNK)
+              cell.links[(i+2)%4].state = OFF;
+            if (cell.links[(i+3)%4].state===UNK)
+              cell.links[(i+3)%4].state = OFF;
+          }
+          if (counts[OFF] + 1 === 4-cell.ord) {
+            // this spoke will complete the cell's allowed OFFs
+            chg = chg || cell.links[(i+2)%4].state===UNK || cell.links[(i+3)%4].state===UNK;
+            if (cell.links[(i+2)%4].state===UNK)
+              cell.links[(i+2)%4].state = ON;
+            if (cell.links[(i+3)%4].state===UNK)
+              cell.links[(i+3)%4].state = ON;
+          }
+          if (chg) {
+            consoleLog("A %i cell has a spoke that will complete it. The opposite links are therefore decided.", cell.ord);
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  function processThreeSpokes(cell) {
+    if (cell.ord!==3) return false;
+    var chg = false;
+    for (var i=0; i<4; i++) {
+      if (cell.spokeAt(i).state===ON) {
+        for (var off=2; off<4; off++) {
+          var i2 = (i+off)%4;
+          chg = chg || cell.links[i2].state!==ON;
+          cell.links[i2].state = ON;
+        }
+        if (chg) {
+          consoleLog("A 3 cell has an ON spoke, so the far links must be ON.");
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+
+  function processTwoAnnotations(cell) {
+    if (cell.ord!==2) return false;
+
+    for (var i=0; i<4; i++) {
+      var spoke = cell.spokeAt(i);
+      var double = cell.doubleIn(i);
+
+      // if there's an ON spoke, the spoke is copied to the other side
+      if (spoke.state===ON) {
+        var farSpoke = cell.spokeAt((i+2)%4);
+        if (farSpoke.state===UNK) {
+          farSpoke.state = ON;
+          consoleLog("A 2 cell has a spoke on one point, so its opposite point is also a spoke.");
+          return true;
+        }
+      }
+      
+      // if there's an OFF spoke, it's copied to the other side, and the wing spokes are ON.
+      if (spoke.state===OFF) {
+        var farSpoke = cell.spokeAt((i+2)%4);
+        var leftSpoke = cell.spokeAt((i+1)%4);
+        var rightSpoke = cell.spokeAt((i+3)%4);
+        if (farSpoke.state===UNK || leftSpoke.state===UNK || leftSpoke.state===UNK) {
+          farSpoke.state = OFF;
+          leftSpoke.state = ON;
+          rightSpoke.state = ON;
+          consoleLog("A 2 cell has a spoke OFF at one point, so its opposite point is also an OFF spoke, and the spokes on its sides must be ON.");
+          return true;
+        }
+      }
+
+      // if there's a double, the double flips to the other side
+      if (double.state===ON) {
+        if (cell.doubleIn((i+2)%4).setOFF()) {
+          consoleLog("A 2 cell has a double which gets flipped and inverted onto the other side.");
+          return true;
+        }
+      } else if (double.state===OFF) {
+        if (cell.doubleIn((i+2)%4).setON()) {
+          consoleLog("A 2 cell has a double which gets flipped and inverted onto the other side.");
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+
+  function processOneSpokes(cell) {
+    if (cell.ord!==1) return false;
+    var chg = false;
+    for (var i=0; i<4; i++) {
+      if (cell.spokeAt(i).state===ON) {
+        chg = chg || cell.spokeAt((i+2)%4).state===UNK;
+        cell.spokeAt((i+2)%4).state = OFF;
+        for (var off=2; off<4; off++) {
+          var i2 = (i+off)%4;
+          chg = chg || cell.links[i2].state!==OFF;
+          cell.links[i2].state = OFF;
+        }
+      }
+      if (chg) {
+        consoleLog("A 1 cell has an ON spoke, so the far links must be OFF.");
+        return true;
+      }
+    }
+    return false;
+  }
+
+
+  function processOneUnknownSpoke(cell) {
+    var counts = emptyCounts();
+    for (var i=0; i<4; i++)
+      counts[cell.spokeAt(i).state] += 1;
+    
+    if (counts[UNK]===1) {
+      var newState = counts[ON]%2===0 ? OFF : ON;
+      for (var i=0; i<4; i++) {
+        if (cell.spokeAt(i).state===UNK) {
+          cell.spokeAt(i).state = newState;
+          consoleLog("The single unknown spoke of a cell was decided by parity.");
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+
+  function processTwoCorners(cell) {
+    if (cell.ord!==2) return false;
+
+    for (var i=0; i<2; i++) {
+      var corner1 = cell.cornerAt(i);
+      if (stateCount(corner1, ON)===1 && stateCount(corner1, UNK)===1) {
+        var corner2 = cell.cornerAt((i+2)%4);
+        if (stateCount(corner2, ON)===1 && stateCount(corner2, UNK)===1) {
+          // opposite corners are both ON/UNK. Make both spokes.
+          if (cell.spokeAt(i).state===UNK || cell.spokeAt((i+2)%4).state===UNK) {
+            cell.spokeAt(i).state = ON;
+            cell.spokeAt((i+2)%4).state = ON;
+            consoleLog("A 2 cell has potential spokes on opposing outer corners, so both must be spokes.");
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+
+  function processAwayCorners(cell) {
+    if (cell.ord===1) return false; // this never helps with 1 cells
+
+    for (var i=0; i<4; i++) {
+      var corner = cell.cornerAt(i);
+      if (cell.countsOppositeCorner(i)[OFF]+2>4-cell.ord) {
+        // we can't take two more OFFs around the corner at i.
+        if (stateCount(corner, ON)===1 && stateCount(corner, UNK)===1) {
+          // the away corner already has one ON. turn the other OFF.
+          for (var c=0; c<2; c++) if (corner[c].state===UNK) corner[c].state = OFF;
+          consoleLog("A cell can't take another two OFFs, so one of it's corners can't be an outside corner, so a link is turned OFF.");
+          return true;
+        }
+        else if (stateCount(corner,UNK)>0) {
+          // the away corner is not decided.
+          var dAdj = cell.diagCellAt(i);
+          if (dAdj && dAdj.isOrd() && dAdj.countsInCorner(i)[UNK]>0 && dAdj.countsInCorner(i)[OFF]+1===4-dAdj.ord) {
+            // another OFF in the far corner would turn on the two links we can't have ON.
+            // so turn ON the undecided links in the opposite corner.
+            for (var off=0; off<2; off++) {
+              var i2 = (i+off)%4;
+              if (dAdj.links[i2].state === UNK) dAdj.links[i2].state = ON;
+            }
+            consoleLog("A cell can't take another two OFFs, but another OFF on the far corner of an adjacent cell would give this cell two more OFFs. Turning an UNK link ON.");
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+
+  function processCellDoubles(cell, debug=false) {
+    var chg = false;
+
+    // threes can have no double OFFs
+    if (cell.ord===3)
+      for (var i=0; i<4; i++)
+        if (cell.doubleIn(i).setOFF())
+          chg = true;
+
+    // ones can have no double ONs
+    if (cell.ord===1)
+      for (var i=0; i<4; i++)
+        if (cell.doubleIn(i).setON()) chg = true;
+
+
+    // twos flip doubles on opposite corners
+    if (cell.ord===2) {
+      for (var i=0; i<4; i++) {
+        if (cell.doubleIn(i).state===ON)
+          if (cell.doubleIn((i+2)%4).setOFF())
+            chg = true;
+        if (cell.doubleIn(i).state===OFF)
+          if (cell.doubleIn((i+2)%4).setON())
+            chg = true;
+      }
+    }
+
+    // check if existing links and doubles dictate links
+    for (var i=0; i<4; i++) {
+      var doubleState = cell.doubleIn(i).state;
+      var spokeState  = cell.spokeAt(i).state;
+      if (doubleState!==UNK) {
+        var counts = cell.countsInCorner(i);
+        if (doubleState===OFF && counts[UNK]===1 && counts[OFF]===1) {
+          // this corner can't have two OFFs, but it already has one OFF.
+          chg = true;
+          for (var off=0; off<2; off++) {
+            var i2 = (i+off)%4;
+            if (cell.links[i2].state===UNK) cell.links[i2].state = ON;
+          }
+        }
+        if (doubleState===ON && counts[UNK]===1 && counts[ON]===1) {
+          // this corner can't have two ONs, but it already has one ON.
+          chg = true;
+          for (var off=0; off<2; off++) {
+            var i2 = (i+off)%4;
+            if (cell.links[i2].state===UNK) cell.links[i2].state = OFF;
+          }
+        }
+        if (spokeState===OFF && doubleState===ON && counts[UNK]===2) {
+          chg = true;
+          cell.links[i].state = OFF;
+          cell.links[(i+1)%4].state = OFF;
+        }
+        if (spokeState===OFF && doubleState===OFF && counts[UNK]===2) {
+          chg = true;
+          cell.links[i].state = ON;
+          cell.links[(i+1)%4].state = ON;
+        }
+      }
+    }
+    return chg;
+  }
+
+  
+  function linksDictateZones(cell) {
+    if (cell.zone!==UNK) return false;
+    for (var i=0; i<4; i++) {
+      if (cell.zoneAt(i)!==UNK) {
+        if (cell.links[i].state===OFF) {
+          cell.zone = cell.zoneAt(i);
+          // consoleLog("An OFF link allows a zone to flood into a cell.");
+          return true;
+        }
+        if (cell.links[i].state===ON) {
+          cell.zone = otherZone(cell.zoneAt(i));
+          // consoleLog("An ON link flips a color into a cell.");
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function spokesDictateZones(cell) {
+    if (cell.zone===UNK) return false;
+    for (var i=0; i<4; i++) {
+      if (cell.diagZoneAt(i)===UNK) {
+        if (cell.sideSpokeAt(i).state===ON) {
+          cell.diagCellAt(i).zone = otherZone(cell.zone);
+          consoleLog("A zone color inverted diagonally over an OFF side spoke.");
+          return true;
+        }
+        else if (cell.sideSpokeAt(i).state===OFF) {
+          cell.diagCellAt(i).zone = cell.zone;
+          consoleLog("A zone color flowed diagonally over an OFF side spoke.");
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function zonesDictateLinks(cell) {
+    if (cell.zone===UNK) return false;
+    for (var i=0; i<4; i++) {
+      if (cell.links[i].state===UNK) {
+        if (knownSame(cell.zone, cell.zoneAt(i))) {
+          cell.links[i].state = OFF;
+          consoleLog("Two adjacent cells are in the same zone, so the link between them must be OFF.");
+          return true;
+        }
+        if (knownDifferent(cell.zone, cell.zoneAt(i))) {
+          cell.links[i].state = ON;
+          consoleLog("Two adjacent cells are in different zones, so the link between them must be ON.");
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  
+ /*####   ####  # #    # #####  ####
+  #    # #    # # ##   #   #   #
+  #    # #    # # # #  #   #    ####
+  #####  #    # # #  # #   #        #
+  #      #    # # #   ##   #   #    #
+  #       ####  # #    #   #    ###*/
+
+  // make annotations on points
+  function annotatePoint(pnt) {
+    var counts = pointCounts(pnt);
+    var links = pnt.links;
+    var spokes = pnt.spokes;
+    var doubles = pnt.doubles;
+    var chg = false;
+
+    // if the links say this is an ON or OFF spoke, mark it as such
+    for (var i=0; i<4; i++) {
+      if (spokes[i].state===UNK) {
+        var twolinks = [links[i], links[(i+1)%4]];
+        if (stateCount(twolinks,ON)===1 && stateCount(twolinks,OFF)===1) {
+          spokes[i].state = ON;
+          doubles[i].state = SPOKE;
+        }
+        if (stateCount(twolinks,ON)===2 || stateCount(twolinks,OFF)===2)
+          spokes[i].state = OFF;
+        chg = chg || spokes[i].state!==UNK;
+      }
+    }
+
+    // mark basic doubles info based on present links
+    for (var i=0; i<4; i++) {
+      if (links[i].state===ON) {
+        // console.log("var", i);
+        if (doubles[i].setOFF()) chg = true;
+        if (doubles[(i+3)%4].setOFF()) chg = true;
+      } else if (links[i].state===OFF) {
+        if (doubles[i].setON()) chg = true;
+        if (doubles[(i+3)%4].setON()) chg = true;
+      }
+    }
+
+    return chg;
+  }
+
+  function basicPoints(pnt) {
+    var counts = pointCounts(pnt);
+    var links = pnt.links;
+
+    // if two are ON, set the others to OFF
+    if (counts[ON]===2 && counts[OFF]!==2) {
+      for (var i=0; i<4; i++)
+        if (links[i].state!==ON)
+          links[i].state = OFF;
+      consoleLog("Turned off links around a continued line.");
+      return true;
+    }
+
+    // if three are OFF, set the last one to OFF.
+    if (counts[OFF]===3) {
+      for (var i=0; i<4; i++)
+        links[i].state = OFF;
+      consoleLog("Turned off a dead-end link.");
+      return true;
+    }
+
+    // if one is ON and two are OFF, set the last one to ON.
+    if (counts[ON]===1 && counts[OFF]===2) {
+      for (var i=0; i<4; i++)
+        if (links[i].state===UNK)
+          links[i].state = ON;
+      consoleLog("Continued a line.");
+      return true;
+    }
+    return false;
+  }
+
+  function writeFromAnnotations(pnt) {
+    // count the ONs, the OFFs, and the UNKs
+    var counts = pointCounts(pnt);
+    var links = pnt.links;
+    var spokes = pnt.spokes;
+    var doubles = pnt.doubles;
+    var chg = false;
+
+    // if a spoke's state is known, this may turn on or off a link.
+    for (var i=0; i<4; i++) {
+      var twolinks = [links[i], links[(i+1)%4]];
+      if (spokes[i].state===ON && stateCount(twolinks,UNK)===1) {
+        for (var i2=0; i2<2; i2++)
+          if (twolinks[i2].state===ON)
+            twolinks[(i2+1)%2].state = OFF;
+          else if (twolinks[i2].state===OFF)
+            twolinks[(i2+1)%2].state = ON;
+        chg = true;
+      }
+      if (spokes[i].state===OFF && stateCount(twolinks,UNK)===1) {
+        for (var i2=0; i2<2; i2++)
+          if (twolinks[i2].state===ON)
+            twolinks[(i2+1)%2].state = ON;
+          else if (twolinks[i2].state===OFF)
+            twolinks[(i2+1)%2].state = OFF;
+        chg = true;
+      }
+    }
+    return chg;
+  }      
+
+  function propagateAnnotationsOnPoint(pnt) {
+    // count the ONs, the OFFs, and the UNKs
+    var spokes = pnt.spokes;
+    var doubles = pnt.doubles;
+    var chg = false;
+
+    // if one corner can't be double OFF, the other side of that corner
+    // can't be double ON.
+    for (var i=0; i<4; i++) {
+      if (doubles[i].state===OFF && doubles[(i+2)%4].setON())
+        chg = true;
+    }
+
+    // if one corner can't be a double ON, and there is a sidespoke ON to that corner,
+    // the other corner can't be a double OFF.
+    for (var i=0; i<4; i++) {
+      if (doubles[i].state===ON && spokes[(i+1)%4].state===ON)
+        if (doubles[(i+2)%4].setOFF())
+          chg = true;
+    }
+
+    // if there's a sidespoke that's OFF, this and the opposite both can't be double ONs.
+    for (var i=0; i<4; i++) {
+      if (spokes[(i+1)%4].state===OFF) {
+        if (doubles[i].setON()) chg = true;
+        if (doubles[(i+2)%4].setON()) chg = true;
+      }
+    }
+
+    return chg;
+  }
+
+  function writeAnnotationsOnPoint(pnt) {
+    var spokes = pnt.spokes;
+    var doubles = pnt.doubles;
+    var links = pnt.links;
+
+    for (var i=0; i<4; i++) {
+      var corner = [links[i], links[(i+1)%4]];
+
+      // ignore this corner if it is fully de
+      // if (stateCount(corner,UNK)===2) continue;
+
+      // ON spoke and one unknown.
+      if (spokes[i].state===ON && stateCount(corner, UNK)===1) {
+        if (corner[0].state===ON)  corner[1].state = OFF;
+        if (corner[0].state===OFF) corner[1].state = ON;
+        if (corner[1].state===ON)  corner[0].state = OFF;
+        if (corner[1].state===OFF) corner[0].state = ON;
+        consoleLog("An ON spoke on a corner with one known dictates the other known as the opposite.");
+        return true;
+      }
+
+      // OFF spoke and one unknown
+      if (spokes[i].state===OFF && stateCount(corner, UNK)===1) {
+        if (stateCount(corner, ON)===1)
+          corner[0].state = corner[1].state = ON;
+        else
+          corner[0].state = corner[1].state = OFF;
+        consoleLog("An OFF spoke on a corner with one known dictates the other known as the same value.");
+        return true;
+      }
+
+      // OFF spoke + OFF double = two ONs.
+      if (spokes[i].state===OFF && doubles[i].state===OFF) {
+        if (links[i].state===UNK || links[(i+1)%4].state===UNK) {
+          links[i].state = ON;
+          links[(i+1)%4].state = ON;
+          links[(i+2)%4].state = OFF;
+          links[(i+3)%4].state = OFF;
+          consoleLog("A corner must be a double and must not be a double OFF, so it must be a double ON.");
+          return true;
+        }
+      }
+
+      // OFF spoke + ON double = two OFFs.
+      if (spokes[i].state===OFF && doubles[i].state===ON) {
+        if (links[i].state===UNK || links[(i+1)%4].state===UNK) {
+          links[i].state = OFF;
+          links[(i+1)%4].state = OFF;
+          consoleLog("A corner must be a double and must not be a double ON, so it must be a double OFF.");
+          return true;
+        }
+      }
+
+      // one ON and double ON = the other one OFF
+      // if (doubles[i].state = ON && stateCount(corner, ON)===1 && stateCount(corner, UNK)===1)
+    }
+    return false;
+  }
+
+
+  
+ /*       ####   ####  #####   ####  
+  #      #    # #    # #    # #      
+  #      #    # #    # #    #  ####  
+  #      #    # #    # #####       # 
+  #      #    # #    # #      #    # 
+  ######  ####   ####  #       ##*/
+
+  function considerLoops() {
+    // put numbers on all ON links, to link them up
+    numberLines();
+
+    // look for an unknown link with the same lineID on both sides
+    for (var i=0; i<allLinks.length; i++) {
+      var link = allLinks[i];
+      if (link.state === UNK) {
+        var lineID = -1;
+        for (var a=0; a<link.allAdjs().length; a++) {
+          var adj = link.allAdjs()[a];
+          if (adj.lineID>0 && lineID === -1)
+            lineID = adj.lineID;
+          else if (lineID>0 && adj.lineID === lineID) {
+            // the same loop id is on both sides of this link
+            consoleLog("Found a link that would close a loop.");
+            link.state = OFF;
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+
+
+  //////////////////////////////////////////////////////////////////////////////////////////
+
+
+  $(document).ready(onReady);
+    </script>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <button onclick="javascript:meowButton();">Solve</button>
+  </body>
+</html>
