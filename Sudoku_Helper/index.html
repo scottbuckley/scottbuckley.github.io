@@ -21,8 +21,8 @@
       const data_swordfish    = "050030602642895317037020800023504700406000520571962483214000900760109234300240170";
       const data_swordfish2   = "020040069003806200060020000890500010000000000030001026000010070009604300270050090";
       const data_colors1      = "007083600039706800826419753640190387080367000073048060390870026764900138208630970";
-      const data_finned1      = "030605000800000030004010059000701006060000010500302000950020300070000008000107090";
-      const data_default = data_finned1; // this one will be loaded automatically.
+      const data_luca1        = "030605000800000030004010059000701006060000010500302000950020300070000008000107090";
+      const data_default = data_luca1; // this one will be loaded automatically.
 
       // Flags to allow/disallow various solving strategies.
       // "simple" strategies
@@ -40,7 +40,6 @@
       const useZW = true; // xyz-wings
       const useSF = true; // swordfish
       const useSC = true; // simple coloring
-      const useFX = false; // finned x-wings
 
       // how long to wait between applying solving steps.
       const stepDelay = 0;
@@ -70,6 +69,14 @@
         }
         // show the board
         refresh();
+
+        // give cells and candidates behaviour
+        initCellClicks();
+      }
+
+
+      function initCellClicks() {
+        
       }
 
       // display the current state of the sudoku board.
@@ -148,10 +155,6 @@
         } else if (useSF && swordfish()) {
           // swordfish
           flash && flashButton("sfButton");
-          return true;
-        } else if (useFX && FinnedXWings()) {
-          // finned x-wings
-          flash && flashButton("fxButton");
           return true;
         } else if (useSC && simpleColors()) {
           // simple coloring
@@ -912,75 +915,6 @@
         return XWingsAux(sudoku, "rows") || XWingsAux(sudokuCols, "cols");
       }
 
-      function blockInd(cellInd) {
-        if (cellInd<3) return 0;
-        if (cellInd<6) return 2;
-        return 3;
-      }
-
-      // input: list of nine 0s and 1s representing candidate presence.
-      // twoMap has exactly two 1s and moreMap has 3 or 4.
-      function FinnedMapMatch(twoMap, moreMap) {
-        var y1 = getFirst1(twoMap);
-        var y2 = getSecond1(twoMap);
-        var b1 = blockInd(y1);
-        var b2 = blockInd(y2);
-
-        if (b1===b2) { // in the same block
-          for (var i=0; i<)
-        }
-
-        for (var bi=0; bi<3; bi++) { // the block of 3 cells
-          for (var i=bi*3; i<(bi+1)*3; i++) {
-
-          }
-
-          for (var si=0; si<3; si++) { // the 'sub-index' in that block
-            var i = bi*3+si;
-
-          }
-        }
-      }
-
-      function FinnedXWingsAux(groups, groupType) {
-        for (var v=0; v<9; v++) { // values
-          var groupInds = [];
-          var otherGroupInds = [];
-          var maps = [];
-          var otherMaps = [];
-          for (var g=0; g<9; g++) {
-            var group = groups[g];
-            var cellCount = countPossibleCells(group, v);
-            if (cellCount === 2) {
-              groupInds.push(g);
-              maps.push(getGroupMap(group, v));
-            } else if (cellCount === 3 || cellCount === 4) {
-              otherGroupInds.push(g);
-              otherMaps.push(getGroupMap(group, v));
-            }
-          }
-          // at this point groupInds contains the group index of every group with exactly 2 candidates
-          // also 'maps' contains the string map (0s and 1s) of value 'v' for that group
-          for (var gi=0; gi<groupInds.length; gi++) {
-            for (var ogi=0; ogi<otherGroupInds.length; ogi++) {
-              var twoMap = maps[gi];
-              var moreMap = otherMaps[ogi];
-              if (FinnedMapMatch(twoMap, moreMap)) {
-                // we have a finned x-wing
-                var twoInd = groupInds[gi];
-                var moreInd = otherGroupInds[ogi];
-                console.log("finned x-wing found on " + groupType + " " + twoInd + " and (fin) " + moreInd);
-              }
-            }
-          }
-        }
-        return false;
-      }
-
-      function FinnedXWings() {
-        return FinnedXWingsAux(sudoku, "rows") || FinnedXWingsAux(sudokuCols, "cols");
-      }
-
       function candidateXOR(cell1, cell2) {
         var out = [];
         for (var v=0; v<9; v++)
@@ -1558,9 +1492,8 @@
 
       // Button actions.
       function buttonCall(solvingFunc) {
-        var changed = solvingFunc();
+        solvingFunc();
         refresh();
-        return changed;
       }
 
       function caButton() {
@@ -1601,13 +1534,6 @@
 
       function xwButton() {
         buttonCall(XWings);
-      }
-
-      function fxButton() {
-        if (buttonCall(FinnedXWings))
-          console.log("finned x-wings worked");
-        else
-          console.log("finned x-wings did not work");
       }
 
       function ywButton() {
@@ -2143,7 +2069,6 @@
     <button id="ywButton" onclick="javascript:ywButton();">Y-Wings</button>
     <button id="zwButton" onclick="javascript:zwButton();">Z-Wings</button>
     <button id="sfButton" onclick="javascript:sfButton();">Swordfish</button>
-    <button id="fxButton" onclick="javascript:fxButton();">Finned X-Wings</button>
     <button id="scButton" onclick="javascript:scButton();">Simple Coloring</button>
     <button onclick="javascript:checkButton();">Check Errors</button>
     <table id="tbl"></table>
