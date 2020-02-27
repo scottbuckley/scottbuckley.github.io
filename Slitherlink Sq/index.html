@@ -19,6 +19,8 @@
   const OFF = 1;
   const ON  = 2;
 
+  const SPECIAL = 94;
+
   const SPOKE = 3; // for doubles
 
   const IN  = 2
@@ -575,6 +577,8 @@
         ctx.fillStyle = unkColor;
       } else if (that.zone===OUT) {
         ctx.fillStyle = outColor;
+      } else if (that.zone===SPECIAL) {
+        ctx.fillStyle = '#0002';
       }
       ctx.fillRect(x, y, cellSize, cellSize);
     }
@@ -918,34 +922,6 @@
     if (zoneA===UNK || zoneB===UNK) return false;
     return (zoneA===zoneB);
   }
-  
-  // LOOP DETECTION
-  function maybeStartLine(link, id) {
-    if (link.state!==ON) return false; // only numbering confirmed lines
-    if (link.lineID!==0) return false; // this link is already numbered
-    link.lineID = id;
-    for (var i=0; i<link.allAdjs().length; i++) {
-      maybeStartLine(link.allAdjs()[i], id);
-    }
-    return true;
-  }
-
-  function numberLines() {
-    // clear all loop IDs
-    for (var i=0; i<allLinks.length; i++) {
-      allLinks[i].lineID = 0;
-      // allLinks[i].UNKLineID = 0;
-    }
-    
-    // write new line IDs to the confirmed lines
-    var lineID = 1;
-    for (var i=0; i<allLinks.length; i++)
-      if (maybeStartLine(allLinks[i],lineID))
-        lineID = lineID+1;
-    
-    return lineID;
-  }
-
 
   function everyPoint(fn) {
     var chg = false;
@@ -1110,14 +1086,20 @@ function makeProgress(fromButton = false) {
   // check if there is exactly one unknown spoke. This will be solved via parity.
   if (anyCell(processOneUnknownSpoke, false, false)) return true;
 
-  // consider loops
-  if (considerLoops()) return true;
-
   // zones can dictate link states
   if (doZoneAnalysis && anyCell(zonesDictateLinks, false, false)) return true;
 
-  // zone colours can jump over spokes
+  // zones can jump over spokes
   if (doZoneAnalysis && anyCell(spokesDictateZones, false, false)) return true;
+
+  // zone neighbours
+  // if (anyCell(processZoneNeighbours)) return true;
+
+  // consider loops
+  if (considerLoops()) return true;
+
+  // search for bridges
+  if (BP(attemptBridgeSearch(), "Found 'bridges' between IN cells that would create unlinkable IN regions.")) return true;
 
   return false;
 }
@@ -1129,6 +1111,37 @@ function makeProgress(fromButton = false) {
   #      #      #      #           #
   #    # #      #      #      #    #
    ####  ###### ###### ######  ##*/
+
+  function processZoneNeighbours(cell) {
+    if (!cell.isOrd()) return false;
+
+    // these strategies are for zones with an unknown zone.
+    if (cell.zone!==UNK) return false;
+
+
+    // count adjacent zones.
+    var counts = [];
+    counts[IN] = counts[OUT] = counts[UNK] = 0;
+    for (var i=0; i<4; i++)
+      counts[cell.zoneAt(i)] += 1;
+
+    //ordinals:
+    // zero: will already be surrounded by OFFs, so zones will sort themselves.
+    
+    // one: can do something
+    if (counts[IN]>=2 || counts[OUT]>=2) {
+      if (counts[IN]>=2)  cell.zone = IN;
+      if (counts[OUT]>=2) cell.zone = OUT;
+      zonesDictateLinks(cell);
+      return true;
+    }
+
+    // two: maybe spokes?
+
+    // three: if there are two of one zone adj, i am not that color
+
+    return false;
+  }
 
   function processOrdinalComplete(cell) {
     // enough ONs already
@@ -1553,7 +1566,7 @@ function makeProgress(fromButton = false) {
     return false;
   }
 
-  
+
  /*####   ####  # #    # #####  ####
   #    # #    # # ##   #   #   #
   #    # #    # # # #  #   #    ####
@@ -1761,6 +1774,33 @@ function makeProgress(fromButton = false) {
   #      #    # #    # #      #    # 
   ######  ####   ####  #       ##*/
 
+  function maybeStartLine(link, id) {
+    if (link.state!==ON) return false; // only numbering confirmed lines
+    if (link.lineID!==0) return false; // this link is already numbered
+    link.lineID = id;
+    for (var i=0; i<link.allAdjs().length; i++) {
+      maybeStartLine(link.allAdjs()[i], id);
+    }
+    return true;
+  }
+
+  function numberLines() {
+    // clear all loop IDs
+    for (var i=0; i<allLinks.length; i++) {
+      allLinks[i].lineID = 0;
+      // allLinks[i].UNKLineID = 0;
+    }
+    
+    // write new line IDs to the confirmed lines
+    var lineID = 1;
+    for (var i=0; i<allLinks.length; i++)
+      if (maybeStartLine(allLinks[i],lineID))
+        lineID = lineID+1;
+    
+    return lineID;
+  }
+
+
   function considerLoops() {
     // put numbers on all ON links, to link them up
     numberLines();
@@ -1787,6 +1827,178 @@ function makeProgress(fromButton = false) {
   }
 
 
+ /*####  #####  # #####   ####  ######  ####
+  #    # #    # # #    # #    # #      #
+  #####  #    # # #    # #      #####   ####
+  #    # #####  # #    # #  ### #           #
+  #    # #   #  # #    # #    # #      #    #
+  #####  #    # # #####   ####  ######  ###*/
+
+  function vertexProto(startPoint, zone) {
+    this.zone = startPoint.zone;
+    this.cells = [];
+    this.nbrs = [];
+    this.adjCells = [];
+
+    this.consume = function(cell) {
+      // ignore cells that are already visited, or null.
+      if (!cell || cell.visited) return;
+      if (cell.zone===otherZone(zone)) return;
+
+      // mark the cell as visited by this vertex
+      cell.visited = true;
+      cell.myVertex = this;
+
+      // record this cell as part of my cells
+      this.cells.push(cell);
+
+      // consume all my neighbors
+      for (var i=0; i<4; i++) {
+        var link = cell.links[i];
+        var adj  = cell.cellAt(i);
+        if (link.state===OFF) {
+          // adjacent cell is the same zone
+          if (adj) this.consume(adj);
+        } else if (link.state===UNK && adj) {
+          // adjacent cell is (maybe) a new neighbor
+          if (adj.zone===UNK || adj.zone===zone) {
+            this.adjCells.push(adj);
+          }
+        }
+      }
+    }
+
+    this.link = function() {
+      for (var i=0; i<this.adjCells.length; i++) {
+        var cell = this.adjCells[i];
+        if (cell.visited) {
+          if (this.nbrs.indexOf(cell.myVertex)===-1)
+            this.nbrs.push(cell.myVertex);
+        } else {
+          var nbr = new vertexProto(cell, zone);
+          this.nbrs.push(nbr);
+        }
+      }
+      this.adjCells = [];
+    }
+
+    this.show = function() {
+      var tempZone;
+      for (var i=0; i<this.cells.length; i++) {
+        tempZone = this.cells[i].zone;
+        this.cells[i].zone = SPECIAL;
+      }
+      refresh();
+      var temp = this;
+      var x = function() {
+        for (var i=0; i<temp.cells.length; i++)
+          temp.cells[i].zone = tempZone;
+        refresh();
+      }
+      setTimeout(x, 10000);
+    }
+
+    this.setZone = function(z) {
+      for (var i=0; i<this.cells.length; i++)
+        this.cells[i].zone = z;
+    }
+
+    // consume points, starting at the point given to the constructor.
+    if (startPoint) {
+      this.consume(startPoint);
+      this.link();
+    }
+  }
+
+  function clearVisited() {
+    for (var i=0; i<allCells.length; i++) {
+      allCells[i].visited = false;
+      allCells[i].myVertex = undefined;
+    }
+  }
+
+  function getFirstIN() {
+    for (var i=0; i<allCells.length; i++)
+      if (allCells[i].zone===IN)
+        return allCells[i];
+    return false;
+  }
+
+  function getINGraph() {
+    // find an IN cell.
+    var firstIN = getFirstIN();
+    if (!firstIN) return false;
+
+    // spawn the graph building process from that cell.
+    var vertex = new vertexProto(firstIN, IN);
+
+    return vertex;
+  }
+
+  // modified Tarjan's bridge-finding algorithm
+  function getBridges(node, depth, bridges=[], zone) {
+    node.bVisited = true;
+    node.bDepth   = depth;
+    node.bLow     = depth;
+
+    var isBridge = false;
+    var childCount = 0;
+
+    // do we see a zone?
+    var zoneSeen = false;
+
+    for (var i=0; i<node.nbrs.length; i++) {
+      var nbr = node.nbrs[i];
+      if (nbr.bVisited !== true) {
+        nbr.bParent = node;
+        // recurse on  call. check if it saw a zone.
+        if (getBridges(nbr, depth+1, bridges, zone)) zoneSeen = true;
+        childCount += 1;
+        if (nbr.bLow >= node.bDepth)
+          isBridge = true;
+        node.bLow = Math.min(node.bLow, nbr.bLow);
+      } else if (nbr !== node.bParent) {
+        node.bLow = Math.min(node.bLow, nbr.bDepth);
+      }
+    }
+    if ((node.bParent && isBridge) || (!node.bParent && childCount > 1)) {
+      // this node is a bridge, but we only care about bridges that
+      // are unknown zones, and that link to zones.
+      if (zoneSeen && node.zone===UNK)
+        bridges.push(node);
+    }
+    
+    return (zoneSeen || node.zone===zone);
+  }  
+
+  var b;
+  function attemptBridgeSearch() {
+    // clear "visited" flag for traversal.
+    clearVisited();
+
+    // get a graph for the IN zones
+    var graph = getINGraph();
+    if (!graph) return false;
+    
+    // get the bridges in that graph
+    var bridges = [];
+    getBridges(graph, 0, bridges, IN);
+    b = bridges;
+
+    // no bridges found = fail
+    if (bridges.length===0) return false;
+
+    // make all bridges IN
+    for (var i=0; i<bridges.length; i++)
+      bridges[i].setZone(IN);
+    return true;
+  }
+
+  function showBridges() {
+    for (var i=0; i<b.length; i++) {
+      b[i].show();
+    }
+  }
 
   //////////////////////////////////////////////////////////////////////////////////////////
 
