@@ -1,7 +1,7 @@
 <html>
   <head>
     <link rel="stylesheet" href="style.css" type="text/css"/>
-    <script src="jquery-3.3.1.js"></script>
+    <script src="jquery-3.4.1.min.js"></script>
     <script src="LineReader.js"></script>
     <script type="text/javascript">
       // CONSTANTS
@@ -53,9 +53,19 @@
       var sudokuCellsByPos = [];      
       var newCellsConfirmed = []; // keep track of new cells as they are confirmed.
 
+      var undoStack = [];
+
       // whether or not to print info on how the solve is achieved
       var logging = true;
 
+      // input globals
+      const SETNOTHING = 0;
+      const SETFULL = 1;
+      const SETCAND = 2;
+      const SETCOLOR = 3;
+      var inputState = SETNOTHING;
+      var dragState  = undefined; // undefined = nothing. -1 = clear. 0-8 = set swatch.
+      var inputNum   = undefined;
 
       // when the page is loaded, check if there is a query variable,
       // otherwise load the example from above.
@@ -67,21 +77,110 @@
         } else {
           initSudoku(data_default);
         }
+
+        // set up controls behaviour
+        initControls();
+
         // show the board
         refresh();
-
-        // give cells and candidates behaviour
-        initCellClicks();
       }
 
+      // a 'confirm' button (td $'this') has been pressed
+      var prevSelectedControl = undefined;
+      function controlButton(ind, state) {
+        if (prevSelectedControl) prevSelectedControl.removeClass("selected");
+        if (inputState===state && inputNum===ind) {
+          inputState = SETNOTHING;
+          inputNum = undefined;
+          refreshHighlights();
+          return;
+        }
 
-      function initCellClicks() {
-        
+        inputState = state;
+        inputNum = ind;
+
+        refreshHighlights();
+
+        this.addClass("selected");
+        prevSelectedControl = this;
+      }
+
+      function initControls() {
+        $("table#confirm").find("td").each(function(ind){
+          var that = $(this);
+          that.off("click").click(function(){
+            controlButton.call(that, ind, SETFULL);
+          });
+        });
+        $("table#candidate").find("td").each(function(ind){
+          var that = $(this);
+          that.off("click").click(function(){
+            controlButton.call(that, ind, SETCAND);
+          });
+        });
+        $("table#swatches").find("td").each(function(ind){
+          var that = $(this);
+          that.attr("swatch",ind);
+          that.off("click").click(function(){
+            controlButton.call(that, ind, SETCOLOR);
+          });
+        });
+        $(document).off("keydown").keydown(processKeys);
+        $(document).off("mouseup").on("mouseup", function(){
+          dragState = undefined;
+        });
+      }
+
+      function processKeys(e) {
+        var shift = e.shiftKey;
+        var code  = e.code;
+        if (code.startsWith("Digit")) {
+          if (code === "Digit0") return true;
+          var num = code.substring(5);
+          if (shift)
+            $("table#candidate").find("td:contains('"+num+"')").click();
+          else
+            $("table#confirm").find("td:contains('"+num+"')").click();
+          return false;
+        } else if (code==="Space") {
+          $(".selected").click();
+          return false;
+        } else if (code==="KeyU") {
+          flashButton("undobutton");
+          undo();
+        }
+        return true;
       }
 
       // display the current state of the sudoku board.
       function refresh() {
         buildTable(sudoku);
+        refreshHighlights();
+      }
+
+      // highlight some of the sudoku board
+      function refreshHighlights() {
+        if (inputState === SETNOTHING || inputState === SETCOLOR) {
+          $("#tbl").find(".highlit").removeClass("highlit");
+        }
+
+        for (var r=0;r<sudoku.length; r++) {
+          var row = sudoku[r];
+          for (var c=0; c<row.length; c++) {
+            var cell = row[c];
+            if (inputState===SETFULL || inputState===SETCAND) {
+              if (cell[inputNum] || cell.solved===inputNum) {
+                cell.td.addClass("highlit");
+              } else {
+                cell.td.removeClass("highlit");
+              }
+            }
+            if (cell.swatch===undefined)
+              cell.td.attr('swatch', '');
+            else
+              cell.td.attr('swatch', cell.swatch);
+          }
+        }
       }
 
       // solve the sudoku as far as you can.
@@ -1491,65 +1590,71 @@
 
 
       // Button actions.
-      function buttonCall(solvingFunc) {
-        solvingFunc();
-        refresh();
+      function buttonCall(solvingFunc, undoLabel=undefined) {
+        if (undoLabel!==undefined) storeUndoState();
+        if (solvingFunc()) {
+          if (undoLabel!==undefined)
+            saveStoredUndoState(undoLabel);
+          refresh();
+          return true;
+        }
+        return false;
       }
 
       function caButton() {
-        buttonCall(clearAdjacents);
+        buttonCall(clearAdjacents, "Clr Adjs");
       }
 
       function nsButton() {
-        buttonCall(nakedSingles);
+        buttonCall(nakedSingles, "Nkd 1s");
       }
 
       function hsButton() {
-        buttonCall(hiddenSingles);
+        buttonCall(hiddenSingles, "Hdn 1s");
       }
 
       function irButton() {
-        buttonCall(intersectionRemoval);
+        buttonCall(intersectionRemoval, "Intersect");
       }
 
       function npButton() {
-        buttonCall(nakedPairs);
+        buttonCall(nakedPairs, "Nkd 2s");
       }
 
       function hpButton() {
-        buttonCall(hiddenPairs);
+        buttonCall(hiddenPairs, "Hdn 2s");
       }
 
       function ntButton() {
-        buttonCall(nakedTriples);
+        buttonCall(nakedTriples, "Nkd 3s");
       }
 
       function htButton() {
-        buttonCall(hiddenTriples);
+        buttonCall(hiddenTriples, "Hdn 3s");
       }
 
       function nqButton() {
-        buttonCall(nakedQuads);
+        buttonCall(nakedQuads, "Nkd 4s");
       }
 
       function xwButton() {
-        buttonCall(XWings);
+        buttonCall(XWings, "X-Wings");
       }
 
       function ywButton() {
-        buttonCall(YWings);
+        buttonCall(YWings, "Y-Wings");
       }
 
       function zwButton() {
-        buttonCall(ZWings);
+        buttonCall(ZWings, "XYZ-Wings");
       }
 
       function sfButton() {
-        buttonCall(swordfish);
+        buttonCall(swordfish, "Swordfish");
       }
 
       function scButton() {
-        buttonCall(simpleColors);
+        buttonCall(simpleColors, "Smpl Clrs");
       }
 
       function checkButton() {
@@ -1798,20 +1903,25 @@
         return changed;
       }
 
-      function rand19() {
-        return 1+Math.floor(Math.random()*9);
-      }
-
       function confirmCell(cell, v) {
+        var changed = !isSolved(cell) || v!==cell.solved;
         newCellsConfirmed.push(cell);
         for (var i=0; i<cell.length; i++) {
           cell[i] = false;
         }
         cell[v] = true;
         cell['solved'] = v;
+        return changed;
+      }
+
+      function toggleCandidate(cell, v) {
+        if (isSolved(cell)) return false;
+        cell[v] = !cell[v];
+        return true;
       }
 
       function autoButton() {
+        saveUndoState("AUTOSOLVE");
         autoSolve();
       }
 
@@ -1843,16 +1953,160 @@
         element.dblclick(function(){changeCell(cell)});
       }
 
+      function undoButton() {
+        undo();
+      }
+
+      function refreshUndoLog() {
+        var labels = undoStack.map(d => d[0]).reverse();
+        $("#history").html("History:<br>"+labels.join("<br>"));
+      }
+
+      function undo() {
+        if (undoStack.length===0) {
+          console.log("nothing to undo");
+          return;
+        }
+        var [label, state] = undoStack.pop();
+        console.log(`undoing "${label}"`);
+        initSudokuData(state);
+        refresh();
+        refreshUndoLog();
+      }
+
+      function saveUndoState(label, state=getStatefulExportString()) {
+        console.log(label);
+        undoStack.push([label, state]);
+        refreshUndoLog();
+      }
+
+      function zoneName(swatch) {
+        if (swatch===undefined) return "none";
+        switch (swatch) {
+          case 0: return "blue";
+          case 1: return "green 1";
+          case 2: return "red";
+          case 3: return "yellow";
+          case 4: return "purple";
+          case 5: return "organg";
+          case 6: return "cyan";
+          case 7: return "green 2";
+          case 8: return "pink";
+        }
+      }
+
+      var tempUndoState = "";
+      function storeUndoState() {
+        tempUndoState = getStatefulExportString();
+      }
+
+      function saveStoredUndoState(label) {
+        saveUndoState(label, tempUndoState);
+      }
+
+      function setCellClick(td, cell) {
+        // td.off("click").click(function(){
+        //   if (inputState===SETNOTHING) return;
+        //   if (inputNum===undefined) return;
+
+        //   if (inputState===SETFULL) {
+        //     storeUndoState();
+        //     if (confirmCell(cell, inputNum))
+        //       saveStoredUndoState(cell.pos + " = " + (inputNum+1));
+        //     if ($("#autoclearadjs").prop('checked')) {
+        //       clearAfterConfirm(cell);
+        //     }
+        //     refresh();
+        //   }
+        //   if (inputState===SETCAND) {
+        //     storeUndoState();
+        //     if (toggleCandidate(cell, inputNum)) {
+        //       var plusminus = cell[inputNum] ? '+' : '-';
+        //       saveStoredUndoState(cell.pos+" "+plusminus+" "+(inputNum+1));
+        //       refresh();
+        //     }
+        //   }
+        //   if (inputState===SETCOLOR) {
+        //     if (cell.swatch === inputNum) {
+        //       saveUndoState(cell.pos+" blank");
+        //       cell.swatch = undefined;
+        //     } else {
+        //       saveUndoState(cell.pos+" "+zoneName(inputNum));
+        //       cell.swatch = inputNum;
+        //     }
+        //     refreshHighlights();
+        //   }
+        // });
+
+        td.off("mousedown").on("mousedown", function(){
+          if (inputState===SETNOTHING) return;
+          if (inputState===undefined) return;
+          
+          // confirm the cell
+          if (inputState===SETFULL) {
+            storeUndoState();
+            if (confirmCell(cell, inputNum))
+              saveStoredUndoState(cell.pos + " = " + (inputNum+1));
+            if ($("#autoclearadjs").prop('checked')) {
+              clearAfterConfirm(cell);
+            }
+            refresh();
+            return;
+          }
+
+          // toggle the cell
+          if (inputState === SETCAND) {
+            storeUndoState();
+            if (toggleCandidate(cell, inputNum)) {
+              var plusminus = cell[inputNum] ? '+' : '-';
+              saveStoredUndoState(cell.pos+" "+plusminus+" "+(inputNum+1));
+              refresh();
+            }
+            return;
+          }
+
+          // set the color
+          if (inputState===SETCOLOR) {
+            if (cell.swatch === inputNum) {
+              saveUndoState(cell.pos+" blank");
+              cell.swatch = undefined;
+              dragState = -1; // CLEARING COLOURS
+            } else {
+              saveUndoState(cell.pos+" "+zoneName(inputNum));
+              cell.swatch = inputNum;
+              dragState = inputNum; // SPREADING THIS COLOR
+            }
+            refreshHighlights();
+          }
+        });
+
+        td.off("mouseenter").on("mouseenter", function(e){
+          if (dragState === undefined) return;
+          if (dragState === -1 && cell.swatch !== undefined) {
+            saveUndoState(cell.pos+" blank");
+            cell.swatch = undefined;
+          } else if (dragState >= 0 && dragState <= 8) {
+            if (cell.swatch !== dragState) {
+              saveUndoState(cell.pos+" "+zoneName(dragState));
+              cell.swatch = dragState;
+            }
+          }
+          refreshHighlights();
+        });
+      }
+
       function buildTable(data) {
         var table = $("#tbl");
         table.empty();
         for (var r=0; r<data.length; r++) {
           var tr = $("<tr>").addClass("row");
           for (var c=0; c<data[r].length; c++) {
-            var td = $("<td>").addClass("cell");
             var cell = data[r][c];
-            setDblClick(td,cell);
-            // td.dblclick(function(){changeCell(cell);});
+            var td = $("<td>").addClass("cell");
+            td.attr('id', cell.pos);
+            cell['td'] = td;
+            // setDblClick(td,cell);
+            setCellClick(td,cell);
             if(isSolved(cell)) {
               td.append($("<c"+(cell.solved+1)+">"));
             } else {
@@ -1956,20 +2210,54 @@
         return out;
       }
 
+      const statefulRegexp = /^[1-9]*[A-I]?(,[1-9]*[A-I]?)+$/
+      const regularRegexp  = /^[0-9]+$/
       function initSudokuData(data) {
         initSudokuBlank();
         if (typeof data !== "string") return;
-        for (var i=0; i<data.length; i++) {
-          var r = Math.floor(i/9);
-          var c = i % 9;
-          var ch = parseInt(data.charAt(i));
-          if (ch > 0)
-            confirmCell(sudoku[r][c], ch-1);
+
+        if (data.match(regularRegexp)) {
+          for (var i=0; i<data.length; i++) {
+            var r = Math.floor(i/9);
+            var c = i % 9;
+            var ch = parseInt(data.charAt(i));
+            if (ch > 0)
+              confirmCell(sudoku[r][c], ch-1);
+          }
+        } else if (data.match(statefulRegexp)) {
+          data = data.split(',');
+          for (var i=0; i<data.length; i++) {
+            var r = Math.floor(i/9);
+            var c = i % 9;
+            setCellFromState(sudoku[r][c], data[i]);
+          }
+        }
+      }
+      const candsAndSwatch = /^[1-9]*[A-I]$/
+      function setCellFromState(cell, data) {
+        var swatch = '';
+        var cands = '';
+        if (data.match(candsAndSwatch)) {
+          swatch = data.substring(data.length-1);
+          cands = data.substring(0,data.length-1);
+        } else {
+          cands = data;
+        }
+        cell.swatch = swatchFromChar(swatch);
+        if (cands.length===1) {
+          var v = parseInt(cands);
+          confirmCell(cell,v-1)
+        } else {
+          for (var i=0; i<9; i++) cell[i]=false;
+          for (var i=0; i<cands.length; i++) {
+            var v = parseInt(cands[i])-1;
+            cell[v] = true;
+          }
         }
       }
 
       function importButton() {
-        var input = "" + prompt("Enter 81 digits, like \"0814\"... 0 means unknown.");
+        var input = "" + prompt("Enter 81 digits, like \"0814\"... 0 means unknown. Alternatively, enter a stateful export string provided by this app (containing commas and letters)");
         initSudoku(input);
         refresh();
       }
@@ -1989,6 +2277,40 @@
         return output;
       }
 
+      function charFromSwatch(val) {
+        if (val===undefined) return '';
+        return String.fromCharCode(65+val);
+      }
+
+      function swatchFromChar(char) {
+        if (char==='') return undefined;
+        if (char < 'A') return undefined;
+        if (char > 'I') return undefined;
+        return char.charCodeAt(0)-65;
+      }
+
+      function getStatefulExportString() {
+        var output = [];
+        for (var r=0; r<9; r++) {
+          for (var c=0; c<9; c++) {
+            var cell = sudoku[r][c];
+            var cellstring = "";
+            if (isSolved(cell)) {
+              cellstring = ""+(cell.solved+1);
+            } else {
+              for (var v=0; v<9; v++) {
+                if (cell[v]) {
+                  cellstring = cellstring + (v+1);
+                }
+              }
+            }
+            cellstring = cellstring + charFromSwatch(cell.swatch);
+            output.push(cellstring);
+          }
+        }
+        return output.join(",");
+      }
+
       // briefly flash the button given by "id".
       function flashButton(id) {
         var btn = $("button#"+id);
@@ -2000,6 +2322,11 @@
 
       function exportButton() {
         var output = getExportString();
+        $("#exportfield").val(output);
+      }
+
+      function statefulExportButton() {
+        var output = getStatefulExportString();
         $("#exportfield").val(output);
       }
 
@@ -2071,11 +2398,35 @@
     <button id="sfButton" onclick="javascript:sfButton();">Swordfish</button>
     <button id="scButton" onclick="javascript:scButton();">Simple Coloring</button>
     <button onclick="javascript:checkButton();">Check Errors</button>
-    <table id="tbl"></table>
+    <div id="gamewrapper">
+      <div id="history"></div>
+      <table id="tbl" class="noselect"></table>
+      <div id="ctrl">
+        <table id="confirm">
+          <tr><td>1</td><td>2</td><td>3</td></tr>
+          <tr><td>4</td><td>5</td><td>6</td></tr>
+          <tr><td>7</td><td>8</td><td>9</td></tr>
+        </table><br/><br/>
+        <table id="candidate">
+          <tr><td>1</td><td>2</td><td>3</td></tr>
+          <tr><td>4</td><td>5</td><td>6</td></tr>
+          <tr><td>7</td><td>8</td><td>9</td></tr>
+        </table>
+        <br/>
+        <input id="autoclearadjs" type="checkbox" checked>Auto-clear adjs</input>
+        <br/><br/>
+        <table id="swatches">
+          <tr><td></td><td></td><td></td></tr>
+          <tr><td></td><td></td><td></td></tr>
+          <tr><td></td><td></td><td></td></tr>
+        </table>
+      </div>
+    </div>
     <button onclick="javascript:importButton();">Import</button>
     <button onclick="javascript:exportButton();">Export</button>
-    
+    <button onclick="javascript:statefulExportButton();">Full Export</button>
     <input type="text" id="exportfield"></input>
     Testing Dataset: <input type="file" id="testFile" onchange="javascript:testFileLoaded();"/>
+    <button id="undobutton" onclick="javascript:undoButton();">UNDO</button>
   </body>
 </html>
