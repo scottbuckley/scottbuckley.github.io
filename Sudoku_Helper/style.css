@@ -1,6 +1,11 @@
       body {
         font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       }
+      .edge {
+        text-align:center;
+        padding:10px;
+        font-size:22pt;
+      }
       #tbl {
         border-collapse:collapse;
       }
@@ -12,19 +17,19 @@
         position:relative;
         border:1px solid black;
       }
-      #tbl tr.row:nth-child(3n) td.cell {
+      #tbl tr.row:nth-child(3n+1) td.cell {
         /* bottom block borders */
         border-bottom:3px solid black;
       }
-      #tbl tr.row:nth-child(3n+1) td.cell {
+      #tbl tr.row:nth-child(3n+2) td.cell {
         /* top block borders */
         border-top:3px solid black;
       }
-      #tbl tr.row td.cell:nth-child(3n) {
+      #tbl tr.row td.cell:nth-child(3n+1) {
         /* right block borders */
         border-right:3px solid black;
       }
-      #tbl tr.row td.cell:nth-child(3n+1) {
+      #tbl tr.row td.cell:nth-child(3n+2) {
         /* left block borders */
         border-left:3px solid black;
       }
@@ -42,6 +47,7 @@
         bottom:0;
         margin:auto;
       }
+      
 
       /* #tbl tr.row td.cell.highlit {
       }
@@ -154,13 +160,21 @@
         height:100%;
       }
 
+
+
       #gamewrapper {
         display:flex;
         justify-content:space-evenly;
-        margin-bottom:10px;
-        height:91%;
+        /* margin-bottom:10px; */
+        /* height:91%; */
       }
 
+      #ctrl {
+        display:flex;
+        flex-direction:column;
+        justify-content:space-evenly;
+      }
+      
       #ctrl table {
         border-collapse: collapse;
       }

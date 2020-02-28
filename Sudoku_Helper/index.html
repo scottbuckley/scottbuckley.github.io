@@ -53,8 +53,9 @@
       var sudokuCols = [];
       var sudokuBoxes = [];
       var sudokuCellsByPos = [];      
-      var newCellsConfirmed = []; // keep track of new cells as they are confirmed.
+      var sudokuEdges = [];
 
+      var newCellsConfirmed = []; // keep track of new cells as they are confirmed.
       var undoStack = [];
 
       // whether or not to print info on how the solve is achieved
@@ -74,10 +75,14 @@
       function onReady() {
         // prepare the board with the appropriate givens.
         var data = getQueryVariable("data");
+        var edge = getQueryVariable("edge");
         if (data) {
           initSudoku(data);
         } else {
           initSudoku(data_default);
+        }
+        if (edge) {
+          initEdges(edge);
         }
 
         // set up controls behaviour
@@ -2216,11 +2221,30 @@
         });
       }
 
+      function leftEdge()   { return sudokuEdges[3]; }
+      function rightEdge()  { return sudokuEdges[1]; }
+      function topEdge()    { return sudokuEdges[0]; }
+      function bottomEdge() { return sudokuEdges[2]; }
+
       function buildTable(data) {
         var table = $("#tbl");
         table.empty();
+
+        // top edge
+        var tEdge = topEdge();
+        var tr = $("<tr>").addClass("row");
+        tr.append($("<td>").addClass("corner"));
+        for (var e=0; e<9; e++)
+          tr.append($("<td>").addClass("edge").text(tEdge[e]));
+        tr.append($("<td>").addClass("corner"));
+        table.append(tr);
+        
+        // table (including edges)
+        var lEdge = leftEdge();
+        var rEdge = rightEdge();
         for (var r=0; r<data.length; r++) {
           var tr = $("<tr>").addClass("row");
+          tr.append($("<td>").addClass("edge").text(lEdge[r]));
           for (var c=0; c<data[r].length; c++) {
             var cell = data[r][c];
             var td = $("<td>").addClass("cell");
@@ -2238,12 +2262,38 @@
             }
             tr.append(td);
           }
+          tr.append($("<td>").addClass("edge").text(rEdge[r]));
           table.append(tr);
         }
+
+        // bottom edge
+        var bEdge = bottomEdge();
+        var tr = $("<tr>").addClass("row");
+        tr.append($("<td>").addClass("corner"));
+        for (var e=0; e<9; e++)
+          tr.append($("<td>").addClass("edge").text(bEdge[e]));
+        tr.append($("<td>").addClass("corner"));
+        table.append(tr);
+
+
         for (var i=0; i<=10; i++) {
           $("v"+i).text(i);
           $("c"+i).text(i);
         }
+      }
+
+      // const edgeRegexp = /^(.*(,.*)*)?$/
+      function initEdges(data){
+        sudokuEdges = [[],[],[],[]];
+        var data = data.split(",");
+        for (var i=0; i<data.length; i++) {
+          var edge = Math.floor(i/9);
+          var ind  = i%9;
+          if (edge>3) break;
+          console.log(edge, ind);
+          sudokuEdges[edge][ind] = data[i];
+        }
+        refresh();
       }
 
       function initSudoku(data) {
@@ -2273,6 +2323,7 @@
         sudokuCols = [];
         sudokuBoxes = [];
         sudokuCellsByPos = [];
+        sudokuEdges = [];
         newCellsConfirmed = [];
 
         // fill lists with empty lists
@@ -2280,6 +2331,9 @@
           sudoku.push([]);
           sudokuCols.push([]);
           sudokuBoxes.push([]);
+        }
+        for (var e=0; e<4; e++) {
+          sudokuEdges.push([]);
         }
         for (var i=0; i<9; i++) {
           sudoku[i].groupName = "Row " + (i+1);
@@ -2381,6 +2435,14 @@
         var input = "" + prompt("Enter 81 digits, like \"0814\"... 0 means unknown. Alternatively, enter a stateful export string provided by this app (containing commas and letters)");
         initSudoku(input);
         refresh();
+      }
+
+      function edgesButton() {
+        var input = "" + prompt("Enter 36 values, comma separated. Top (LTR), Right (TTB), Bottom (LTR), Right(TTB).");
+        if (input!=="null") {
+          initEdges(input);
+          refresh();
+        }
       }
 
       function getExportString() {
@@ -2522,19 +2584,19 @@
       <div id="history"></div>
       <table id="tbl" class="noselect"></table>
       <div id="ctrl">
-        <table id="confirm">
-          <tr><td>1</td><td>2</td><td>3</td></tr>
-          <tr><td>4</td><td>5</td><td>6</td></tr>
-          <tr><td>7</td><td>8</td><td>9</td></tr>
-        </table><br/><br/>
+        <div>
+          <table id="confirm">
+            <tr><td>1</td><td>2</td><td>3</td></tr>
+            <tr><td>4</td><td>5</td><td>6</td></tr>
+            <tr><td>7</td><td>8</td><td>9</td></tr>
+          </table>
+          <input id="autoclearadjs" type="checkbox" checked>Auto-clear adjs</input>
+        </div>
         <table id="candidate">
           <tr><td>1</td><td>2</td><td>3</td></tr>
           <tr><td>4</td><td>5</td><td>6</td></tr>
           <tr><td>7</td><td>8</td><td>9</td></tr>
         </table>
-        <br/>
-        <input id="autoclearadjs" type="checkbox" checked>Auto-clear adjs</input>
-        <br/><br/>
         <table id="swatches">
           <tr><td></td><td></td><td></td></tr>
           <tr><td></td><td></td><td></td></tr>
@@ -2543,6 +2605,7 @@
       </div>
     </div>
     <button onclick="javascript:importButton();">Import</button>
+    <button onclick="javascript:edgesButton();">Set Edges</button>
     <button onclick="javascript:exportButton();">Export</button>
     <button onclick="javascript:statefulExportButton();">Full Export</button>
     <input type="text" id="exportfield"></input>
