@@ -2046,6 +2046,7 @@
       }
 
       function changeCell(cell) {
+        if (inputState !== SETNOTHING) return;
         var input = prompt("Enter the digits that are candidates for this cell. 0=all");
         if (input === null) return;
         if (input === "0") {
@@ -2225,7 +2226,7 @@
             var td = $("<td>").addClass("cell");
             td.attr('id', cell.pos);
             cell['td'] = td;
-            // setDblClick(td,cell);
+            setDblClick(td,cell);
             setCellClick(td,cell);
             if(isSolved(cell)) {
               td.append($("<c"+(cell.solved+1)+">"));
