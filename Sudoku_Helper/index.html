@@ -57,6 +57,10 @@
 
       var newCellsConfirmed = []; // keep track of new cells as they are confirmed.
       var undoStack = [];
+      // for (var i=0; i<100; i++) {
+      //   undoStack.push(["meow", "010"]);
+      // }
+      // setTimeout(function(){ refreshUndoLog(); },500);
 
       // whether or not to print info on how the solve is achieved
       var logging = true;
@@ -90,6 +94,7 @@
 
         // show the board
         refresh();
+        makeSq();
       }
 
       // a 'confirm' button (td $'this') has been pressed
@@ -2085,6 +2090,7 @@
 
       function refreshUndoLog() {
         var labels = undoStack.map(d => d[0]).reverse();
+        // $("#history").empty().append($("<div>").html("History:<br>"+labels.join("<br>")));
         $("#history").html("History:<br>"+labels.join("<br>"));
       }
 
@@ -2232,10 +2238,10 @@
 
         // top edge
         var tEdge = topEdge();
-        var tr = $("<tr>").addClass("row");
+        var tr = $("<tr>").addClass("row").addClass("toprow");
         tr.append($("<td>").addClass("corner"));
         for (var e=0; e<9; e++)
-          tr.append($("<td>").addClass("edge").text(tEdge[e]));
+          tr.append($("<td>").addClass("edge tbedge").text(tEdge[e]));
         tr.append($("<td>").addClass("corner"));
         table.append(tr);
         
@@ -2244,7 +2250,7 @@
         var rEdge = rightEdge();
         for (var r=0; r<data.length; r++) {
           var tr = $("<tr>").addClass("row");
-          tr.append($("<td>").addClass("edge").text(lEdge[r]));
+          tr.append($("<td>").addClass("edge ledge").text(lEdge[r]));
           for (var c=0; c<data[r].length; c++) {
             var cell = data[r][c];
             var td = $("<td>").addClass("cell");
@@ -2262,16 +2268,16 @@
             }
             tr.append(td);
           }
-          tr.append($("<td>").addClass("edge").text(rEdge[r]));
+          tr.append($("<td>").addClass("edge redge").text(rEdge[r]));
           table.append(tr);
         }
 
         // bottom edge
         var bEdge = bottomEdge();
-        var tr = $("<tr>").addClass("row");
+        var tr = $("<tr>").addClass("row").addClass("bottomrow");
         tr.append($("<td>").addClass("corner"));
         for (var e=0; e<9; e++)
-          tr.append($("<td>").addClass("edge").text(bEdge[e]));
+          tr.append($("<td>").addClass("edge tbedge").text(bEdge[e]));
         tr.append($("<td>").addClass("corner"));
         table.append(tr);
 
@@ -2290,7 +2296,6 @@
           var edge = Math.floor(i/9);
           var ind  = i%9;
           if (edge>3) break;
-          console.log(edge, ind);
           sudokuEdges[edge][ind] = data[i];
         }
         refresh();
@@ -2323,7 +2328,7 @@
         sudokuCols = [];
         sudokuBoxes = [];
         sudokuCellsByPos = [];
-        sudokuEdges = [];
+        // sudokuEdges = [];
         newCellsConfirmed = [];
 
         // fill lists with empty lists
@@ -2560,58 +2565,76 @@
         });
       }
 
-      $(document).ready(onReady);
+      function makeSq() {
+        var tbl = $("#tbl");
+        tbl.width(tbl.height());
+      }
+
+      $(document).ready(function(){
+        $(window).off("resize").on("resize", function(){
+          makeSq();
+        });
+        onReady();
+      });
     </script>
   </head>
   <body>
-    <button onclick="javascript:autoButton();">SOLVE</button>
-    <button id="caButton" onclick="javascript:caButton();">Clear Adjacents</button>
-    <button id="nsButton" onclick="javascript:nsButton();">Naked Singles</button>
-    <button id="hsButton" onclick="javascript:hsButton();">Hidden Singles</button>
-    <button id="npButton" onclick="javascript:npButton();">Naked Pairs</button>
-    <button id="hpButton" onclick="javascript:hpButton();">Hidden Pairs</button>
-    <button id="ntButton" onclick="javascript:ntButton();">Naked Triples</button>
-    <button id="htButton" onclick="javascript:htButton();">Hidden Triples</button>
-    <button id="htButton" onclick="javascript:nqButton();">Naked Quads</button>
-    <button id="irButton" onclick="javascript:irButton();">Intersection Removal</button>
-    <button id="xwButton" onclick="javascript:xwButton();">X-Wings</button>
-    <button id="ywButton" onclick="javascript:ywButton();">Y-Wings</button>
-    <button id="zwButton" onclick="javascript:zwButton();">Z-Wings</button>
-    <button id="sfButton" onclick="javascript:sfButton();">Swordfish</button>
-    <button id="fxButton" onclick="javascript:fxButton();">Finned X-Wings</button>
-    <button id="scButton" onclick="javascript:scButton();">Simple Coloring</button>
-    <div id="gamewrapper">
-      <div id="history"></div>
-      <table id="tbl" class="noselect"></table>
-      <div id="ctrl">
-        <div>
-          <table id="confirm">
+    <div id="maincont">
+      <div id="topbuttons">
+        <button onclick="javascript:autoButton();">SOLVE</button>
+        <button id="caButton" onclick="javascript:caButton();">Clear Adjacents</button>
+        <button id="nsButton" onclick="javascript:nsButton();">Naked Singles</button>
+        <button id="hsButton" onclick="javascript:hsButton();">Hidden Singles</button>
+        <button id="npButton" onclick="javascript:npButton();">Naked Pairs</button>
+        <button id="hpButton" onclick="javascript:hpButton();">Hidden Pairs</button>
+        <button id="ntButton" onclick="javascript:ntButton();">Naked Triples</button>
+        <button id="htButton" onclick="javascript:htButton();">Hidden Triples</button>
+        <button id="htButton" onclick="javascript:nqButton();">Naked Quads</button>
+        <button id="irButton" onclick="javascript:irButton();">Intersection Removal</button>
+        <button id="xwButton" onclick="javascript:xwButton();">X-Wings</button>
+        <button id="ywButton" onclick="javascript:ywButton();">Y-Wings</button>
+        <button id="zwButton" onclick="javascript:zwButton();">Z-Wings</button>
+        <button id="sfButton" onclick="javascript:sfButton();">Swordfish</button>
+        <button id="fxButton" onclick="javascript:fxButton();">Finned X-Wings</button>
+        <button id="scButton" onclick="javascript:scButton();">Simple Coloring</button>
+      </div>
+      <div id="gamewrapper">
+        <div id="history"></div>
+        <div id="gridcont">
+          <table id="tbl" class="noselect"></table>
+        </div>
+        <div id="ctrl">
+          <div>
+            <table id="confirm">
+              <tr><td>1</td><td>2</td><td>3</td></tr>
+              <tr><td>4</td><td>5</td><td>6</td></tr>
+              <tr><td>7</td><td>8</td><td>9</td></tr>
+            </table>
+            <input id="autoclearadjs" type="checkbox" checked>Auto-clear adjs</input>
+          </div>
+          <table id="candidate">
             <tr><td>1</td><td>2</td><td>3</td></tr>
             <tr><td>4</td><td>5</td><td>6</td></tr>
             <tr><td>7</td><td>8</td><td>9</td></tr>
           </table>
-          <input id="autoclearadjs" type="checkbox" checked>Auto-clear adjs</input>
+          <table id="swatches">
+            <tr><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td></tr>
+          </table>
         </div>
-        <table id="candidate">
-          <tr><td>1</td><td>2</td><td>3</td></tr>
-          <tr><td>4</td><td>5</td><td>6</td></tr>
-          <tr><td>7</td><td>8</td><td>9</td></tr>
-        </table>
-        <table id="swatches">
-          <tr><td></td><td></td><td></td></tr>
-          <tr><td></td><td></td><td></td></tr>
-          <tr><td></td><td></td><td></td></tr>
-        </table>
+      </div>
+      <div id="bottombuttons">
+        <button onclick="javascript:importButton();">Import</button>
+        <button onclick="javascript:edgesButton();">Set Edges</button>
+        <button onclick="javascript:exportButton();">Export</button>
+        <button onclick="javascript:statefulExportButton();">Full Export</button>
+        <input type="text" id="exportfield"></input>
+        Testing Dataset: <input type="file" id="testFile" onchange="javascript:testFileLoaded();"/>
+        <button id="undobutton" onclick="javascript:undoButton();">UNDO</button>
+        <button onclick="javascript:checkButton();">Check Errors</button>
+        <button onclick="javascript:onReady();">Reset</button>
       </div>
     </div>
-    <button onclick="javascript:importButton();">Import</button>
-    <button onclick="javascript:edgesButton();">Set Edges</button>
-    <button onclick="javascript:exportButton();">Export</button>
-    <button onclick="javascript:statefulExportButton();">Full Export</button>
-    <input type="text" id="exportfield"></input>
-    Testing Dataset: <input type="file" id="testFile" onchange="javascript:testFileLoaded();"/>
-    <button id="undobutton" onclick="javascript:undoButton();">UNDO</button>
-    <button onclick="javascript:checkButton();">Check Errors</button>
-    <button onclick="javascript:onReady();">Reset</button>
   </body>
 </html>
