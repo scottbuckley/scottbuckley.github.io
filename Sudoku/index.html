@@ -1056,40 +1056,36 @@
 
       // input: list of nine 0s and 1s representing candidate presence.
       // twoMap has exactly two 1s and moreMap has 3 or 4.
+      // output: if these maps constitute a finned xwing, the index (base 1)
+      // of the side of the xwing with the fin. otherwise "false".
       function FinnedMapMatch(twoMap, moreMap) {
         var y1 = getFirst1(twoMap);
         var y2 = getSecond1(twoMap);
         var b1 = blockInd(y1);
         var b2 = blockInd(y2);
 
+        // a finned x-wing must be over two blocks
+        if (b1===b2) return false;
+
         // make sure moreMap includes the x-wing
         if (moreMap[y1] !== '1') return false;
         if (moreMap[y2] !== '1') return false;
-
-        if (b1===b2) { // in the same block
-          for (var i=0; i<9; i++) {
-            if (moreMap[i]==='1' && blockInd(i) !== b1)
-              // there are candidates that don't share a block with an X corner
-              return false;
+        
+        var withB1 = false;
+        var withB2 = false;
+        for (var i=0; i<9; i++) {
+          if (i !== y1 && i !== y2 && moreMap[i]==='1') {
+            var ib = blockInd(i);
+            if      (ib === b1) withB1 = true;
+            else if (ib === b2) withB2 = true;
+            else                return false; // candidates with neither blocks
           }
-          return (b1+1);
-        } else {
-          var withB1 = false;
-          var withB2 = false;
-          for (var i=0; i<9; i++) {
-            if (i !== y1 && i !== y2 && moreMap[i]==='1') {
-              var ib = blockInd(i);
-              if      (ib === b1) withB1 = true;
-              else if (ib === b2) withB2 = true;
-              else                return false; // candidates with neither blocks
-            }
-          }
-          if (withB1 &&  withB2) return false; // candidates with both blocks
-          // return which one index we start with
-          if (withB1) return y1 + 1;
-          if (withB2) return y2 + 1;
-          return true;
         }
+        if (withB1 &&  withB2) return false; // candidates with both blocks
+        // return which one index we start with
+        if (withB1) return y1 + 1;
+        if (withB2) return y2 + 1;
+        return false;
       }
 
       function FinnedXWingsAux(groups, groupType) {
@@ -1765,10 +1761,7 @@
       }
 
       function fxButton() {
-        if (buttonCall(FinnedXWings))
-          console.log("finned x-wings worked");
-        else
-          console.log("finned x-wings did not work");
+        buttonCall(FinnedXWings, "Finned X");
       }
 
       function ywButton() {
