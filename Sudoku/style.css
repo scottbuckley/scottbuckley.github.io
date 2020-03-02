@@ -232,6 +232,19 @@
     border:3px solid black;
   }
 
+  .stratcat {
+    text-transform: uppercase;
+    font-size:8pt;
+    text-align:center;
+    font-weight: bold;
+  }
+  .btndiv {
+    display:flex;
+    justify-content:space-between;
+  }
+  .btndiv button {
+    flex-grow:1;
+  }
   button {
     -webkit-border-radius: 3px;
     -khtml-border-radius: 3px;    

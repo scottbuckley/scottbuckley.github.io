@@ -25,96 +25,111 @@
       const data_finned2      = "030605000800000030004010059000701006060000010500302000950020300070000008000107090"; // current can't solve this (nor can andoku)
       const data_default = undefined; // this one will be loaded automatically.
 
+      const strat_categories = [
+        "Simple",
+        "Tough",
+        "Diabolical",
+        "Anti-Knight"
+      ];
+
       const strats = [
         { name:  "Clear Adjacents",
           sname: "Clr Adjs",
           func:  clearAdjacents,
-          enabled: true
+          enabled: true,
+          category: "Simple"
         },
         { name:  "Naked Singles",
           sname: "Nkd 1s",
           func:  nakedSingles,
-          enabled: true
+          enabled: true,
+          category: "Simple"
+        },
+        { name:  "Antiknight Adjacents",
+          sname: "AK Adjs",
+          func:  AntiknightAdjs,
+          enabled:false,
+          category: "Anti-Knight"
         },
         { name:  "Hidden Singles",
           sname: "Hdn 1s",
           func:  hiddenSingles,
-          enabled: true
+          enabled: true,
+          category: "Simple"
         },
         { name:  "Intersection Removal",
           sname: "Intersect",
           func:  intersectionRemoval,
-          enabled: true
+          enabled: true,
+          category: "Simple"
         },
         { name:  "Naked Pairs",
           sname: "Nkd 2s",
           func:  nakedPairs,
-          enabled: true
+          enabled: true,
+          category: "Simple"
         },
         { name:  "Hidden Pairs",
           sname: "Hdn 2s",
           func:  hiddenPairs,
-          enabled: true
+          enabled: true,
+          category: "Simple"
         },
         { name:  "Naked Triples",
           sname: "Nkd 3s",
           func:  nakedTriples,
-          enabled: true
+          enabled: true,
+          category: "Simple"
         },
         { name:  "Hidden Triples",
           sname: "Hdn 3s",
           func:  hiddenTriples,
-          enabled: true
+          enabled: true,
+          category: "Simple"
         },
         { name:  "Naked Quads",
           sname: "Nkd 4s",
           func:  nakedQuads,
-          enabled: true
+          enabled: true,
+          category: "Simple"
         },
         { name:  "X-Wings",
           sname: "XWings",
           func:  XWings,
-          enabled: true
+          enabled: true,
+          category: "Tough"
         },
         { name:  "Y-Wings",
           sname: "YWings",
           func:  YWings,
-          enabled: true
+          enabled: true,
+          category: "Tough"
         },
         { name:  "Z-Wings",
           sname: "ZWings",
           func:  ZWings,
-          enabled: true
+          enabled: true,
+          category: "Tough"
         },
-        { name:  "Finned X-Wings",
-          sname: "Finned",
-          func:  FinnedXWings,
-          enabled: true
+        { name:  "Swordfish",
+          sname: "Swordfish",
+          func:  swordfish,
+          enabled: true,
+          category: "Tough"
         },
         { name:  "Simple Colors Chain",
           sname: "Smpl Clrs",
           func:  simpleColors,
-          enabled: true
+          enabled: true,
+          category: "Tough"
+        },
+        { name:  "Finned X-Wings",
+          sname: "Finned",
+          func:  FinnedXWings,
+          enabled: true,
+          category: "Diabolical"
         },
       ];
-
-      // Flags to allow/disallow various solving strategies.
-      // "simple" strategies
-      const useNS = true; // naked singles
-      const useHS = true; // hidden singles
-      const useNP = true; // naked pairs
-      const useHP = true; // hidden pairs
-      const useNT = true; // naked triples
-      const useHT = true; // hidden triples
-      const useNQ = true; // naked quads
-      const useIR = true; // intersection removal
-      // "tough" strategies
-      const useXW = true; // x-wings
-      const useYW = true; // y-wings
-      const useZW = true; // xyz-wings
-      const useSF = true; // swordfish
-      const useSC = true; // simple coloring
-      const useFX = true; // finned x-wings 
 
       // how long to wait between applying solving steps.
       const stepDelay = 0;
@@ -193,33 +208,50 @@
         prevSelectedControl = this;
       }
 
-      function initSolverButtons() {
-        var cont = $("#solvers");
-        for (var i=0; i<strats.length; i++) {
-          var strat = strats[i];
-          var button = $("<button>")
-            .text(strat.name)
-            .click(solverButton(strat));
-          cont.append(button);
+      function checkChangeFunc(strat) {
+        return function() {
+          if ($(this).prop('checked'))
+            strat.enabled = true;
+          else
+            strat.enabled = false;
         }
       }
 
-      function buttonCall(solvingFunc, undoLabel=undefined) {
-        if (undoLabel!==undefined) storeUndoState();
-        if (solvingFunc()) {
-          if (undoLabel!==undefined)
-            saveStoredUndoState(undoLabel);
-          refresh();
-          return true;
+      function initSolverButtons() {
+        var cont = $("#solvers");
+        var prevCat = undefined;
+        for (var c=0; c<strat_categories.length; c++) {
+          var cat = strat_categories[c];
+          for (var i=0; i<strats.length; i++) {
+            var strat = strats[i];
+            if (strat.category !== cat) continue;
+            var button = $("<button>")
+              .addClass('solvebutton')
+              .text(strat.name)
+              .click(solverButton(strat));
+            var check = $("<input>")
+              .attr('type', 'checkbox')
+              .prop('checked', strat.enabled)
+              .change(checkChangeFunc(strat));
+            var btndiv = $("<div>")
+              .append(check)
+              .append(button)
+              .addClass('btndiv');
+            strat.button = button;
+            if (strat.category != prevCat) {
+              prevCat = strat.category;
+              cont.append($("<div>").text(strat.category).addClass("stratcat"));
+            }
+            cont.append(btndiv);
+          }
         }
-        return false;
       }
 
       function solverButton(strat) {
         return function() {
           storeUndoState();
           if (!strat.func()) return false;
-          saveStoredUndoState(undoLabel);
+          saveStoredUndoState(strat.sname);
           refresh();
           return true;
         }
@@ -266,7 +298,7 @@
           $(".selected").click();
           return false;
         } else if (code==="KeyU") {
-          flashButton("undobutton");
+          flashButton($("#undobutton"));
           undo();
         }
         return true;
@@ -322,67 +354,17 @@
       // try all strategies from the easiest to hardest. return true if
       // some progress was made.
       function makeSomeChange(flash=true) {
-        if (newCellsConfirmed.length > 0 && clearAdjacents()) {
-          // clearing cells adjacent to confirmed cells
-          flash && flashButton("caButton");
-          return true;
-        } else if (useNS && nakedSingles()) {
-          // naked singles
-          flash && flashButton("nsButton");
-          return true;
-        } else if (useHS && hiddenSingles()) {
-          // hidden singles
-          flash && flashButton("hsButton");
-          return true;
-        } else if (useNP && nakedPairs()) {
-          // naked pairs
-          flash && flashButton("npButton");
-          return true;
-        } else if (useHP && hiddenPairs()) {
-          // hidden pairs
-          flash && flashButton("hpButton");
-          consolelog("hidden pairs.");
-          return true;
-        } else if (useNT && nakedTriples()) {
-          // naked triples
-          flash && flashButton("ntButton");
-          return true;
-        } else if (useHT && hiddenTriples()) {
-          // hidden triples
-          flash && flashButton("htButton");
-          return true;
-        } else if (useIR && intersectionRemoval()) {
-          // intersection removal
-          flash && flashButton("irButton");
-          return true;
-        } else if (useNQ && nakedQuads()) {
-          // hidden triples
-          flash && flashButton("nqButton");
-          return true;
-        } else if (useXW && XWings()) {
-          // x-wings
-          flash && flashButton("xwButton");
-          return true;
-        } else if (useYW && YWings()) {
-          // y-wings
-          flash && flashButton("ywButton");
-          return true;
-        } else if (useZW && ZWings()) {
-          // z-wings
-          flash && flashButton("zwButton");
-          return true;
-        } else if (useSF && swordfish()) {
-          // swordfish
-          flash && flashButton("sfButton");
-          return true;
-        } else if (useFX && FinnedXWings()) {
-          // finned x-wings
-          flash && flashButton("fxButton");
-          return true;
-        } else if (useSC && simpleColors()) {
-          // simple coloring
-          flash && flashButton("scButton");
-          return true;
+        
+        for (var s=0; s<strats.length; s++) {
+          // only (auto) clear adj if new cells listed
+          if (s===0 &&newCellsConfirmed.length===0) continue;
+
+          // perform strategy and optionally flash button
+          var strat = strats[s];
+          if (strat.enabled && strat.func()) {
+            flash && flashButton(strat.button);
+            return true;
+          }
         }
         return false;
       }
@@ -1241,6 +1223,59 @@
       }
 
 
+
+
+      function knightAdjs(x, y) {
+        var out = [];
+        for (var xx=-2; xx<=2; xx++) {
+          if (xx===0) continue;
+          for (var yy=-2; yy<=2; yy++) {
+            if (yy===0 || Math.abs(xx)===Math.abs(yy)) continue;
+            var xout = x+xx;
+            if (xout<0 || xout>=9) continue;
+            var yout = y+yy;
+            if (yout<0 || yout>=9) continue;
+            out.push(sudoku[yout][xout]);
+          }
+        }
+        return out;
+      }
+
+      // function knightMoves(x, y) {
+      //   return [
+      //     [x-1,y-2], [x-2,y-1],
+      //     [x+1,y+2], [x+2,y+1],
+      //     [x-1,y+2], [x-2,y+1],
+      //     [x+1,y-2], [x+2,y-1]
+      //   ];
+      // }
+
+      function AntiknightAdjs() {
+        var changed = false;
+        for (var r=0; r<9; r++) {
+          var row = sudoku[r];
+          for (var c=0; c<9; c++) {
+            var cell = row[c];
+            if (!isSolved(cell)) continue;
+            var v = cell.solved;
+            var adjs = knightAdjs(c,r);
+            for (var i=0; i<adjs.length; i++) {
+              var adj = adjs[i];
+              changed = changed || adj[v];
+              adj[v] = false;
+            }
+          }
+        }
+        return changed;
+      }
+
+
+
+
+
+
+
+
       function candidateXOR(cell1, cell2) {
         var out = [];
         for (var v=0; v<9; v++)
@@ -1815,69 +1850,6 @@
           if (simpleColorsVal(v)) return true;
       }
 
-
-      // Button actions.
-
-      function caButton() {
-        buttonCall(clearAdjacents, "Clr Adjs");
-      }
-
-      function nsButton() {
-        buttonCall(nakedSingles, "Nkd 1s");
-      }
-
-      function hsButton() {
-        buttonCall(hiddenSingles, "Hdn 1s");
-      }
-
-      function irButton() {
-        buttonCall(intersectionRemoval, "Intersect");
-      }
-
-      function npButton() {
-        buttonCall(nakedPairs, "Nkd 2s");
-      }
-
-      function hpButton() {
-        buttonCall(hiddenPairs, "Hdn 2s");
-      }
-
-      function ntButton() {
-        buttonCall(nakedTriples, "Nkd 3s");
-      }
-
-      function htButton() {
-        buttonCall(hiddenTriples, "Hdn 3s");
-      }
-
-      function nqButton() {
-        buttonCall(nakedQuads, "Nkd 4s");
-      }
-
-      function xwButton() {
-        buttonCall(XWings, "X-Wings");
-      }
-
-      function fxButton() {
-        buttonCall(FinnedXWings, "Finned X");
-      }
-
-      function ywButton() {
-        buttonCall(YWings, "Y-Wings");
-      }
-
-      function zwButton() {
-        buttonCall(ZWings, "XYZ-Wings");
-      }
-
-      function sfButton() {
-        buttonCall(swordfish, "Swordfish");
-      }
-
-      function scButton() {
-        buttonCall(simpleColors, "Smpl Clrs");
-      }
-
       function checkButton() {
         if (checkErrors()) {
           alert("some errors found :(");
@@ -2198,7 +2170,7 @@
       }
 
       function saveUndoState(label, state=getStatefulExportString()) {
-        console.log(label);
+        // console.log(label);
         undoStack.push([label, state]);
         refreshUndoLog();
       }
@@ -2504,7 +2476,7 @@
           }
         }
       }
-      const candsAndSwatch = /^[1-9]*[A-I]$/
+      const candsAndSwatch = /^!?[1-9]*[A-I]$/
       function setCellFromState(cell, data) {
         var swatch = '';
         var cands = '';
@@ -2590,9 +2562,8 @@
         return output.join(",");
       }
 
-      // briefly flash the button given by "id".
-      function flashButton(id) {
-        var btn = $("button#"+id);
+      // briefly flash the button given
+      function flashButton(btn) {
         btn.removeClass("highlight").addClass("highlight");
         setTimeout(function(){
           btn.removeClass("highlight");
