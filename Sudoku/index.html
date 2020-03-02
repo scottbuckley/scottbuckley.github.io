@@ -25,6 +25,79 @@
       const data_finned2      = "030605000800000030004010059000701006060000010500302000950020300070000008000107090"; // current can't solve this (nor can andoku)
       const data_default = undefined; // this one will be loaded automatically.
 
+      const strats = [
+        { name:  "Clear Adjacents",
+          sname: "Clr Adjs",
+          func:  clearAdjacents,
+          enabled: true
+        },
+        { name:  "Naked Singles",
+          sname: "Nkd 1s",
+          func:  nakedSingles,
+          enabled: true
+        },
+        { name:  "Hidden Singles",
+          sname: "Hdn 1s",
+          func:  hiddenSingles,
+          enabled: true
+        },
+        { name:  "Intersection Removal",
+          sname: "Intersect",
+          func:  intersectionRemoval,
+          enabled: true
+        },
+        { name:  "Naked Pairs",
+          sname: "Nkd 2s",
+          func:  nakedPairs,
+          enabled: true
+        },
+        { name:  "Hidden Pairs",
+          sname: "Hdn 2s",
+          func:  hiddenPairs,
+          enabled: true
+        },
+        { name:  "Naked Triples",
+          sname: "Nkd 3s",
+          func:  nakedTriples,
+          enabled: true
+        },
+        { name:  "Hidden Triples",
+          sname: "Hdn 3s",
+          func:  hiddenTriples,
+          enabled: true
+        },
+        { name:  "Naked Quads",
+          sname: "Nkd 4s",
+          func:  nakedQuads,
+          enabled: true
+        },
+        { name:  "X-Wings",
+          sname: "XWings",
+          func:  XWings,
+          enabled: true
+        },
+        { name:  "Y-Wings",
+          sname: "YWings",
+          func:  YWings,
+          enabled: true
+        },
+        { name:  "Z-Wings",
+          sname: "ZWings",
+          func:  ZWings,
+          enabled: true
+        },
+        { name:  "Finned X-Wings",
+          sname: "Finned",
+          func:  FinnedXWings,
+          enabled: true
+        },
+        { name:  "Simple Colors Chain",
+          sname: "Smpl Clrs",
+          func:  simpleColors,
+          enabled: true
+        },
+      ];
+
       // Flags to allow/disallow various solving strategies.
       // "simple" strategies
       const useNS = true; // naked singles
@@ -89,6 +162,9 @@
           initEdges(edge);
         }
 
+        // set up the individual solver buttons
+        initSolverButtons();
+
         // set up controls behaviour
         initControls();
 
@@ -116,6 +192,38 @@
         this.addClass("selected");
         prevSelectedControl = this;
       }
+
+      function initSolverButtons() {
+        var cont = $("#solvers");
+        for (var i=0; i<strats.length; i++) {
+          var strat = strats[i];
+          var button = $("<button>")
+            .text(strat.name)
+            .click(solverButton(strat));
+          cont.append(button);
+        }
+      }
+
+      function buttonCall(solvingFunc, undoLabel=undefined) {
+        if (undoLabel!==undefined) storeUndoState();
+        if (solvingFunc()) {
+          if (undoLabel!==undefined)
+            saveStoredUndoState(undoLabel);
+          refresh();
+          return true;
+        }
+        return false;
+      }
+
+      function solverButton(strat) {
+        return function() {
+          storeUndoState();
+          if (!strat.func()) return false;
+          saveStoredUndoState(undoLabel);
+          refresh();
+          return true;
+        }
+      };
 
       function initControls() {
         $("table#confirm").find("td").each(function(ind){
@@ -1709,16 +1817,6 @@
 
 
       // Button actions.
-      function buttonCall(solvingFunc, undoLabel=undefined) {
-        if (undoLabel!==undefined) storeUndoState();
-        if (solvingFunc()) {
-          if (undoLabel!==undefined)
-            saveStoredUndoState(undoLabel);
-          refresh();
-          return true;
-        }
-        return false;
-      }
 
       function caButton() {
         buttonCall(clearAdjacents, "Clr Adjs");
@@ -2383,7 +2481,7 @@
         return out;
       }
 
-      const statefulRegexp = /^[1-9]*[A-I]?(,[1-9]*[A-I]?)+$/
+      const statefulRegexp = /^!?[1-9]*[A-I]?(,!?[1-9]*[A-I]?)+$/
       const regularRegexp  = /^[0-9]+$/
       function initSudokuData(data) {
         initSudokuBlank();
@@ -2417,8 +2515,8 @@
           cands = data;
         }
         cell.swatch = swatchFromChar(swatch);
-        if (cands.length===1) {
-          var v = parseInt(cands);
+        if (cands.length>1 && cands[0]==='!') {
+          var v = parseInt(cands[1]);
           confirmCell(cell,v-1)
         } else {
           for (var i=0; i<9; i++) cell[i]=false;
@@ -2477,7 +2575,7 @@
             var cell = sudoku[r][c];
             var cellstring = "";
             if (isSolved(cell)) {
-              cellstring = ""+(cell.solved+1);
+              cellstring = "!"+(cell.solved+1);
             } else {
               for (var v=0; v<9; v++) {
                 if (cell[v]) {
@@ -2573,26 +2671,26 @@
   </head>
   <body>
     <div id="maincont">
-      <div id="topbuttons">
-        <button onclick="javascript:autoButton();">SOLVE</button>
-        <button id="caButton" onclick="javascript:caButton();">Clear Adjacents</button>
-        <button id="nsButton" onclick="javascript:nsButton();">Naked Singles</button>
-        <button id="hsButton" onclick="javascript:hsButton();">Hidden Singles</button>
-        <button id="npButton" onclick="javascript:npButton();">Naked Pairs</button>
-        <button id="hpButton" onclick="javascript:hpButton();">Hidden Pairs</button>
-        <button id="ntButton" onclick="javascript:ntButton();">Naked Triples</button>
-        <button id="htButton" onclick="javascript:htButton();">Hidden Triples</button>
-        <button id="htButton" onclick="javascript:nqButton();">Naked Quads</button>
-        <button id="irButton" onclick="javascript:irButton();">Intersection Removal</button>
-        <button id="xwButton" onclick="javascript:xwButton();">X-Wings</button>
-        <button id="ywButton" onclick="javascript:ywButton();">Y-Wings</button>
-        <button id="zwButton" onclick="javascript:zwButton();">Z-Wings</button>
-        <button id="sfButton" onclick="javascript:sfButton();">Swordfish</button>
-        <button id="fxButton" onclick="javascript:fxButton();">Finned X-Wings</button>
-        <button id="scButton" onclick="javascript:scButton();">Simple Coloring</button>
-      </div>
       <div id="gamewrapper">
-        <div id="history"></div>
+        <div id="solvers">
+          <button onclick="javascript:autoButton();">SOLVE</button>
+          <!-- <button id="caButton" onclick="javascript:caButton();">Clear Adjacents</button>
+          <button id="nsButton" onclick="javascript:nsButton();">Naked Singles</button>
+          <button id="hsButton" onclick="javascript:hsButton();">Hidden Singles</button>
+          <button id="npButton" onclick="javascript:npButton();">Naked Pairs</button>
+          <button id="hpButton" onclick="javascript:hpButton();">Hidden Pairs</button>
+          <button id="ntButton" onclick="javascript:ntButton();">Naked Triples</button>
+          <button id="htButton" onclick="javascript:htButton();">Hidden Triples</button>
+          <button id="htButton" onclick="javascript:nqButton();">Naked Quads</button>
+          <button id="irButton" onclick="javascript:irButton();">Intersection Removal</button>
+          <button id="xwButton" onclick="javascript:xwButton();">X-Wings</button>
+          <button id="ywButton" onclick="javascript:ywButton();">Y-Wings</button>
+          <button id="zwButton" onclick="javascript:zwButton();">Z-Wings</button>
+          <button id="sfButton" onclick="javascript:sfButton();">Swordfish</button>
+          <button id="fxButton" onclick="javascript:fxButton();">Finned X-Wings</button>
+          <button id="scButton" onclick="javascript:scButton();">Simple Coloring</button> -->
+        </div>
+        <div id="history">History:</div>
         <div id="gridcont">
           <table id="tbl" class="noselect"></table>
         </div>
@@ -2616,6 +2714,7 @@
             <tr><td></td><td></td><td></td></tr>
           </table>
         </div>
+        <div id="endspacer"></div>
       </div>
       <div id="bottombuttons">
         <button onclick="javascript:importButton();">Import</button>
