@@ -4,7 +4,15 @@
     <script src="jquery-3.4.1.min.js"></script>
     <script src="LineReader.js"></script>
     <script type="text/javascript">
-      // CONSTANTS
+      
+      // ######## ##     ##    ###    ##     ## ########  ##       ########  ######
+      // ##        ##   ##    ## ##   ###   ### ##     ## ##       ##       ##    ##
+      // ##         ## ##    ##   ##  #### #### ##     ## ##       ##       ##
+      // ######      ###    ##     ## ## ### ## ########  ##       ######    ######
+      // ##         ## ##   ######### ##     ## ##        ##       ##             ##
+      // ##        ##   ##  ##     ## ##     ## ##        ##       ##       ##    ##
+      // ######## ##     ## ##     ## ##     ## ##        ######## ########  ######
+
       // some example sudokus to test various strategies
       const data_extreme1     = "000000050050793000430008006307000061000000000600002803900100032000654080000000000";
       const data_expert1      = "001004900009000800020100070800005000100700342007090000000007005900200000600000010";
@@ -25,11 +33,20 @@
       const data_finned2      = "030605000800000030004010059000701006060000010500302000950020300070000008000107090"; // current can't solve this (nor can andoku)
       const data_default = undefined; // this one will be loaded automatically.
 
+
+      //  ######  ######## ########     ###    ########  ######
+      // ##    ##    ##    ##     ##   ## ##      ##    ##    ##
+      // ##          ##    ##     ##  ##   ##     ##    ##
+      //  ######     ##    ########  ##     ##    ##     ######
+      //       ##    ##    ##   ##   #########    ##          ##
+      // ##    ##    ##    ##    ##  ##     ##    ##    ##    ##
+      //  ######     ##    ##     ## ##     ##    ##     ######
       const strat_categories = [
         "Simple",
         "Tough",
         "Diabolical",
-        "Anti-Knight"
+        "Anti-Knight",
+        "Sandwich"
       ];
 
       const strats = [
@@ -74,6 +91,12 @@
           func:  hiddenPairs,
           enabled: true,
           category: "Simple"
+        },
+        { name:  "Sandwich Eliminations",
+          sname: "Sand Elim",
+          func:  sandwichElims,
+          enabled: true,
+          category: "Sandwich"
         },
         { name:  "Naked Triples",
           sname: "Nkd 3s",
@@ -121,7 +144,8 @@
           sname: "Smpl Clrs",
           func:  simpleColors,
           enabled: true,
-          category: "Tough"
+          category: "Tough",
+          aka: "Singles Chains"
         },
         { name:  "Finned X-Wings",
           sname: "Finned",
@@ -131,11 +155,31 @@
         },
       ];
 
+      //  ######   #######  ##    ## ######## ####  ######
+      // ##    ## ##     ## ###   ## ##        ##  ##    ##
+      // ##       ##     ## ####  ## ##        ##  ##
+      // ##       ##     ## ## ## ## ######    ##  ##   ####
+      // ##       ##     ## ##  #### ##        ##  ##    ##
+      // ##    ## ##     ## ##   ### ##        ##  ##    ##
+      //  ######   #######  ##    ## ##       ####  ######
+
       // how long to wait between applying solving steps.
       const stepDelay = 0;
       const flashDelay = Math.max(10, stepDelay*0.9);
 
-      // GLOBALS
+      // whether or not to print info on how the solve is achieved
+      var logging = true;
+
+
+
+      //  ######  ########    ###    ######## ########
+      // ##    ##    ##      ## ##      ##    ##
+      // ##          ##     ##   ##     ##    ##
+      //  ######     ##    ##     ##    ##    ######
+      //       ##    ##    #########    ##    ##
+      // ##    ##    ##    ##     ##    ##    ##
+      //  ######     ##    ##     ##    ##    ########
+
       // we store the sudoku in various ways simultaneously.
       var sudoku = [];
       var sudokuCols = [];
@@ -145,13 +189,15 @@
 
       var newCellsConfirmed = []; // keep track of new cells as they are confirmed.
       var undoStack = [];
-      // for (var i=0; i<100; i++) {
-      //   undoStack.push(["meow", "010"]);
-      // }
-      // setTimeout(function(){ refreshUndoLog(); },500);
 
-      // whether or not to print info on how the solve is achieved
-      var logging = true;
+
+      //  #### ##    ## ########  ##     ## ########
+      //   ##  ###   ## ##     ## ##     ##    ##
+      //   ##  ####  ## ##     ## ##     ##    ##
+      //   ##  ## ## ## ########  ##     ##    ##
+      //   ##  ##  #### ##        ##     ##    ##
+      //   ##  ##   ### ##        ##     ##    ##
+      //  #### ##    ## ##         #######     ##
 
       // input globals
       const SETNOTHING = 0;
@@ -159,8 +205,13 @@
       const SETCAND = 2;
       const SETCOLOR = 3;
       var inputState = SETNOTHING;
-      var dragState  = undefined; // undefined = nothing. -1 = clear. 0-8 = set swatch.
+      var dragState  = undefined; // undefined = nothing. -1 = clear. 0-8 = set swatch. -2 = select
       var inputNum   = undefined;
+
+
+
+
+
 
       // when the page is loaded, check if there is a query variable,
       // otherwise load the example from above.
@@ -296,6 +347,7 @@
           return false;
         } else if (code==="Space") {
           $(".selected").click();
+          clearSelected();
           return false;
         } else if (code==="KeyU") {
           flashButton($("#undobutton"));
@@ -354,6 +406,7 @@
       // try all strategies from the easiest to hardest. return true if
       // some progress was made.
       function makeSomeChange(flash=true) {
+        console.log("attempting");
         
         for (var s=0; s<strats.length; s++) {
           // only (auto) clear adj if new cells listed
@@ -404,6 +457,121 @@
               count++;
         return count;
       }
+
+
+
+      //  ######   #######  ##       ##     ## ######## ########   ######
+      // ##    ## ##     ## ##       ##     ## ##       ##     ## ##    ##
+      // ##       ##     ## ##       ##     ## ##       ##     ## ##
+      //  ######  ##     ## ##       ##     ## ######   ########   ######
+      //       ## ##     ## ##        ##   ##  ##       ##   ##         ##
+      // ##    ## ##     ## ##         ## ##   ##       ##    ##  ##    ##
+      //  ######   #######  ########    ###    ######## ##     ##  ######
+
+
+
+
+
+      //  EEEEEEE DDDDD     GGGG  EEEEEEE
+      //  EE      DD  DD   GG  GG EE
+      //  EEEEE   DD   DD GG      EEEEE
+      //  EE      DD   DD GG   GG EE
+      //  EEEEEEE DDDDDD   GGGGGG EEEEEEE
+
+      function cleanEdgeVal(val) {
+        if (val) {
+          var numVal = parseInt(val);
+          if(numVal === NaN)
+            return val;
+          return numVal
+        }
+        return undefined;
+      }
+
+      function getSingleEdgeValue_Col(ind) {
+        if (ind>=9) return undefined;
+        var top    = cleanEdgeVal(topEdge()[ind]);
+        var bottom = cleanEdgeVal(bottomEdge()[ind]);
+        return top || bottom; // bottom only if top is falseish
+      }
+
+      function getSingleEdgeValue_Row(ind) {
+        if (ind>=9) return undefined;
+        var left  = cleanEdgeVal(leftEdge()[ind]);
+        var right = cleanEdgeVal(rightEdge()[ind]);
+        return left || right; // right only if left is falseish
+      }
+
+
+
+
+      //   SSSSS    AAA   NN   NN DDDDD   WW      WW IIIII  CCCCC  HH   HH
+      //  SS       AAAAA  NNN  NN DD  DD  WW      WW  III  CC    C HH   HH
+      //   SSSSS  AA   AA NN N NN DD   DD WW   W  WW  III  CC      HHHHHHH
+      //       SS AAAAAAA NN  NNN DD   DD  WW WWW WW  III  CC    C HH   HH
+      //   SSSSS  AA   AA NN   NN DDDDDD    WW   WW  IIIII  CCCCC  HH   HH
+
+      // call a function on every row and column, given
+      // the row/col, its edge value, and its label.
+      function everyRowColSandwich(func) {
+        var changed = false;
+        for (var i=0; i<9; i++) {
+          var row = sudoku[i];
+          var rowSW = getSingleEdgeValue_Row(i);
+          if (isNumber(rowSW) && func(row, rowSW, "row "+(i+1))) changed = true;
+
+          var col = sudokuCols[i];
+          var colSW = getSingleEdgeValue_Col(i);
+          if (isNumber(colSW) && func(col, colSW, "col "+(i+1))) changed = true;
+        }
+        return changed;
+      }
+
+      // set a cell to only 1 and 9
+      function set19only(cell) {
+        var changed = false;
+        for (var v=1; v<8; v++) {
+          changed = changed || cell[v];
+          cell[v] = false;
+        }
+        return changed;
+      }
+
+      // turn 1 and 9 off on a cell
+      function set19off(cell) {
+        if (!cell[0] && !cell[8]) return false;
+        cell[0] = cell[8] = false;
+        return true;
+      }
+
+      // given a group, if its sandwich value is 35, 
+      // note that the 1 and 9 are on the outside cells.
+      function sandwich35(group, sw, groupLabel) {
+        if (sw!==35) return false;
+        var changed = false;
+        for (var c=0; c<9; c++) {
+          var cell = group[c];
+          if (c===0 || c===8) {
+            changed = set19only(cell) || changed;
+          } else {
+            changed = set19off(cell) || changed;
+          }
+        }
+        changed && consolelog(`Accounted for 35 sandwich on ${groupLabel}.`);
+        return changed;
+      }
+
+      function sandwichElims() {
+        return everyRowColSandwich(sandwich35);
+      }
+
+
+
+
+
+
+
+
 
       // clear candidates from all cells visible to newly confirmed cells.
       function clearAdjacents() {
@@ -599,7 +767,7 @@
         var groupings = [sudoku, sudokuCols, sudokuBoxes];
         for (var g=0; g<3; g++) {
           var grouping = groupings[g];
-          for (var i=0; i<9; i++) {
+          for (var i=0; i<grouping.length; i++) {
             var group = grouping[i];
             var ch = groupFunc(group);
             if (ch) changes.push(ch);
@@ -621,9 +789,10 @@
         return changed;
       }
 
-      function everyGroup(groupFunc) {
+      function everyGroup(groupFunc, noBoxes=false) {
         var changed = false;
         var groupings = [sudoku, sudokuCols, sudokuBoxes];
+        if (noBoxes) groupings = [sudoku,sudokuCols];
         for (var g=0; g<3; g++) {
           var grouping = groupings[g];
           for (var i=0; i<9; i++) {
@@ -1695,7 +1864,7 @@
           placeLink(links, strongLinks[i][1].pos, strongLinks[i][0].pos);
         }
 
-        // get a list of separated (and now colored) graphs
+        // get a list of separated graphs, and colour these graphs
         var graphStarts = [];
         for (var i=0; i<strongLinks.length; i++) {
           var node = strongLinks[i][0].pos;
@@ -1710,7 +1879,7 @@
           var [reds,grns] = getRedsGreens(links, colors, graphStarts[i]);
           // need at least four points to be a useful graph
           if (reds.length + grns.length > 3) {
-            // check if any color occurs twice in a group
+            // check if any color occurs twice in a group (Rule 2)
             var [group, cell1, cell2] = colorOccursTwiceInOneGroup(reds);
             var colorWithConflict = 'red';
             if (!group) {
@@ -1727,7 +1896,7 @@
               return true;
             } else {
               // there are no "two reds in one group" style conflicts.
-              // look for co-visible nodes.
+              // look for co-visible nodes. (Rule 4)
               var numChanged = findCovisibleToColors(v,reds,grns);
               if (numChanged>0) {
                 console.log("Simple colors chain found on value "+(v+1)+", removing candidates from "+numChanged+" cells. Red: "+reds.join(",")+". Green: "+grns.join(",")+".");
@@ -2199,44 +2368,9 @@
         saveUndoState(label, tempUndoState);
       }
 
-      function setCellClick(td, cell) {
-        // td.off("click").click(function(){
-        //   if (inputState===SETNOTHING) return;
-        //   if (inputNum===undefined) return;
+      function setCellMouseDown(td, cell) {
+        td.off("mousedown").on("mousedown", function(e){
 
-        //   if (inputState===SETFULL) {
-        //     storeUndoState();
-        //     if (confirmCell(cell, inputNum))
-        //       saveStoredUndoState(cell.pos + " = " + (inputNum+1));
-        //     if ($("#autoclearadjs").prop('checked')) {
-        //       clearAfterConfirm(cell);
-        //     }
-        //     refresh();
-        //   }
-        //   if (inputState===SETCAND) {
-        //     storeUndoState();
-        //     if (toggleCandidate(cell, inputNum)) {
-        //       var plusminus = cell[inputNum] ? '+' : '-';
-        //       saveStoredUndoState(cell.pos+" "+plusminus+" "+(inputNum+1));
-        //       refresh();
-        //     }
-        //   }
-        //   if (inputState===SETCOLOR) {
-        //     if (cell.swatch === inputNum) {
-        //       saveUndoState(cell.pos+" blank");
-        //       cell.swatch = undefined;
-        //     } else {
-        //       saveUndoState(cell.pos+" "+zoneName(inputNum));
-        //       cell.swatch = inputNum;
-        //     }
-        //     refreshHighlights();
-        //   }
-        // });
-
-        td.off("mousedown").on("mousedown", function(){
-          if (inputState===SETNOTHING) return;
-          if (inputState===undefined) return;
-          
           // confirm the cell
           if (inputState===SETFULL) {
             storeUndoState();
@@ -2250,7 +2384,7 @@
           }
 
           // toggle the cell
-          if (inputState === SETCAND) {
+          else if (inputState === SETCAND) {
             storeUndoState();
             if (toggleCandidate(cell, inputNum)) {
               var plusminus = cell[inputNum] ? '+' : '-';
@@ -2261,7 +2395,7 @@
           }
 
           // set the color
-          if (inputState===SETCOLOR) {
+          else if (inputState===SETCOLOR) {
             if (cell.swatch === inputNum) {
               saveUndoState(cell.pos+" blank");
               cell.swatch = undefined;
@@ -2273,6 +2407,14 @@
             }
             refreshHighlights();
           }
+
+          // selecting cells
+          else if (inputState===SETNOTHING) {
+            if (!e.shiftKey) clearSelected();
+            dragState = -2;
+            td.addClass("selected");
+          }
+
         });
 
         td.off("mouseenter").on("mouseenter", function(e){
@@ -2285,15 +2427,22 @@
               saveUndoState(cell.pos+" "+zoneName(dragState));
               cell.swatch = dragState;
             }
+          } else if (dragState === -2) {
+            td.addClass("selected");
           }
           refreshHighlights();
         });
       }
 
-      function leftEdge()   { return sudokuEdges[3]; }
-      function rightEdge()  { return sudokuEdges[1]; }
+      function clearSelected() {
+        $("#tbl").find(".selected").removeClass("selected");
+      }
+
       function topEdge()    { return sudokuEdges[0]; }
-      function bottomEdge() { return sudokuEdges[2]; }
+      function leftEdge()   { return sudokuEdges[1]; }
+      function rightEdge()  { return sudokuEdges[2]; }
+      function bottomEdge() { return sudokuEdges[3]; }
+
 
       function buildTable(data) {
         var table = $("#tbl");
@@ -2303,8 +2452,11 @@
         var tEdge = topEdge();
         var tr = $("<tr>").addClass("row").addClass("toprow");
         tr.append($("<td>").addClass("corner"));
-        for (var e=0; e<9; e++)
-          tr.append($("<td>").addClass("edge tbedge").text(tEdge[e]));
+        for (var e=0; e<9; e++) {
+          var td = $("<td>").addClass("edge tbedge").text(tEdge[e]);
+          setEdgeBehaviour(td, 0, e);
+          tr.append(td);
+        }
         tr.append($("<td>").addClass("corner"));
         table.append(tr);
         
@@ -2313,14 +2465,17 @@
         var rEdge = rightEdge();
         for (var r=0; r<data.length; r++) {
           var tr = $("<tr>").addClass("row");
-          tr.append($("<td>").addClass("edge ledge").text(lEdge[r]));
+          var td = $("<td>")
+            .addClass("edge ledge")
+            .text(lEdge[r]);
+          setEdgeBehaviour(td, 1, r);
+          tr.append(td);
           for (var c=0; c<data[r].length; c++) {
             var cell = data[r][c];
             var td = $("<td>").addClass("cell");
             td.attr('id', cell.pos);
             cell['td'] = td;
-            setDblClick(td,cell);
-            setCellClick(td,cell);
+            setCellBehaviour(td, cell);
             if(isSolved(cell)) {
               td.append($("<c"+(cell.solved+1)+">"));
             } else {
@@ -2331,7 +2486,11 @@
             }
             tr.append(td);
           }
-          tr.append($("<td>").addClass("edge redge").text(rEdge[r]));
+          var td = $("<td>")
+            .addClass("edge redge")
+            .text(rEdge[r]);
+          setEdgeBehaviour(td, 2, r);
+          tr.append(td);
           table.append(tr);
         }
 
@@ -2339,8 +2498,13 @@
         var bEdge = bottomEdge();
         var tr = $("<tr>").addClass("row").addClass("bottomrow");
         tr.append($("<td>").addClass("corner"));
-        for (var e=0; e<9; e++)
-          tr.append($("<td>").addClass("edge tbedge").text(bEdge[e]));
+        for (var e=0; e<9; e++) {
+          var td = $("<td>")
+            .addClass("edge tbedge")
+            .text(bEdge[e]);
+          setEdgeBehaviour(td, 3, e);
+          tr.append(td);
+        }
         tr.append($("<td>").addClass("corner"));
         table.append(tr);
 
@@ -2349,6 +2513,20 @@
           $("v"+i).text(i);
           $("c"+i).text(i);
         }
+      }
+
+      function setCellBehaviour(td, cell) {
+        setDblClick(td,cell);
+        setCellMouseDown(td,cell);
+      }
+
+      function setEdgeBehaviour(td, edgeind, ind) {
+        td.dblclick(function(){
+          var input = prompt("Enter an edge/corner value");
+          if (input === undefined) return;
+          sudokuEdges[edgeind][ind] = input;
+          refresh();
+        });
       }
 
       // const edgeRegexp = /^(.*(,.*)*)?$/
