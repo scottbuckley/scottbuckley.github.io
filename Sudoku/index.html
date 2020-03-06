@@ -95,7 +95,7 @@
         { name:  "Sandwich Eliminations",
           sname: "Sand Elim",
           func:  sandwichElims,
-          enabled: true,
+          enabled: false,
           category: "Sandwich"
         },
         { name:  "Naked Triples",
@@ -358,7 +358,7 @@
 
       // display the current state of the sudoku board.
       function refresh() {
-        buildTable(sudoku);
+        buildTable();
         refreshHighlights();
       }
 
@@ -406,8 +406,6 @@
       // try all strategies from the easiest to hardest. return true if
       // some progress was made.
       function makeSomeChange(flash=true) {
-        console.log("attempting");
-        
         for (var s=0; s<strats.length; s++) {
           // only (auto) clear adj if new cells listed
           if (s===0 &&newCellsConfirmed.length===0) continue;
@@ -478,28 +476,22 @@
       //  EE      DD   DD GG   GG EE
       //  EEEEEEE DDDDDD   GGGGGG EEEEEEE
 
-      function cleanEdgeVal(val) {
-        if (val) {
-          var numVal = parseInt(val);
-          if(numVal === NaN)
-            return val;
-          return numVal
-        }
-        return undefined;
-      }
-
       function getSingleEdgeValue_Col(ind) {
         if (ind>=9) return undefined;
-        var top    = cleanEdgeVal(topEdge()[ind]);
-        var bottom = cleanEdgeVal(bottomEdge()[ind]);
-        return top || bottom; // bottom only if top is falseish
+        var top    = topEdge()[ind];
+        var bottom = bottomEdge()[ind];
+        if (isNumber(top)) return top;
+        if (isNumber(bottom)) return bottom;
+        return undefined;
       }
 
       function getSingleEdgeValue_Row(ind) {
         if (ind>=9) return undefined;
-        var left  = cleanEdgeVal(leftEdge()[ind]);
-        var right = cleanEdgeVal(rightEdge()[ind]);
-        return left || right; // right only if left is falseish
+        var left  = leftEdge()[ind];
+        var right = rightEdge()[ind];
+        if (isNumber(left)) return left;
+        if (isNumber(right)) return right;
+        return undefined;
       }
 
 
@@ -513,22 +505,27 @@
 
       // call a function on every row and column, given
       // the row/col, its edge value, and its label.
-      function everyRowColSandwich(func) {
+      function everyRowColSandwich(func, skipFullySet=true) {
         var changed = false;
         for (var i=0; i<9; i++) {
           var row = sudoku[i];
-          var rowSW = getSingleEdgeValue_Row(i);
-          if (isNumber(rowSW) && func(row, rowSW, "row "+(i+1))) changed = true;
+          if (!row.sandwichFullySet) {
+            var rowSW = getSingleEdgeValue_Row(i);
+            if (isNumber(rowSW) && func(row, rowSW, "row "+(i+1))) changed = true;
+          }
 
           var col = sudokuCols[i];
-          var colSW = getSingleEdgeValue_Col(i);
-          if (isNumber(colSW) && func(col, colSW, "col "+(i+1))) changed = true;
+          if (!row.sandwichFullySet) {
+            var colSW = getSingleEdgeValue_Col(i);
+            if (isNumber(colSW) && func(col, colSW, "col "+(i+1))) changed = true;
+          }
         }
         return changed;
       }
 
       // set a cell to only 1 and 9
       function set19only(cell) {
+        if (isSolved(cell)) return false;
         var changed = false;
         for (var v=1; v<8; v++) {
           changed = changed || cell[v];
@@ -544,25 +541,501 @@
         return true;
       }
 
-      // given a group, if its sandwich value is 35, 
-      // note that the 1 and 9 are on the outside cells.
-      function sandwich35(group, sw, groupLabel) {
-        if (sw!==35) return false;
+      // non-static
+      function sandwichOuterDone(group, sw, groupLabel) {
         var changed = false;
+        var found19s = 0;
+        var startSum = 0;
+        var startInd = 0;
+        var endSum = 0;
+        var endInd = 8;
         for (var c=0; c<9; c++) {
+          startInd = c;
           var cell = group[c];
-          if (c===0 || c===8) {
-            changed = set19only(cell) || changed;
-          } else {
+          if (!isSolved(cell)) break;
+          if (cell.solved===1 || cell.solved===9) { found19s++; break; }
+          startSum += cell.solved+1;
+        }
+        for (var c=8; c>=startInd; c--) {
+          endInd = c;
+          var cell = group[c];
+          if (!isSolved(cell)) break;
+          if (cell.solved===1 || cell.solved===9) { found19s++; break; }
+          endSum += cell.solved+1;
+        }
+
+        // only useful if there are unknown 1s and 9s
+        if (found19s === 2) return false;
+
+        // there are two or fewer unsolved cells
+        if (startInd >= (endInd+1)) return false;
+
+        // outer sum is already completed
+        if ((startSum + endSum) === (35-sw)) {
+          changed = set19only(group[startInd]) || changed;
+          changed = set19only(group[endInd]) || changed;
+          for (var c=startInd+1; c<endInd; c++) {
+            var cell = group[c];
             changed = set19off(cell) || changed;
           }
         }
-        changed && consolelog(`Accounted for 35 sandwich on ${groupLabel}.`);
-        return changed;
+        if (changed) {
+          consolelog(`[sandwich] outer numbers of ${groupLabel} sum to its complement, so 1/9 positions known.`);
+          return true;
+        } return false;
       }
 
+      function isOnly1or9(cell) {
+        if (isSolved(cell))
+          return (cell.solved===0 || cell.solved===8);
+        for (var v=1; v<8; v++)
+          if (cell[v] || cell.solved===v)
+            return false;
+        return true;
+      }
+
+      // returns the indexes in group that match the filter
+      // returns [] if more than 'max' are found
+      function filterIndexes(group, filter, max=group.length) {
+        var out = [];
+        for (var i=0; i<group.length; i++) {
+          if (filter(group[i])) {
+            out.push(i);
+            if (out.length > max) return [];
+          }
+        }
+        return out;
+      }
+
+
+      // non-static
+      function sandwichKnown19Distances(group, sw, groupLabel) {
+        // check if there is a (single) 1-9
+        var ind19s = filterIndexes(group, isOnly1or9, 1);
+        if (ind19s.length !==1) return false;
+        var ind = ind19s[0];
+
+        var [close, far] = waysToSumRange(sw);
+
+        var changed = false;
+        for (var c=0; c<9; c++) {
+          if (c===ind) continue;
+          if (c > ind-close-1 && c < ind+close+1) {
+            if (set19off(group[c])) changed = true;
+          } else if (c < ind-far-1 || c > ind+far+1) {
+            if (set19off(group[c])) changed = true;
+          }
+        }
+
+        if (changed) {
+          consolelog(`[sandwich] cleared 1/9s too close or far from an existing 1/9 in ${groupLabel}`);
+          return true;
+        }
+        return false;
+      }
+
+
+      // non-static
+      function sandwichClearMiddle19s(group, sw, groupLabel) {
+        var startInd = 0;
+        var endInd = 8;
+        for (var i=0; i<9; i++) {
+          var cell = group[i];
+          if (cell.solved===0 || cell.solved===8) return false;
+          if (!cell[0] && !cell[8])
+            startInd = i+1;
+          else break;
+        }
+        for (var i=8; i>=startInd; i--) {
+          var cell = group[i];
+          if (cell.solved===0 || cell.solved===8) return false;
+          if (!cell[0] && !cell[8])
+            endInd = i-1;
+          else break;
+        }
+        
+        // not sure if this applies for being closer together
+        if (endInd-startInd < 2) return false;
+
+        var [minSpread, maxSpread] = waysToSumRange(sw);
+        
+        // disable 1/9 for any cells that are too close to both sides
+        var changed = false;
+        for (var i=startInd; i<=endInd; i++) {
+          if (i <= startInd+minSpread && i >= endInd-minSpread) {
+            if (set19off(group[i])) changed = true;
+          }
+        }
+        if (changed) {
+          consolelog(`[sandwich] removed 1/9 from middle of ${groupLabel} due to adjusted outer bounds.`);
+          return true;
+        } return false;
+      }
+
+      function oneWayToSum(sw) {
+        var ways = waysToSum(sw);
+        if (ways.length === 1)
+          return ways[0];
+        return undefined;
+      }
+
+      function arrayContains(arr, val) {
+        for (var i=0; i<arr.length; i++)
+          if (arr[i]===val) return true;
+        return false;
+      }
+
+      function sandwichOneWayOutside(group, sw, groupLabel) {
+
+        // if the sw complement can only be summed one way (usually only 1 digit but not always),
+        // then its one way of summing can't be right on the edge.
+        var wayToSum = oneWayToSum(35-sw);
+        if (wayToSum === undefined) return false;
+
+        // the cells that must be on the outside of the 1/9
+        // cannot be too close to the middle
+        var changed = false;
+        for (var c=wayToSum.length; c<9-wayToSum.length; c++) {
+          var cell = group[c];
+          for (var i=0; i<wayToSum.length; i++) {
+            var v = wayToSum[i]-1;
+            if (cell[v]) {
+              cell[v] = false;
+              changed = true;
+            }
+          }
+        }
+
+        // the cells on the edge can only be values from the sum
+        for (var v=1; v<8; v++) {
+          if (arrayContains(wayToSum, v+1)) continue;
+          if (group[0][v] || group[8][v]) changed = true;
+          group[0][v] = group[8][v] = false;
+        }
+
+        if (changed) {
+          consolelog(`[sandwich] ${groupLabel}'s outside sandwich value ${35-sw} limits edge cells to ${wayToSum}, and may limit these values towards the center.`);
+          return true;
+        }
+        return false;
+      }
+
+      var waysToSumRangeCache = [];
+      function waysToSumRange(total) {
+        if (waysToSumRangeCache[total])
+          return waysToSumRangeCache[total];
+
+        var ways = waysToSum(total)
+        if (ways.length>0) {
+          var minLength = 99;
+          var maxLength = -1;
+          for (var i=0; i<ways.length; i++) {
+            var len = ways[i].length;
+            if (len < minLength) minLength = len;
+            if (len > maxLength) maxLength = len;
+          }
+          var result = [minLength, maxLength];
+          waysToSumRangeCache[total] = result;
+          return result;
+        } else {
+          waysToSumRangeCache[total] = [0,0];
+          return [0,0];
+        }
+      }
+
+      var waysToSumCache = [];
+      function waysToSum(total) {
+        if (waysToSumCache[total] === undefined)
+          waysToSumCache[total] = waysToSumAux(total, [2,3,4,5,6,7,8]);
+        return waysToSumCache[total];
+      }
+
+      function waysToSumAux(total, vals) {
+        // console.log(`waysToSum(${total}, ${vals})`)
+
+        // just to be safe
+        if (total<2) return [];
+
+        // base case
+        if (vals.length===0) return [];
+
+        // single case
+        if (vals.length===1)
+          if (vals[0]===total)
+            return [[vals[0]]];
+          else
+            return [];
+
+        // two or more
+        var ways = [];
+        for (var i=vals.length-1; i>=0; i--) {
+          var val = vals[i];
+          // console.log("i", i, "val", val);
+          if (val > total) continue;
+          else if (val === total) {
+            ways.push([val]);
+            // console.log("761",[val], i);
+          } else {
+            var smallerVals = vals.slice(0,i);
+            // console.log("smallerVals", smallerVals);
+            var subWays = waysToSumAux(total-val, smallerVals);
+            // console.log("subWays", subWays);
+            for (var w=0; w<subWays.length; w++) {
+              subWays[w].push(val);
+            }
+            ways = ways.concat(subWays);
+            // console.log("ways now", ways);
+          }
+        }
+        // console.log("out",ways)
+        return ways;
+      }
+
+      // static
+      function sandwichOneWayInside(group, sw, groupLabel) {
+        // if the sw can only be summed one way (usually only 1 digit but not always),
+        // then its one way of summing can't be right on the edge.
+        var wayToSum = oneWayToSum(sw);
+        if (wayToSum === undefined) return false;
+
+        var changed = false;
+        for (var i=0; i<wayToSum.length; i++) {
+          var v = wayToSum[i]-1;
+          if (group[0][v] || group[8][v]) {
+            group[0][v] = group[8][v] = false;
+            changed = true;
+          }
+        }
+
+        if (changed) {
+          consolelog(`[sandwich] ${groupLabel}'s sandwich value ${sw} eliminates ${wayToSum} from edge cells, and may limit these values towards the center.`);
+          return true;
+        }
+        return false;
+      }
+
+      function candidateHasCandInRange(group, cand, ind, range) {
+        var [close, far] = range;
+        for (var i=ind-far-1; i<=ind-close-1; i++) {
+          if (i<0) continue;
+          if (group[i][cand]) return true;
+          if (group[i].solved===cand) return true;          
+        }
+        for (var i=ind+close+1; i<=ind+far+1; i++) {
+          if (i>8) continue;
+          if (group[i][cand]) return true;
+          if (group[i].solved===cand) return true;
+        }
+        return false;
+
+        // for (var i=0; i<9; i++) {
+        //   var cell = group[i];
+        //   if (cell[cand] === false) continue; // only looking for [cand]s
+        //   if (i===ind) continue;
+        //   if (i > ind-close-1 && i < ind+close+1) continue; // too close
+        //   if (i < ind-far-1 || i > ind+far+1)     continue; // too far
+        //   if (cell[cand]) return true;
+        //   if (cell.solved===cand) return true;
+        // }
+        // return false;
+      }
+
+      function sandwichOtherCandInRange(group, sw, groupLabel) {
+        var changed = false;
+        for (var c=0; c<9; c++) {
+          var cell = group[c];
+          if (cell[0] && !candidateHasCandInRange(group,8,c,waysToSumRange(sw))) {
+            cell[0] = false;
+            changed = true;
+          }
+          if (cell[8] && !candidateHasCandInRange(group,0,c,waysToSumRange(sw))) {
+            cell[8] = false;
+            changed = true;
+          }
+        }
+        if (changed) {
+          consolelog(`[sandwich] removed 1 or 9 candidates in ${groupLabel} because it didn't have any complementary candidates in range.`);
+          return true;
+        } return false;
+      }
+
+      function sandwichTwoKnown19s(group, sw, groupLabel) {
+        // fullySet means that we have now extracted all possible
+        // information from the sandwich value for this group.
+        var fullySet = false;
+
+        var ind19s = filterIndexes(group, isOnly1or9, 2);
+        if (ind19s.length !== 2) return;
+
+        // the indexes of the two 19s
+        var [ind1,ind2] = ind19s;
+
+        // console.log("inds", ind1, ind2);
+
+        // the number of cells between the 19s
+        var cellsBetween = ind2-ind1-1;
+
+        // console.log("cellsBetween", cellsBetween);
+
+        // the cells inside and outside the 19s
+        var cellsOut = [];
+        var cellsIn = [];
+        for (var i=0; i<9; i++) {
+          var cell = group[i];
+          if (i<ind1)           cellsOut.push(cell);
+          if (i>ind1 && i<ind2) cellsIn.push(cell);
+          if (i>ind2)           cellsOut.push(cell);
+        }
+
+        // the possible candidates for the in and out sets
+        var candsIn = [];
+        var candsOut = [];
+        for (var c=0; c<cellsIn.length; c++) {
+          var cell = cellsIn[c];
+          for (var v=1; v<8; v++)
+            if (cell[v] || cell.solved===v)
+              candsIn[v] = true;
+        }
+        for (var c=0; c<cellsOut.length; c++) {
+          var cell = cellsOut[c];
+          for (var v=1; v<8; v++)
+            if (cell[v] || cell.solved===v)
+              candsOut[v] = true;
+        }
+
+        // console.log("candsIn", candsIn);
+        // console.log("candsOut", candsOut);
+
+
+        // candidates for between the 19s
+        var inWays = waysToSum(sw);
+        var inAllowed = [];
+        var inWaysConsidered = 0;
+        for (var w=0; w<inWays.length; w++) {
+          var way = inWays[w];
+          // only ways of the right length
+          if (way.length !== cellsBetween) continue;
+
+          // only ways where each number can be placed
+          if (inWays.length !== 1) {
+            var wayValid = true;
+            for (var i=0; i<way.length; i++) {
+              if (candsIn[way[i]-1]) continue;
+              wayValid = false;
+              break;
+            }
+            if (!wayValid) continue;
+          }
+
+          // mark all the candidates for this way
+          inWaysConsidered++;
+          for (var c=0; c<way.length; c++)
+            inAllowed[way[c]-1] = true;
+        }
+        // if there was only one valid way to sum the inside,
+        // this group is now fully set
+        if (inWaysConsidered === 1)
+          fullySet = true;
+
+
+        // candidates for outside the 19s
+        var outWays = waysToSum(35-sw);
+        var outAllowed = [];
+        var outWaysConsidered = 0;
+        for (var w=0; w<outWays.length; w++) {
+          var way = outWays[w];
+
+          // only ways of the right length
+          if (way.length !== 7-cellsBetween) continue;
+
+          // only ways where each number can be placed
+          if (outWays.length !== 1) {
+            var wayValid = true;
+            for (var i=0; i<way.length; i++) {
+              if (candsOut[way[i]-1]) continue;
+              wayValid = false;
+              break;
+            }
+            if (!wayValid) continue;
+          }
+
+          // mark all the candidates for this way
+          outWaysConsidered++;
+          for (var c=0; c<way.length; c++)
+            outAllowed[way[c]-1] = true;
+        }
+        // if there was only one valid way to sum the outside,
+        // this group is now fully set
+        if (outWaysConsidered === 1)
+          fullySet = true;
+
+
+
+        // MAKE ACTUAL CHANGES FINALLY
+        var changed = false;
+        // set candidates for inCells
+        for (var i=0; i<cellsIn.length; i++) {
+          var cell = cellsIn[i];
+          for (var v=1; v<8; v++) {
+            if (cell[v]===false) continue;
+            if (inAllowed[v]) continue;
+            cell[v] = false;
+            changed = true;
+          }
+        }
+
+        for (var i=0; i<cellsOut.length; i++) {
+          var cell = cellsOut[i];
+          for (var v=1; v<8; v++) {
+            if (cell[v]===false) continue;
+            if (outAllowed[v]) continue;
+            cell[v] = false;
+            changed = true;
+          }
+        }
+
+        // if this group is now fully set, mark it
+        // so we don't waste time on it later.
+        if (fullySet)
+          group.sandwichFullySet = true;
+
+        if (changed || fullySet) {
+          console.log(`[sandwich] due to known distance between 1/9s in ${groupLabel}, we can restrict candidates within and without them.`);
+          return true;
+        } return false;
+
+        // we should mark groups "sandwichComplete" SOMETIMES after this
+        // operation. if we have done all we can from the sw constraint
+        // (including naked quads etc) we won't need the info any more.
+      }
+
+      
+      var sandwichStaticFinished = false;
       function sandwichElims() {
-        return everyRowColSandwich(sandwich35);
+        if (!sandwichStaticFinished) {
+          // these do ALMOST the same thing, but not exactly the same thing
+          // if i improved one of them, they would be equivalent
+          if (everyRowColSandwich(sandwichOneWayInside)) return true;
+          if (everyRowColSandwich(sandwichOneWayOutside)) return true;
+          else sandwichStaticFinished = true; // all static analyses are finished, so don't try again later
+        }
+
+        // clear impossible distances from 1/9s
+        if (everyRowColSandwich(sandwichKnown19Distances)) return true;
+
+        // clear 1/9s too close to both sides (dynamic to cells with 1/9s disabled)
+        if (everyRowColSandwich(sandwichClearMiddle19s)) return true;
+
+        // set known 1/9s when outer sum is done
+        if (everyRowColSandwich(sandwichOuterDone)) return true;
+
+        // consider if every candidate 1 OR 9 has any 9s or 1s in range
+        if (everyRowColSandwich(sandwichOtherCandInRange)) return true;
+
+        // when there are exactly two known 1/9s, sometimes we can restrict candidates
+        // inside and outside these cells
+        if (everyRowColSandwich(sandwichTwoKnown19s)) return true;
+        return false;
       }
 
 
@@ -2237,7 +2710,7 @@
       }
 
       function isNumber(v) {
-        if (v === undefined) return false;
+        if (isNaN(v)) return false;
         if (v === null) return false;
         if (typeof v === "number") return true;
         return false;
@@ -2444,7 +2917,7 @@
       function bottomEdge() { return sudokuEdges[3]; }
 
 
-      function buildTable(data) {
+      function buildTable() {
         var table = $("#tbl");
         table.empty();
 
@@ -2463,15 +2936,15 @@
         // table (including edges)
         var lEdge = leftEdge();
         var rEdge = rightEdge();
-        for (var r=0; r<data.length; r++) {
+        for (var r=0; r<sudoku.length; r++) {
           var tr = $("<tr>").addClass("row");
           var td = $("<td>")
             .addClass("edge ledge")
             .text(lEdge[r]);
           setEdgeBehaviour(td, 1, r);
           tr.append(td);
-          for (var c=0; c<data[r].length; c++) {
-            var cell = data[r][c];
+          for (var c=0; c<sudoku[r].length; c++) {
+            var cell = sudoku[r][c];
             var td = $("<td>").addClass("cell");
             td.attr('id', cell.pos);
             cell['td'] = td;
@@ -2523,10 +2996,24 @@
       function setEdgeBehaviour(td, edgeind, ind) {
         td.dblclick(function(){
           var input = prompt("Enter an edge/corner value");
+          if (!isNaN(parseInt(input)))
+            input = parseInt(input);
           if (input === undefined) return;
           sudokuEdges[edgeind][ind] = input;
+          sandwichStaticFinished = false;
           refresh();
         });
+        // why the fuck is this backwards lol
+        var isSet = false;
+        if (edgeind===1 || edgeind===2)
+          if (sudokuCols[ind].sandwichFullySet)
+            isSet = true;
+        else
+          if (sudoku[ind].sandwichFullySet)
+            isSet = true;
+        if (isSet) {
+          td.addClass("fullyset");
+        }
       }
 
       // const edgeRegexp = /^(.*(,.*)*)?$/
@@ -2537,7 +3024,12 @@
           var edge = Math.floor(i/9);
           var ind  = i%9;
           if (edge>3) break;
-          sudokuEdges[edge][ind] = data[i];
+          var edgeVal = data[i];
+          var edgeValInt = parseInt(edgeVal);
+          if (isNaN(edgeValInt)) {
+            sudokuEdges[edge][ind] = edgeVal;
+          } else
+            sudokuEdges[edge][ind] = edgeValInt;
         }
         refresh();
       }
@@ -2571,6 +3063,7 @@
         sudokuCellsByPos = [];
         // sudokuEdges = [];
         newCellsConfirmed = [];
+        sandwichStaticFinished = false;
 
         // fill lists with empty lists
         for(var i=0; i<9; i++) {
@@ -2578,9 +3071,9 @@
           sudokuCols.push([]);
           sudokuBoxes.push([]);
         }
-        for (var e=0; e<4; e++) {
-          sudokuEdges.push([]);
-        }
+        // for (var e=0; e<4; e++) {
+        //   sudokuEdges.push([]);
+        // }
         for (var i=0; i<9; i++) {
           sudoku[i].groupName = "Row " + (i+1);
           sudoku[i].groupType = "row";
