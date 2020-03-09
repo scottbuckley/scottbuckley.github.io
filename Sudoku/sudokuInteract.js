@@ -80,7 +80,7 @@
 
   // when the page is loaded, check if there is a query variable,
   // otherwise load the example from the settings.
-  function onReady() {
+  function onReady(buildUI=true) {
     // prepare the board with the appropriate givens.
     var data = getQueryVariable("data");
     var edge = getQueryVariable("edge");
@@ -103,7 +103,7 @@
     }
 
     // set up the individual solver buttons
-    initSolverButtons();
+    buildUI && initSolverButtons();
 
     // set up controls behaviour
     initControls();
@@ -194,6 +194,9 @@
      #######  ##    ##  ######  ######## ####  ######  ##    ##    ########    ##     ######
 */
 
+function resetButton() {
+  onReady(false);
+}
 
 function setDblClick(element, cell) {
   element.dblclick(function(){changeCell(cell)});
