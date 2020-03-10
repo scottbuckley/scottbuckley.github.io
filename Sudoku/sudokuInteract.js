@@ -29,6 +29,11 @@
   const data_finned2      = "030605000800000030004010059000701006060000010500302000950020300070000008000107090"; // current can't solve this (nor can andoku)
   const data_default = undefined; // this one will be loaded automatically.
 
+  // sandwich 1: ?sandwich=true&edge=15,9,26,8,8,12,0,12,6,7,14,20,2,8,26,10,31,16&data=000000000000900000010000000000009000000000000000800000000000050000005000000000000
+  // sandwich 2 (plus "9s follow 2s"): ?sandwich=true&edge=,29,,,2,,,20,20,24,13,7,10,12,4,25,0,2&data=0000029000000000000000000000000000000000000002000000009
+  // sandwich 3: ?sandwich=true&edge=17,17,17,17,20,22,27,17,0,17,17,17,17,20,22,27,17,0&data=00000000004002003000000000000000000002000001000000000000000000006009005
+  // sandwich 4 (not solved): ?sandwich=true&edge=19,7,15,19,4,0,6,9,35,5,13,20,9,12,0,4,14,5&data=00000000100000000000000000000000000000001
+
 
 /*
      ######   #######  ##    ## ######## ####  ######
@@ -194,6 +199,46 @@
      #######  ##    ##  ######  ######## ####  ######  ##    ##    ########    ##     ######
 */
 
+
+function autoButton() {
+  saveUndoState("AUTOSOLVE");
+  autoSolve();
+}
+
+function changeCell(cell) {
+  if (inputState !== SETNOTHING) return;
+  var input = prompt("Enter the digits that are candidates for this cell. 0=all");
+  if (input === null) return;
+  if (input === "0") {
+    cell['solved'] = undefined;
+    for (var v=0; v<9; v++)
+      cell[v] = true;
+  } else if (input.length === 1) {
+    var v = parseInt(input);
+    cell['solved'] = v-1;
+    for (var v=0; v<9; v++)
+      cell[v] = false;
+  } else if (input.length > 1) {
+    cell['solved'] = undefined;
+    for (var v=0; v<9; v++)
+      cell[v] = false;
+    for (var i=0; i<input.length; i++) {
+      var v=parseInt(input.charAt(i));
+      cell[v-1] = true;
+    }
+  }
+  refresh();
+}
+
+
+function checkButton() {
+  if (checkErrors()) {
+    alert("some errors found :(");
+  } else {
+    alert("no errors found :)")
+  }
+}
+
 function resetButton() {
   onReady(false);
 }
@@ -325,6 +370,186 @@ function setDblClick(element, cell) {
   function showVs() {
     for (var i=1; i<10; i++)
       $(`v${i}`).show();
+  }
+
+  const statefulRegexp = /^!?[1-9]*[A-I]?(,!?[1-9]*[A-I]?)+$/
+  const regularRegexp  = /^[0-9]+$/
+  function importSudokuData(data) {
+    if (typeof data !== "string") return;
+
+    if (data.match(regularRegexp)) {
+      for (var i=0; i<data.length; i++) {
+        var r = Math.floor(i/9);
+        var c = i % 9;
+        var ch = parseInt(data.charAt(i));
+        if (ch > 0)
+          confirmCell(sudoku[r][c], ch-1);
+      }
+    } else if (data.match(statefulRegexp)) {
+      data = data.split(',');
+      for (var i=0; i<data.length; i++) {
+        var r = Math.floor(i/9);
+        var c = i % 9;
+        setCellFromState(sudoku[r][c], data[i]);
+      }
+    }
+  }
+
+  const candsAndSwatch = /^!?[1-9]*[A-I]$/
+  function setCellFromState(cell, data) {
+    cell.solved = undefined;
+    var swatch = '';
+    var cands = '';
+    if (data.match(candsAndSwatch)) {
+      swatch = data.substring(data.length-1);
+      cands = data.substring(0,data.length-1);
+    } else {
+      cands = data;
+    }
+    cell.swatch = swatchFromChar(swatch);
+    if (cands.length>1 && cands[0]==='!') {
+      var v = parseInt(cands[1]);
+      confirmCell(cell,v-1)
+    } else {
+      for (var i=0; i<9; i++) cell[i]=false;
+      for (var i=0; i<cands.length; i++) {
+        var v = parseInt(cands[i])-1;
+        cell[v] = true;
+      }
+    }
+  }
+
+  function importButton() {
+    var input = "" + prompt("Enter 81 digits, like \"0814\"... 0 means unknown. Alternatively, enter a stateful export string provided by this app (containing commas and letters)");
+    initSudoku(input);
+    refresh();
+  }
+
+  function edgesButton() {
+    var input = "" + prompt("Enter 36 values, comma separated. Top (LTR), Right (TTB), Bottom (LTR), Right(TTB).");
+    if (input!=="null") {
+      initEdges(input);
+      refresh();
+    }
+  }
+
+  function getExportString() {
+    var output = "";
+    for (var r=0; r<9; r++) {
+      for (var c=0; c<9; c++) {
+        var cell = sudoku[r][c];
+        if (isSolved(cell)) {
+          output = output + (cell.solved+1);
+        } else {
+          output = output + "0";
+        }
+      }
+    }
+    return output;
+  }
+
+  function charFromSwatch(val) {
+    if (val===undefined) return '';
+    return String.fromCharCode(65+val);
+  }
+
+  function swatchFromChar(char) {
+    if (char==='') return undefined;
+    if (char < 'A') return undefined;
+    if (char > 'I') return undefined;
+    return char.charCodeAt(0)-65;
+  }
+
+  function getStatefulExportString() {
+    var output = [];
+    for (var r=0; r<9; r++) {
+      for (var c=0; c<9; c++) {
+        var cell = sudoku[r][c];
+        var cellstring = "";
+        if (isSolved(cell)) {
+          cellstring = "!"+(cell.solved+1);
+        } else {
+          for (var v=0; v<9; v++) {
+            if (cell[v]) {
+              cellstring = cellstring + (v+1);
+            }
+          }
+        }
+        cellstring = cellstring + charFromSwatch(cell.swatch);
+        output.push(cellstring);
+      }
+    }
+    return output.join(",");
+  }
+
+  // briefly flash the button given
+  function flashButton(btn) {
+    btn.removeClass("highlight").addClass("highlight");
+    setTimeout(function(){
+      btn.removeClass("highlight");
+    }, flashDelay);
+  }
+
+  function exportButton() {
+    var output = getExportString();
+    $("#exportfield").val(output);
+  }
+
+  function statefulExportButton() {
+    var output = getStatefulExportString();
+    $("#exportfield").val(output);
+  }
+
+  function getQueryVariable(variable) {
+    var query = window.location.search.substring(1);
+    var vars = query.split("&");
+    for (var i=0;i<vars.length;i++) {
+      var pair = vars[i].split("=");
+      if(pair[0] == variable) {
+        return pair[1];
+      }
+    }
+    return false;
+  }
+
+  // if a test file is loaded, parse all sudokus in it and attempt to complete them.
+  function testFileLoaded() {
+    var total      = 0;
+    var finished   = 0;
+    var incomplete = 0;
+    var errors     = 0;
+
+    console.log("Total / Completed / Incomplete / Errors");
+    logging = false;
+    var file = $("#testFile")[0].files[0];
+    new LineReader(file).readLines(function(line){
+      var [givens, solution] = line.split(",");
+      if (total%1000===0) {
+        console.log([total, finished, incomplete, errors].join(" / "));
+        refresh();
+      }
+      total = total + 1;
+      var myOutput = completeSilently(givens);
+      if (myOutput === solution) {
+        finished = finished + 1;
+      } else if ("myOutput"==="INCOMPLETE") {
+        incomplete = incomplete + 1;
+      } else if ("myOutput"==="ERROR") {
+        errors = errors + 1;
+      }
+    }, function(){
+      console.log(total + " sudokus attempted.");
+      console.log(finished +" solved correctly.");
+      console.log(incomplete +" incomplete.");
+      console.log(errors+" resulted in errors.");
+      logging = true;
+      refresh();
+    });
+  }
+
+  function makeSq() {
+    var tbl = $("#tbl");
+    tbl.width(tbl.height());
   }
 
 /*
@@ -619,3 +844,11 @@ function setDblClick(element, cell) {
       refreshHighlights();
     });
   }
+
+
+  $(document).ready(function(){
+    $(window).off("resize").on("resize", function(){
+      makeSq();
+    });
+    onReady();
+  });

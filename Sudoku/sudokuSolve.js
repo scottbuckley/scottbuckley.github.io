@@ -132,7 +132,6 @@
   var logging = true;
 
 
-
   //  ######  ########    ###    ######## ########
   // ##    ##    ##      ## ##      ##    ##
   // ##          ##     ##   ##     ##    ##
@@ -225,6 +224,90 @@
     return count;
   }
 
+/*
+    ##     ## ######## ##       ########  ######## ########   ######
+    ##     ## ##       ##       ##     ## ##       ##     ## ##    ##
+    ##     ## ##       ##       ##     ## ##       ##     ## ##
+    ######### ######   ##       ########  ######   ########   ######
+    ##     ## ##       ##       ##        ##       ##   ##         ##
+    ##     ## ##       ##       ##        ##       ##    ##  ##    ##
+    ##     ## ######## ######## ##        ######## ##     ##  ######
+*/
+//meowmeow
+
+
+function isNumber(v) {
+  if (isNaN(v)) return false;
+  if (v === null) return false;
+  if (typeof v === "number") return true;
+  return false;
+}
+
+function isSolved(cell) {
+  return isNumber(cell.solved);
+}
+
+function clearAfterConfirm(cell) {
+  var changed = false;
+  if (isSolved(cell)) {
+    var v = cell.solved;
+    cell[v] = false;
+    var row = sudoku[cell.row];
+    var col = sudokuCols[cell.col];
+    var box = sudokuBoxes[cell.box]
+    for (var i=0; i<row.length; i++) {
+      changed = changed || row[i][v] || col[i][v] || box[i][v];
+      row[i][v] = false;
+      col[i][v] = false;
+      box[i][v] = false;
+    }
+  }
+  return changed;
+}
+
+function confirmCell(cell, v) {
+  var changed = !isSolved(cell) || v!==cell.solved;
+  newCellsConfirmed.push(cell);
+  for (var i=0; i<cell.length; i++) {
+    cell[i] = false;
+  }
+  cell[v] = true;
+  cell['solved'] = v;
+  return changed;
+}
+
+function toggleCandidate(cell, v) {
+  if (isSolved(cell)) return false;
+  cell[v] = !cell[v];
+  return true;
+}
+
+function topEdge()    { return sudokuEdges[0]; }
+function leftEdge()   { return sudokuEdges[1]; }
+function rightEdge()  { return sudokuEdges[2]; }
+function bottomEdge() { return sudokuEdges[3]; }
+
+
+function boxNum(r, c) {
+  if (r<3) {
+    if (c<3) return 0;
+    if (c<6) return 1;
+    if (c<9) return 2;
+  } else if (r<6) {
+    if (c<3) return 3;
+    if (c<6) return 4;
+    if (c<9) return 5;
+  } else if (r<9) {
+    if (c<3) return 6;
+    if (c<6) return 7;
+    if (c<9) return 8;
+  } else return -1;
+}
+
+
+
+
+
 
 
   //  ######   #######  ##       ##     ## ######## ########   ######
@@ -278,13 +361,13 @@
     var changed = false;
     for (var i=0; i<9; i++) {
       var row = sudoku[i];
-      if (!row.sandwichFullySet) {
+      if (!skipFullySet || !row.sandwichFullySet) {
         var rowSW = getSingleEdgeValue_Row(i);
         if (isNumber(rowSW) && func(row, rowSW, "row "+(i+1))) changed = true;
       }
 
       var col = sudokuCols[i];
-      if (!col.sandwichFullySet) {
+      if (!skipFullySet || !col.sandwichFullySet) {
         var colSW = getSingleEdgeValue_Col(i);
         if (isNumber(colSW) && func(col, colSW, "col "+(i+1))) changed = true;
       }
@@ -292,6 +375,11 @@
     return changed;
   }
 
+  function everyRowColSandwichAllTrue(func) {
+    // invert the function, call above, then invert the result.
+    // it will return true iff func always returned true.
+    return !everyRowColSandwich(function(a,b,c){return !func(a,b,c);}, false);
+  }
 
   // set a cell to only 1 and 9. true if a change was made.
   function set19only(cell) {
@@ -473,54 +561,6 @@
         cell[8] = false;
         changed = true;
       }
-      // if (cell[0]===true) {
-      //   var foundInRange = false;
-      //   for (var i=c-far-1; i<c-close; i++) {
-      //     if (i>=0 && (group[i][8] || group[i].solved===8)) {
-      //       if (rangeCanSupportSum(group, sw, i, c)) {
-      //         foundInRange = true;
-      //         break;
-      //       }
-      //     }
-      //   }
-      //   if (foundInRange===false)
-      //     for (var i=c+close+1; i<=c+far+1; i++) {
-      //       if (i<9 && (group[i][8] || group[i].solved===8)) {
-      //         if (rangeCanSupportSum(group, sw, c, i)) {
-      //           foundInRange = true;
-      //           break;
-      //         }
-      //       }
-      //     }
-      //   if (foundInRange===false) {
-      //     cell[0] = false;
-      //     changed = true;
-      //   }
-      // }
-      // if (cell[8]===true) {
-      //   var foundInRange = false;
-      //   for (var i=c-far-1; i<c-close; i++) {
-      //     if (i>=0 && (group[i][0] || group[i].solved===0)) {
-      //       if (rangeCanSupportSum(group, sw, i, c)) {
-      //         foundInRange = true;
-      //         break;
-      //       }
-      //     }
-      //   }
-      //   if (foundInRange===false)
-      //     for (var i=c+close+1; i<=c+far+1; i++) {
-      //       if (i<9 && (group[i][0] || group[i].solved===0)) {
-      //         if (rangeCanSupportSum(group, sw, c, i)) {
-      //           foundInRange = true;
-      //           break;
-      //         }
-      //       }
-      //     }
-      //   if (foundInRange===false) {
-      //     cell[8] = false;
-      //     changed = true;
-      //   }
-      // }
     }
     if (changed) {
       consolelog(`[sandwich] removed candidate 1/9s in ${groupLabel} due to having no complementary 1/9s in range.`);
@@ -613,14 +653,6 @@
     }
     return false;
   }
-
-
-
-
-
-
-
-
 
 
   function ensureIndices(arr) {
@@ -755,51 +787,6 @@
     }
     return false;
   }
-
-  // function candidateHasCandInRange(group, cand, ind, range) {
-  //   var [close, far] = range;
-  //   for (var i=ind-far-1; i<=ind-close-1; i++) {
-  //     if (i<0) continue;
-  //     if (group[i][cand]) return true;
-  //     if (group[i].solved===cand) return true;          
-  //   }
-  //   for (var i=ind+close+1; i<=ind+far+1; i++) {
-  //     if (i>8) continue;
-  //     if (group[i][cand]) return true;
-  //     if (group[i].solved===cand) return true;
-  //   }
-  //   return false;
-
-    // for (var i=0; i<9; i++) {
-    //   var cell = group[i];
-    //   if (cell[cand] === false) continue; // only looking for [cand]s
-    //   if (i===ind) continue;
-    //   if (i > ind-close-1 && i < ind+close+1) continue; // too close
-    //   if (i < ind-far-1 || i > ind+far+1)     continue; // too far
-    //   if (cell[cand]) return true;
-    //   if (cell.solved===cand) return true;
-    // }
-    // return false;
-  // }
-
-  // function sandwichOtherCandInRange(group, sw, groupLabel) {
-  //   var changed = false;
-  //   for (var c=0; c<9; c++) {
-  //     var cell = group[c];
-  //     if (cell[0] && !candidateHasCandInRange(group,8,c,waysToSumRange(sw))) {
-  //       cell[0] = false;
-  //       changed = true;
-  //     }
-  //     if (cell[8] && !candidateHasCandInRange(group,0,c,waysToSumRange(sw))) {
-  //       cell[8] = false;
-  //       changed = true;
-  //     }
-  //   }
-  //   if (changed) {
-  //     consolelog(`[sandwich] removed 1 or 9 candidates in ${groupLabel} because it didn't have any complementary candidates in range.`);
-  //     return true;
-  //   } return false;
-  // }
 
   function sandwichTwoKnown19s(group, sw, groupLabel) {
     // fullySet means that we have now extracted all possible
@@ -1053,6 +1040,7 @@
     return changed;
   }
 
+
 /*
     HH   HH DDDDD   NN   NN     SSSSS  IIIII NN   NN   GGGG  LL      EEEEEEE  SSSSS
     HH   HH DD  DD  NNN  NN    SS       III  NNN  NN  GG  GG LL      EE      SS
@@ -1159,6 +1147,118 @@
     }
     return false;
   }
+
+/*
+    IIIII NN   NN TTTTTTT EEEEEEE RRRRRR   SSSSS  EEEEEEE  CCCCC  TTTTTTT    RRRRRR  MM    MM VV     VV LL
+     III  NNN  NN   TTT   EE      RR   RR SS      EE      CC    C   TTT      RR   RR MMM  MMM VV     VV LL
+     III  NN N NN   TTT   EEEEE   RRRRRR   SSSSS  EEEEE   CC        TTT      RRRRRR  MM MM MM  VV   VV  LL
+     III  NN  NNN   TTT   EE      RR  RR       SS EE      CC    C   TTT      RR  RR  MM    MM   VV VV   LL
+    IIIII NN   NN   TTT   EEEEEEE RR   RR  SSSSS  EEEEEEE  CCCCC    TTT      RR   RR MM    MM    VVV    LLLLLLL
+*/
+
+  function optionsConfined(group, otherGroupType) {
+    var mins = [10, 10, 10, 10, 10, 10, 10, 10, 10];
+    var maxs = [-1, -1, -1, -1, -1, -1, -1, -1, -1];
+
+    // get the min and max value for grouptype (row/col/box) for
+    // each cell holding each value.
+    for (var c=0; c<9; c++) {
+      var cell = group[c];
+      for (var v=0; v<9; v++) {
+        if (cell[v]) {
+          mins[v] = Math.min(mins[v], cell[otherGroupType]);
+          maxs[v] = Math.max(maxs[v], cell[otherGroupType]);
+        }
+      }
+    }
+
+    // when the min is the max, store that value in the below array.
+    var totals = [-1, -1, -1, -1, -1, -1, -1, -1, -1];
+    for (var v=0; v<9; v++) {
+      if (mins[v] == maxs[v]) {
+        totals[v] = mins[v];
+      }
+    }
+
+    return totals;
+  }
+
+
+  function clearExceptGroup(thisgroup, othergrouptype, othergroup, v) {
+    var changed = false;
+    for (var i=0; i<9; i++) {
+      var cell = thisgroup[i];
+      if (cell[othergrouptype] !== othergroup) {
+        if (cell[v]) {
+          cell[v] = false;
+          changed = true;
+        }
+      }
+    }
+    return changed;
+  }
+
+  function intersectionRemoval() {
+    var changes = [];
+
+    for (var i=0; i<9; i++) {
+      var row = sudoku[i];
+      var col = sudokuCols[i];
+      var box = sudokuBoxes[i];
+
+      var rowConfines    = optionsConfined(row, 'box');
+      var colConfines    = optionsConfined(col, 'box');
+      var boxConfinesRow = optionsConfined(box, 'row');
+      var boxConfinesCol = optionsConfined(box, 'col');
+      
+      for (var v=0; v<9; v++) {
+        if (rowConfines[v] >= 0) {
+          // clear v from the box, apart from this row
+          var intersectedBox = sudokuBoxes[rowConfines[v]];
+          if (clearExceptGroup(intersectedBox, 'row', i, v)) {
+            changes.push([row, intersectedBox, v]);
+          }
+        }
+        if (colConfines[v] >= 0) {
+          // clear v from the box, apart rom this col
+          var intersectedBox = sudokuBoxes[colConfines[v]];
+          if (clearExceptGroup(intersectedBox, 'col', i, v)) {
+            changes.push([col, intersectedBox, v]);
+          }
+        }
+        if (boxConfinesRow[v] >= 0) {
+          // clear v from the row, apart from this box
+          var intersectedRow = sudoku[boxConfinesRow[v]];
+          if (clearExceptGroup(intersectedRow, 'box', i, v)) {
+            changes.push([box, intersectedRow, v]);
+          }
+        }
+        if (boxConfinesCol[v] >= 0) {
+          // clear v from the col, apart from this box
+          var intersectedCol = sudokuCols[boxConfinesCol[v]];
+          if (clearExceptGroup(intersectedCol, 'box', i, v)) {
+            changes.push([box, intersectedCol, v]);
+          }
+        }
+      } 
+    } 
+
+    if (changes.length === 0) return false;
+    for (var i=0; i<changes.length; i++) {
+      var [group1,group2,v] = changes[i];
+      consolelog("Intersection on value " + (v+1) + " between " + group1.groupName + " and " + group2.groupName + ".");
+    }
+    return true;
+  }
+
+
+/*
+    NN   NN KK  KK DDDDD      PPPPPP    AAA   IIIII RRRRRR   SSSSS
+    NNN  NN KK KK  DD  DD     PP   PP  AAAAA   III  RR   RR SS
+    NN N NN KKKK   DD   DD    PPPPPP  AA   AA  III  RRRRRR   SSSSS
+    NN  NNN KK KK  DD   DD    PP      AAAAAAA  III  RR  RR       SS
+    NN   NN KK  KK DDDDDD     PP      AA   AA IIIII RR   RR  SSSSS
+*/
 
   function moreThanLeft(group, n) {
     var count = 0;
@@ -1271,6 +1371,24 @@
     return changed;
   }
 
+
+  function sameCell(cell1, cell2) {
+    return (cell1.pos === cell2.pos);
+  }
+
+  function clearNakedPair(group, val1, val2, cell1, cell2) {
+    var changed = false;
+    for (var c=0; c<9; c++) {
+      var cell = group[c];
+      if (!sameCell(cell, cell1) && !sameCell(cell, cell2)) {
+        changed = changed || cell[val1] || cell[val2];
+        cell[val1] = false;
+        cell[val2] = false;
+      }
+    }
+    return changed;
+  }
+
   function nakedPairsGroup(group) {
     // changed = false;
     var changes = [];
@@ -1299,6 +1417,14 @@
     }
     return true;
   }
+
+/*
+    NN   NN KK  KK DDDDD      TTTTTTT RRRRRR  IIIII PPPPPP  LL      EEEEEEE
+    NNN  NN KK KK  DD  DD       TTT   RR   RR  III  PP   PP LL      EE
+    NN N NN KKKK   DD   DD      TTT   RRRRRR   III  PPPPPP  LL      EEEEE
+    NN  NNN KK KK  DD   DD      TTT   RR  RR   III  PP      LL      EE
+    NN   NN KK  KK DDDDDD       TTT   RR   RR IIIII PP      LLLLLLL EEEEEEE
+*/
 
   function combinedCandidateCount(cell1, cell2) {
     var count=0;
@@ -1424,6 +1550,14 @@
     return everyGroup(nakedTriplesGroup);
   }
 
+/*
+    NN   NN KK  KK DDDDD       QQQQQ  UU   UU   AAA   DDDDD
+    NNN  NN KK KK  DD  DD     QQ   QQ UU   UU  AAAAA  DD  DD
+    NN N NN KKKK   DD   DD    QQ   QQ UU   UU AA   AA DD   DD
+    NN  NNN KK KK  DD   DD    QQ  QQ  UU   UU AAAAAAA DD   DD
+    NN   NN KK  KK DDDDDD      QQQQ Q  UUUUU  AA   AA DDDDDD
+*/
+
   function nakedQuadsGroup(group) {
     if (!moreThanFourLeft(group)) return false;
 
@@ -1475,6 +1609,14 @@
   function nakedQuads() {
     return everyGroup(nakedQuadsGroup);
   }
+
+/*
+    HH   HH DDDDD   NN   NN    TTTTTTT RRRRRR  IIIII PPPPPP  LL      EEEEEEE
+    HH   HH DD  DD  NNN  NN      TTT   RR   RR  III  PP   PP LL      EE
+    HHHHHHH DD   DD NN N NN      TTT   RRRRRR   III  PPPPPP  LL      EEEEE
+    HH   HH DD   DD NN  NNN      TTT   RR  RR   III  PP      LL      EE
+    HH   HH DDDDDD  NN   NN      TTT   RR   RR IIIII PP      LLLLLLL EEEEEEE
+*/
 
   function mapCount(map) {
     var count = 0;
@@ -1580,6 +1722,14 @@
     return everyGroup(hiddenTripleGroup);
   }
 
+/*
+    HH   HH DDDDD   NN   NN    PPPPPP    AAA   IIIII RRRRRR   SSSSS
+    HH   HH DD  DD  NNN  NN    PP   PP  AAAAA   III  RR   RR SS
+    HHHHHHH DD   DD NN N NN    PPPPPP  AA   AA  III  RRRRRR   SSSSS
+    HH   HH DD   DD NN  NNN    PP      AAAAAAA  III  RR  RR       SS
+    HH   HH DDDDDD  NN   NN    PP      AA   AA IIIII RR   RR  SSSSS
+*/
+
   function countPossibleCells(group, v) {
     var count = 0;
     for (var c=0; c<9; c++) {
@@ -1678,6 +1828,13 @@
     return true;
   }
 
+/*
+    XX    XX        WW      WW IIIII NN   NN   GGGG   SSSSS
+     XX  XX         WW      WW  III  NNN  NN  GG  GG SS
+      XXXX   _____  WW   W  WW  III  NN N NN GG       SSSSS
+     XX  XX          WW WWW WW  III  NN  NNN GG   GG      SS
+    XX    XX          WW   WW  IIIII NN   NN  GGGGGG  SSSSS
+*/
 
   String.prototype.nthIndexOf = function(pattern, n) {
     var i = -1;
@@ -1706,12 +1863,6 @@
       }
     }
     return -1;
-  }
-  function getThird1(str) {
-    var onesfound = 0;
-    for (var i=0; i<str.length; i++) {
-      
-    }
   }
 
   function clearXWing(groups, v, g1, g2, y1, y2) {
@@ -1758,6 +1909,13 @@
     return XWingsAux(sudoku, "rows") || XWingsAux(sudokuCols, "cols");
   }
 
+/*
+    FFFFFFF IIIII NN   NN NN   NN EEEEEEE DDDDD      XX    XX
+    FF       III  NNN  NN NNN  NN EE      DD  DD      XX  XX
+    FFFF     III  NN N NN NN N NN EEEEE   DD   DD      XXXX
+    FF       III  NN  NNN NN  NNN EE      DD   DD     XX  XX
+    FF      IIIII NN   NN NN   NN EEEEEEE DDDDDD     XX    XX
+*/
 
   function clearFinnedXWing(v, y1, y2, x, groupType) {
     var group = sudoku[x];
@@ -1861,7 +2019,13 @@
   }
 
 
-
+/*
+      AAA   NN   NN TTTTTTT IIIII KK  KK NN   NN IIIII   GGGG  HH   HH TTTTTTT
+     AAAAA  NNN  NN   TTT    III  KK KK  NNN  NN  III   GG  GG HH   HH   TTT
+    AA   AA NN N NN   TTT    III  KKKK   NN N NN  III  GG      HHHHHHH   TTT
+    AAAAAAA NN  NNN   TTT    III  KK KK  NN  NNN  III  GG   GG HH   HH   TTT
+    AA   AA NN   NN   TTT   IIIII KK  KK NN   NN IIIII  GGGGGG HH   HH   TTT
+*/
 
   function knightAdjs(x, y) {
     var out = [];
@@ -1878,15 +2042,6 @@
     }
     return out;
   }
-
-  // function knightMoves(x, y) {
-  //   return [
-  //     [x-1,y-2], [x-2,y-1],
-  //     [x+1,y+2], [x+2,y+1],
-  //     [x-1,y+2], [x-2,y+1],
-  //     [x+1,y-2], [x+2,y-1]
-  //   ];
-  // }
 
   function AntiknightAdjs() {
     var changed = false;
@@ -1909,10 +2064,13 @@
 
 
 
-
-
-
-
+/*
+    YY   YY        WW      WW IIIII NN   NN   GGGG   SSSSS
+    YY   YY        WW      WW  III  NNN  NN  GG  GG SS
+     YYYYY  _____  WW   W  WW  III  NN N NN GG       SSSSS
+      YYY           WW WWW WW  III  NN  NNN GG   GG      SS
+      YYY            WW   WW  IIIII NN   NN  GGGGGG  SSSSS
+*/
 
   function candidateXOR(cell1, cell2) {
     var out = [];
@@ -1920,10 +2078,6 @@
       if (cell1[v] !== cell2[v])
         out.push(v);
     return out;
-  }
-
-  function findAdjacentByCands(cell, cands, groupType) {
-
   }
 
   function cellHasExactlyCands(cell, cands) {
@@ -2086,6 +2240,14 @@
     return false;
   }
 
+/*
+    ZZZZZ        WW      WW IIIII NN   NN   GGGG   SSSSS
+       ZZ        WW      WW  III  NNN  NN  GG  GG SS
+      ZZ  _____  WW   W  WW  III  NN N NN GG       SSSSS
+     ZZ           WW WWW WW  III  NN  NNN GG   GG      SS
+    ZZZZZ          WW   WW  IIIII NN   NN  GGGGGG  SSSSS
+*/
+
   function clearZWing(rowcol, z, box, pivot) {
     var changed = false;
     for (var c=0; c<9; c++) {
@@ -2162,6 +2324,14 @@
     return false;
   }
 
+/*
+     SSSSS  WW      WW  OOOOO  RRRRRR  DDDDD   FFFFFFF IIIII  SSSSS  HH   HH
+    SS      WW      WW OO   OO RR   RR DD  DD  FF       III  SS      HH   HH
+     SSSSS  WW   W  WW OO   OO RRRRRR  DD   DD FFFF     III   SSSSS  HHHHHHH
+         SS  WW WWW WW OO   OO RR  RR  DD   DD FF       III       SS HH   HH
+     SSSSS    WW   WW   OOOO0  RR   RR DDDDDD  FF      IIIII  SSSSS  HH   HH
+*/
+
   function clearSwordfish(groups, v, g1, g2, g3, y1, y2, y3) {
     var changed = false;
     for (var g=0; g<9; g++) {
@@ -2222,6 +2392,14 @@
   function swordfish() {
     return swordfishAux(sudoku, "rows") || swordfishAux(sudokuCols, "cols");
   }
+
+/*
+     CCCCC  LL      RRRRRR   SSSSS      CCCCC  HH   HH   AAA   IIIII NN   NN  SSSSS
+    CC    C LL      RR   RR SS         CC    C HH   HH  AAAAA   III  NNN  NN SS
+    CC      LL      RRRRRR   SSSSS     CC      HHHHHHH AA   AA  III  NN N NN  SSSSS
+    CC    C LL      RR  RR       SS    CC    C HH   HH AAAAAAA  III  NN  NNN      SS
+     CCCCC  LLLLLLL RR   RR  SSSSS      CCCCC  HH   HH AA   AA IIIII NN   NN  SSSSS
+*/
 
   function getOnlyTwoCells(group, v) {
     var out = [];
@@ -2488,14 +2666,15 @@
       if (simpleColorsVal(v)) return true;
   }
 
-  function checkButton() {
-    if (checkErrors()) {
-      alert("some errors found :(");
-    } else {
-      alert("no errors found :)")
-    }
-  }
-
+/*
+     ######  ##     ## ########  ######  ##    ## #### ##    ##  ######
+    ##    ## ##     ## ##       ##    ## ##   ##   ##  ###   ## ##    ##
+    ##       ##     ## ##       ##       ##  ##    ##  ####  ## ##
+    ##       ######### ######   ##       #####     ##  ## ## ## ##   ####
+    ##       ##     ## ##       ##       ##  ##    ##  ##  #### ##    ##
+    ##    ## ##     ## ##       ##    ## ##   ##   ##  ##   ### ##    ##
+     ######  ##     ## ########  ######  ##    ## #### ##    ##  ######
+*/
 
   function checkGroupForEmpties(group, desc) {
     var error = false;
@@ -2539,6 +2718,37 @@
     error = true;
   }
 
+  function sandwichEnabled() {
+    for (var i=0; i<strats.length; i++)
+      if (strats[i].category="Sandwich" && strats[i].enabled) return true;
+    return false;
+  }
+
+  function sandwichErrors(group, sw) {
+    var outSum = 0;
+    var inSum = 0;
+    var allSolved = true;
+    var inSandwich = false;
+    for (var c=0; c<9; c++) {
+      var cell = group[c];
+      if (isSolved(cell)) {
+        if (cell.solved===0 || cell.solved===8) {
+          inSandwich = !inSandwich;
+          continue;
+        } else {
+          if (inSandwich) inSum  += (cell.solved+1);
+          else            outSum += (cell.solved+1);
+        }
+      } else { 
+        allSolved = false;
+      }
+    }
+    if (allSolved && inSum === sw) return false;
+    if (!allSolved && inSum <= sw && outSum <= (35-sw)) return false;
+    console.error(`${group.groupName} does not match Sandwich constraints.`);
+    return true;
+  }
+
   function checkErrors() {
     var errors = false;
     // errors = checkGroupForEmpties(sudoku[0], "row " + (0+1)) || errors;
@@ -2557,239 +2767,21 @@
       errors = checkGroupForEmpties(sudokuBoxes[b], "box " + (b+1)) || errors;
     }
 
+    if (sandwichEnabled())
+      errors = everyRowColSandwich(sandwichErrors, false) || errors;
+
     return errors;
   }
 
-
-  function optionsConfined(group, otherGroupType) {
-    var mins = [10, 10, 10, 10, 10, 10, 10, 10, 10];
-    var maxs = [-1, -1, -1, -1, -1, -1, -1, -1, -1];
-
-    // get the min and max value for grouptype (row/col/box) for
-    // each cell holding each value.
-    for (var c=0; c<9; c++) {
-      var cell = group[c];
-      for (var v=0; v<9; v++) {
-        if (cell[v]) {
-          mins[v] = Math.min(mins[v], cell[otherGroupType]);
-          maxs[v] = Math.max(maxs[v], cell[otherGroupType]);
-        }
-      }
-    }
-
-    // when the min is the max, store that value in the below array.
-    var totals = [-1, -1, -1, -1, -1, -1, -1, -1, -1];
-    for (var v=0; v<9; v++) {
-      if (mins[v] == maxs[v]) {
-        totals[v] = mins[v];
-      }
-    }
-
-    return totals;
-  }
-
-  function intersectionRemoval() {
-    var changes = [];
-
-    for (var i=0; i<9; i++) {
-      var row = sudoku[i];
-      var col = sudokuCols[i];
-      var box = sudokuBoxes[i];
-
-      var rowConfines    = optionsConfined(row, 'box');
-      var colConfines    = optionsConfined(col, 'box');
-      var boxConfinesRow = optionsConfined(box, 'row');
-      var boxConfinesCol = optionsConfined(box, 'col');
-      
-      for (var v=0; v<9; v++) {
-        if (rowConfines[v] >= 0) {
-          // clear v from the box, apart from this row
-          var intersectedBox = sudokuBoxes[rowConfines[v]];
-          if (clearExceptGroup(intersectedBox, 'row', i, v)) {
-            changes.push([row, intersectedBox, v]);
-          }
-        }
-        if (colConfines[v] >= 0) {
-          // clear v from the box, apart rom this col
-          var intersectedBox = sudokuBoxes[colConfines[v]];
-          if (clearExceptGroup(intersectedBox, 'col', i, v)) {
-            changes.push([col, intersectedBox, v]);
-          }
-        }
-        if (boxConfinesRow[v] >= 0) {
-          // clear v from the row, apart from this box
-          var intersectedRow = sudoku[boxConfinesRow[v]];
-          if (clearExceptGroup(intersectedRow, 'box', i, v)) {
-            changes.push([box, intersectedRow, v]);
-          }
-        }
-        if (boxConfinesCol[v] >= 0) {
-          // clear v from the col, apart from this box
-          var intersectedCol = sudokuCols[boxConfinesCol[v]];
-          if (clearExceptGroup(intersectedCol, 'box', i, v)) {
-            changes.push([box, intersectedCol, v]);
-          }
-        }
-      } 
-    } 
-
-    if (changes.length === 0) return false;
-    for (var i=0; i<changes.length; i++) {
-      var [group1,group2,v] = changes[i];
-      consolelog("Intersection on value " + (v+1) + " between " + group1.groupName + " and " + group2.groupName + ".");
-    }
-    return true;
-
-    // the below was existing alongside the above. not sure if it was needed or not...
-    // // if all row options for N are in the same box, remove N from other cells in that box.
-    // // same for col, and box->row.
-    // for (var b=0; b<9; b++) {
-    //   var box = sudokuBoxes[b];
-    //   // in this box, look at every value's min/max positions.
-    //   for (var v=0; v<9; v++) {
-    //     var rMin = 10;
-    //     var rMax = -1;
-    //     var cMin = 10;
-    //     var cMax = -1;
-    //     for (var c=0; c<9; c++) {
-    //       var cell = box[c];
-    //       if (cell[v]) {
-    //         rMin = Math.min(rMin, cell.row);
-    //         rMax = Math.max(rMax, cell.row);
-    //         cMin = Math.min(cMin, cell.col);
-    //         cMax = Math.max(cMax, cell.col);
-    //       }
-    //     }
-    //     if (rMin===rMax) {
-    //       // in box b, value v is only found in row rMin
-    //       // consolelog("clearing row " + (rMin+1) + " of " + (v+1) + " because of box " + (b+1));
-    //       changed = clearExceptGroup(sudoku[rMin],'box',b,v) || changed;
-    //     } else if (cMin===cMax) {
-    //       // in box b, value v is only found in col cMin
-    //       // consolelog("clearing col " + (cMin+1) + " of " + (v+1) + " because of box " + (b+1));
-    //       changed = clearExceptGroup(sudokuCols[cMin],'box',b,v) || changed;
-    //     }
-    //   }
-    // }
-    // return changed;
-  }
-
-  function clearExceptGroup(thisgroup, othergrouptype, othergroup, v) {
-    var changed = false;
-    for (var i=0; i<9; i++) {
-      var cell = thisgroup[i];
-      if (cell[othergrouptype] !== othergroup) {
-        if (cell[v]) {
-          cell[v] = false;
-          changed = true;
-        }
-      }
-    }
-    return changed;
-  }
-
-  function sameCell(cell1, cell2) {
-    return (cell1.pos === cell2.pos);
-  }
-
-  function clearNakedPair(group, val1, val2, cell1, cell2) {
-    var changed = false;
-    for (var c=0; c<9; c++) {
-      var cell = group[c];
-      if (!sameCell(cell, cell1) && !sameCell(cell, cell2)) {
-        changed = changed || cell[val1] || cell[val2];
-        cell[val1] = false;
-        cell[val2] = false;
-      }
-    }
-    return changed;
-  }
-
-  function isNumber(v) {
-    if (isNaN(v)) return false;
-    if (v === null) return false;
-    if (typeof v === "number") return true;
-    return false;
-  }
-
-  function isSolved(cell) {
-    return isNumber(cell.solved);
-  }
-
-  function clearAfterConfirm(cell) {
-    var changed = false;
-    if (isSolved(cell)) {
-      var v = cell.solved;
-      cell[v] = false;
-      var row = sudoku[cell.row];
-      var col = sudokuCols[cell.col];
-      var box = sudokuBoxes[cell.box]
-      for (var i=0; i<row.length; i++) {
-        changed = changed || row[i][v] || col[i][v] || box[i][v];
-        row[i][v] = false;
-        col[i][v] = false;
-        box[i][v] = false;
-      }
-    }
-    return changed;
-  }
-
-  function confirmCell(cell, v) {
-    var changed = !isSolved(cell) || v!==cell.solved;
-    newCellsConfirmed.push(cell);
-    for (var i=0; i<cell.length; i++) {
-      cell[i] = false;
-    }
-    cell[v] = true;
-    cell['solved'] = v;
-    return changed;
-  }
-
-  function toggleCandidate(cell, v) {
-    if (isSolved(cell)) return false;
-    cell[v] = !cell[v];
-    return true;
-  }
-
-  function autoButton() {
-    saveUndoState("AUTOSOLVE");
-    autoSolve();
-  }
-
-  function changeCell(cell) {
-    if (inputState !== SETNOTHING) return;
-    var input = prompt("Enter the digits that are candidates for this cell. 0=all");
-    if (input === null) return;
-    if (input === "0") {
-      cell['solved'] = undefined;
-      for (var v=0; v<9; v++)
-        cell[v] = true;
-    } else if (input.length === 1) {
-      var v = parseInt(input);
-      cell['solved'] = v-1;
-      for (var v=0; v<9; v++)
-        cell[v] = false;
-    } else if (input.length > 1) {
-      cell['solved'] = undefined;
-      for (var v=0; v<9; v++)
-        cell[v] = false;
-      for (var i=0; i<input.length; i++) {
-        var v=parseInt(input.charAt(i));
-        cell[v-1] = true;
-      }
-    }
-    refresh();
-  }
-
-
-  function topEdge()    { return sudokuEdges[0]; }
-  function leftEdge()   { return sudokuEdges[1]; }
-  function rightEdge()  { return sudokuEdges[2]; }
-  function bottomEdge() { return sudokuEdges[3]; }
-
-
-  
-
+/*
+    #### ##    ## #### ######## ####    ###    ##       ####  ######  ########
+     ##  ###   ##  ##     ##     ##    ## ##   ##        ##  ##    ## ##
+     ##  ####  ##  ##     ##     ##   ##   ##  ##        ##  ##       ##
+     ##  ## ## ##  ##     ##     ##  ##     ## ##        ##   ######  ######
+     ##  ##  ####  ##     ##     ##  ######### ##        ##        ## ##
+     ##  ##   ###  ##     ##     ##  ##     ## ##        ##  ##    ## ##
+    #### ##    ## ####    ##    #### ##     ## ######## ####  ######  ########
+*/
 
   // const edgeRegexp = /^(.*(,.*)*)?$/
   function initEdges(data){
@@ -2811,22 +2803,6 @@
   function initSudoku(data) {
     if (data) initSudokuData(data);
     else initSudokuBlank();
-  }
-
-  function boxNum(r, c) {
-    if (r<3) {
-      if (c<3) return 0;
-      if (c<6) return 1;
-      if (c<9) return 2;
-    } else if (r<6) {
-      if (c<3) return 3;
-      if (c<6) return 4;
-      if (c<9) return 5;
-    } else if (r<9) {
-      if (c<3) return 6;
-      if (c<6) return 7;
-      if (c<9) return 8;
-    } else return -1;
   }
 
   function initSudokuBlank() {
@@ -2896,194 +2872,8 @@
     return out;
   }
 
-  const statefulRegexp = /^!?[1-9]*[A-I]?(,!?[1-9]*[A-I]?)+$/
-  const regularRegexp  = /^[0-9]+$/
   function initSudokuData(data) {
     initSudokuBlank();
     importSudokuData(data);
   }
 
-  function importSudokuData(data) {
-    if (typeof data !== "string") return;
-
-    if (data.match(regularRegexp)) {
-      for (var i=0; i<data.length; i++) {
-        var r = Math.floor(i/9);
-        var c = i % 9;
-        var ch = parseInt(data.charAt(i));
-        if (ch > 0)
-          confirmCell(sudoku[r][c], ch-1);
-      }
-    } else if (data.match(statefulRegexp)) {
-      data = data.split(',');
-      for (var i=0; i<data.length; i++) {
-        var r = Math.floor(i/9);
-        var c = i % 9;
-        setCellFromState(sudoku[r][c], data[i]);
-      }
-    }
-  }
-
-  const candsAndSwatch = /^!?[1-9]*[A-I]$/
-  function setCellFromState(cell, data) {
-    cell.solved = undefined;
-    var swatch = '';
-    var cands = '';
-    if (data.match(candsAndSwatch)) {
-      swatch = data.substring(data.length-1);
-      cands = data.substring(0,data.length-1);
-    } else {
-      cands = data;
-    }
-    cell.swatch = swatchFromChar(swatch);
-    if (cands.length>1 && cands[0]==='!') {
-      var v = parseInt(cands[1]);
-      confirmCell(cell,v-1)
-    } else {
-      for (var i=0; i<9; i++) cell[i]=false;
-      for (var i=0; i<cands.length; i++) {
-        var v = parseInt(cands[i])-1;
-        cell[v] = true;
-      }
-    }
-  }
-
-  function importButton() {
-    var input = "" + prompt("Enter 81 digits, like \"0814\"... 0 means unknown. Alternatively, enter a stateful export string provided by this app (containing commas and letters)");
-    initSudoku(input);
-    refresh();
-  }
-
-  function edgesButton() {
-    var input = "" + prompt("Enter 36 values, comma separated. Top (LTR), Right (TTB), Bottom (LTR), Right(TTB).");
-    if (input!=="null") {
-      initEdges(input);
-      refresh();
-    }
-  }
-
-  function getExportString() {
-    var output = "";
-    for (var r=0; r<9; r++) {
-      for (var c=0; c<9; c++) {
-        var cell = sudoku[r][c];
-        if (isSolved(cell)) {
-          output = output + (cell.solved+1);
-        } else {
-          output = output + "0";
-        }
-      }
-    }
-    return output;
-  }
-
-  function charFromSwatch(val) {
-    if (val===undefined) return '';
-    return String.fromCharCode(65+val);
-  }
-
-  function swatchFromChar(char) {
-    if (char==='') return undefined;
-    if (char < 'A') return undefined;
-    if (char > 'I') return undefined;
-    return char.charCodeAt(0)-65;
-  }
-
-  function getStatefulExportString() {
-    var output = [];
-    for (var r=0; r<9; r++) {
-      for (var c=0; c<9; c++) {
-        var cell = sudoku[r][c];
-        var cellstring = "";
-        if (isSolved(cell)) {
-          cellstring = "!"+(cell.solved+1);
-        } else {
-          for (var v=0; v<9; v++) {
-            if (cell[v]) {
-              cellstring = cellstring + (v+1);
-            }
-          }
-        }
-        cellstring = cellstring + charFromSwatch(cell.swatch);
-        output.push(cellstring);
-      }
-    }
-    return output.join(",");
-  }
-
-  // briefly flash the button given
-  function flashButton(btn) {
-    btn.removeClass("highlight").addClass("highlight");
-    setTimeout(function(){
-      btn.removeClass("highlight");
-    }, flashDelay);
-  }
-
-  function exportButton() {
-    var output = getExportString();
-    $("#exportfield").val(output);
-  }
-
-  function statefulExportButton() {
-    var output = getStatefulExportString();
-    $("#exportfield").val(output);
-  }
-
-  function getQueryVariable(variable) {
-    var query = window.location.search.substring(1);
-    var vars = query.split("&");
-    for (var i=0;i<vars.length;i++) {
-      var pair = vars[i].split("=");
-      if(pair[0] == variable) {
-        return pair[1];
-      }
-    }
-    return false;
-  }
-
-  // if a test file is loaded, parse all sudokus in it and attempt to complete them.
-  function testFileLoaded() {
-    var total      = 0;
-    var finished   = 0;
-    var incomplete = 0;
-    var errors     = 0;
-
-    console.log("Total / Completed / Incomplete / Errors");
-    logging = false;
-    var file = $("#testFile")[0].files[0];
-    new LineReader(file).readLines(function(line){
-      var [givens, solution] = line.split(",");
-      if (total%1000===0) {
-        console.log([total, finished, incomplete, errors].join(" / "));
-        refresh();
-      }
-      total = total + 1;
-      var myOutput = completeSilently(givens);
-      if (myOutput === solution) {
-        finished = finished + 1;
-      } else if ("myOutput"==="INCOMPLETE") {
-        incomplete = incomplete + 1;
-      } else if ("myOutput"==="ERROR") {
-        errors = errors + 1;
-      }
-    }, function(){
-      console.log(total + " sudokus attempted.");
-      console.log(finished +" solved correctly.");
-      console.log(incomplete +" incomplete.");
-      console.log(errors+" resulted in errors.");
-      logging = true;
-      refresh();
-    });
-  }
-
-  function makeSq() {
-    var tbl = $("#tbl");
-    tbl.width(tbl.height());
-  }
-
-  $(document).ready(function(){
-    $(window).off("resize").on("resize", function(){
-      makeSq();
-    });
-    onReady();
-  });
