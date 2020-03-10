@@ -145,7 +145,7 @@
   var sudokuCols = [];
   var sudokuBoxes = [];
   var sudokuCellsByPos = [];      
-  var sudokuEdges = [];
+  var sudokuEdges = [[],[],[],[]];
 
   var newCellsConfirmed = []; // keep track of new cells as they are confirmed.
   var undoStack = [];
@@ -2059,6 +2059,7 @@ function boxNum(r, c) {
         }
       }
     }
+    if (changed) consolelog(`[antiknight] cleared antiknight adjacents`);
     return changed;
   }
 
@@ -2715,13 +2716,42 @@ function boxNum(r, c) {
         solveds[cell.solved-1] = true;
       }
     }
-    error = true;
+    return error;
   }
 
   function sandwichEnabled() {
     for (var i=0; i<strats.length; i++)
       if (strats[i].category="Sandwich" && strats[i].enabled) return true;
     return false;
+  }
+
+  function antiknightEnabled() {
+    for (var i=0; i<strats.length; i++)
+      if (strats[i].category="Anti-Knight" && strats[i].enabled) return true;
+    return false;
+  }
+
+  function checkAntiknightErrors() {
+    var errors = false;
+    for (var r=0; r<9; r++) {
+      var row = sudoku[r];
+      for (var c=0; c<9; c++) {
+        var cell = row[c];
+        if (isSolved(cell)) {
+          var adjs = knightAdjs(c,r);
+          for (var a=0; a<adjs.length; a++) {
+            var adj = adjs[a];
+            if (isSolved(adj)) {
+              if (adj.solved === cell.solved) {
+                errors = true;
+                console.error(`Cell at ${cell.pos} has antiknight collisions`);
+              }
+            }
+          }
+        }
+      }
+    }
+    return errors;
   }
 
   function sandwichErrors(group, sw) {
@@ -2769,6 +2799,9 @@ function boxNum(r, c) {
 
     if (sandwichEnabled())
       errors = everyRowColSandwich(sandwichErrors, false) || errors;
+    
+    if (antiknightEnabled())
+      errors = checkAntiknightErrors() || errors;
 
     return errors;
   }

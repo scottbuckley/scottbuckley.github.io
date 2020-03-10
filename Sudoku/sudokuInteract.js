@@ -34,6 +34,8 @@
   // sandwich 3: ?sandwich=true&edge=17,17,17,17,20,22,27,17,0,17,17,17,17,20,22,27,17,0&data=00000000004002003000000000000000000002000001000000000000000000006009005
   // sandwich 4 (not solved): ?sandwich=true&edge=19,7,15,19,4,0,6,9,35,5,13,20,9,12,0,4,14,5&data=00000000100000000000000000000000000000001
 
+  // antiknight 1: ?antiknight=true&data=000010000000302000009000300020000040300000005040000060004000700000108000000090000
+
 
 /*
      ######   #######  ##    ## ######## ####  ######
@@ -83,13 +85,18 @@
     #### ##    ## ####    ##
 */
 
+  function queryBool(value) {
+    return (value==="true");
+  }
+
   // when the page is loaded, check if there is a query variable,
   // otherwise load the example from the settings.
   function onReady(buildUI=true) {
     // prepare the board with the appropriate givens.
     var data = getQueryVariable("data");
     var edge = getQueryVariable("edge");
-    var sandwich = getQueryVariable("sandwich");
+    var sandwich = queryBool(getQueryVariable("sandwich"));
+    var antiknight = queryBool(getQueryVariable("antiknight"));
 
     if (data) {
       initSudoku(data);
@@ -104,6 +111,12 @@
     if (sandwich) {
       for (var i=0; i<strats.length; i++)
         if (strats[i].category === "Sandwich")
+          strats[i].enabled = true;
+    }
+
+    if (antiknight) {
+      for (var i=0; i<strats.length; i++)
+        if (strats[i].category === "Anti-Knight")
           strats[i].enabled = true;
     }
 
