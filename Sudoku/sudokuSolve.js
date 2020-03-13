@@ -27,9 +27,9 @@
       enabled: true,
       category: "Simple"
     },
-    { name:  "Antiknight Adjacents",
-      sname: "AK Adjs",
-      func:  AntiknightAdjs,
+    { name:  "Antiknight Eliminations",
+      sname: "AK Elims",
+      func:  antiknightElims,
       enabled:false,
       category: "Anti-Knight"
     },
@@ -2027,6 +2027,156 @@ function boxNum(r, c) {
     AA   AA NN   NN   TTT   IIIII KK  KK NN   NN IIIII  GGGGGG HH   HH   TTT
 */
 
+
+  function antiknightElims() {
+    if (antiknightAdjs()) return true;
+    if (antiknightKillsBox()) return true;
+    if (antiknightKillsLine()) return true;
+    return false;
+  }
+
+  function isKnightAdjacent(cell1, cell2) {
+    var r = Math.abs(cell1.row-cell2.row);
+    var c = Math.abs(cell1.col-cell2.col);
+    if (r===1 && c===2) return true;
+    if (r===2 && c===1) return true;
+    return false;
+  }
+
+  function isRowColAdjacent(cell1, cell2) {
+    return (cell1.row===cell2.row || cell1.col===cell2.col);
+  }
+
+  function isRowColBoxAdjacent(cell1, cell2) {
+    return ( cell1.box===cell2.box || cell1.row===cell2.row || cell1.col===cell2.col);
+  }
+
+  function antiknightLineKilled(group, v) {
+    // get all the candidates for this value
+    var candCells = [];
+    var min = -1;
+    var max = -1;
+    for (var c=0; c<9; c++) {
+      var cell = group[c];
+      if (isSolved(cell)) {
+        if (cell.solved===v) return false;
+      } else if (cell[v]) {
+        candCells.push(cell);
+        if (min===-1) min = c;
+        else max = c;
+      }
+    }
+
+    // they can't be spread too far
+    if (max-min>4) return false;
+
+    // get all the knight adjacent cells outside this box
+    var adjCells = [];
+    var adjPos = [];
+    for (var c=0; c<candCells.length; c++) {
+      var cell = candCells[c];
+      var adjs = knightAdjs(cell.col,cell.row);
+      for (var a=0; a<adjs.length; a++) {
+        var adj = adjs[a];
+        if (!adj[v]) continue;
+        if (adjPos.indexOf(adj.pos) !== -1) continue;
+        adjCells.push(adj);
+        adjPos.push(adj.pos);
+      }
+    }
+
+    // check if any adjacents would kill the group
+    for (var a=0; a<adjCells.length; a++) {
+      var adj = adjCells[a];
+      var allAdjacent = true;
+      for (var c=0; c<candCells.length; c++) {
+        var cell = candCells[c];
+        if (!isKnightAdjacent(cell,adj) && !isRowColBoxAdjacent(cell,adj)) {
+          allAdjacent = false;
+          break;
+        }
+      }
+      if (allAdjacent) {
+        adj[v] = false;
+        consolelog(`[antiknight] Cell at ${adj.pos} would eliminate all ${v+1}s from ${group.groupName}`);
+        return true;
+      }
+    }
+
+
+  }
+
+  function antiknightBoxKilled(b, v) {
+    var box = sudokuBoxes[b];
+
+    // get all the candidates for this value
+    var candCells = [];
+    for (var c=0; c<9; c++) {
+      var cell = box[c];
+      if (isSolved(cell)) {
+        if (cell.solved===v) return false;
+      } else if (cell[v])
+        candCells.push(cell);
+    }
+
+    // a knight can only block 5 cells in a box
+    if (candCells.length>5) return false;
+
+    // get all the knight adjacent cells outside this box
+    var adjCells = [];
+    var adjPos = [];
+    for (var c=0; c<candCells.length; c++) {
+      var cell = candCells[c];
+      var adjs = knightAdjs(cell.col,cell.row);
+      for (var a=0; a<adjs.length; a++) {
+        var adj = adjs[a];
+        if (adj.box===b) continue;
+        if (!adj[v]) continue;
+        if (adjPos.indexOf(adj.pos) !== -1) continue;
+        adjCells.push(adj);
+        adjPos.push(adj.pos);
+      }
+    }
+
+    // check if any adjacents would kill the box
+    for (var a=0; a<adjCells.length; a++) {
+      var adj = adjCells[a];
+      var allAdjacent = true;
+      for (var c=0; c<candCells.length; c++) {
+        var cell = candCells[c];
+        if (!isKnightAdjacent(cell,adj) && !isRowColAdjacent(cell,adj)) {
+          allAdjacent = false;
+          break;
+        }
+      }
+      if (allAdjacent) {
+        adj[v] = false;
+        consolelog(`[antiknight] Cell at ${adj.pos} would eliminate all ${v+1}s from Box ${b+1}`);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function antiknightKillsBox() {
+    var changed = false;
+    for (var b=0; b<9; b++)
+      for (var v=0; v<9; v++)
+        if (antiknightBoxKilled(b,v))
+          changed = true;
+    return changed;
+  }
+
+  function antiknightKillsLine() {
+    var changed = false;
+    for (var g=0; g<9; g++)
+      for (var v=0; v<9; v++) {
+        if (antiknightLineKilled(sudoku[g],v)) changed = true;
+        if (antiknightLineKilled(sudokuCols[g],v)) changed = true;
+      }
+    return changed;
+  }
+
   function knightAdjs(x, y) {
     var out = [];
     for (var xx=-2; xx<=2; xx++) {
@@ -2043,7 +2193,7 @@ function boxNum(r, c) {
     return out;
   }
 
-  function AntiknightAdjs() {
+  function antiknightAdjs() {
     var changed = false;
     for (var r=0; r<9; r++) {
       var row = sudoku[r];
