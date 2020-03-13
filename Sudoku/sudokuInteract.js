@@ -36,6 +36,7 @@
 
   // antiknight 1: ?antiknight=true&data=000010000000302000009000300020000040300000005040000060004000700000108000000090000
 
+  // x-sudoku 1: ?xsudoku=true&data=000000000001408300080020070070364050008209700040781090060090010002807500000000000
 
 /*
      ######   #######  ##    ## ######## ####  ######
@@ -48,7 +49,7 @@
 */
 
   // how long to wait between applying solving steps.
-  const stepDelay = 20;
+  const stepDelay = 0;
   const flashDelay = Math.max(10, stepDelay*0.9);
 
 
@@ -89,6 +90,12 @@
     return (value==="true");
   }
 
+  function enableStrats(stratCat) {
+    for (var i=0; i<strats.length; i++)
+      if (strats[i].category === stratCat)
+        strats[i].enabled = true;
+  }
+
   // when the page is loaded, check if there is a query variable,
   // otherwise load the example from the settings.
   function onReady(buildUI=true) {
@@ -97,6 +104,7 @@
     var edge = getQueryVariable("edge");
     var sandwich = queryBool(getQueryVariable("sandwich"));
     var antiknight = queryBool(getQueryVariable("antiknight"));
+    var xsudoku = queryBool(getQueryVariable("xsudoku"));
 
     if (data) {
       initSudoku(data);
@@ -104,21 +112,11 @@
       initSudoku(data_default);
     }
 
-    if (edge) {
-      initEdges(edge);
-    }
+    if (edge) initEdges(edge);
 
-    if (sandwich) {
-      for (var i=0; i<strats.length; i++)
-        if (strats[i].category === "Sandwich")
-          strats[i].enabled = true;
-    }
-
-    if (antiknight) {
-      for (var i=0; i<strats.length; i++)
-        if (strats[i].category === "Anti-Knight")
-          strats[i].enabled = true;
-    }
+    if (sandwich) enableStrats("Sandwich");
+    if (antiknight) enableStrats("Anti-Knight");
+    if (xsudoku) enableStrats("X Sudoku")
 
     // set up the individual solver buttons
     buildUI && initSolverButtons();
@@ -131,8 +129,21 @@
 
     // show the board
     buildTable();
+    refreshHighlights();
 
+    // make the board square (also happens on resize)
     makeSq();
+  }
+
+  function getFlagString() {
+    var out = [];
+    var sandwich = queryBool(getQueryVariable("sandwich"));
+    var antiknight = queryBool(getQueryVariable("antiknight"));
+    var xsudoku = queryBool(getQueryVariable("xsudoku"));
+    if (sandwich)   out.push(`sandwich=${sandwich}`);
+    if (antiknight) out.push(`antiknight=${antiknight}`);
+    if (xsudoku)    out.push(`xsudoku=${xsudoku}`);
+    return out.join(",");
   }
 
 
@@ -385,7 +396,7 @@ function setDblClick(element, cell) {
       $(`v${i}`).show();
   }
 
-  const statefulRegexp = /^!?[1-9]*[A-I]?(,!?[1-9]*[A-I]?)+$/
+  const statefulRegexp = /^!?[0-9]*[A-I]?(,!?[0-9]*[A-I]?)+$/
   const regularRegexp  = /^[0-9]+$/
   function importSudokuData(data) {
     if (typeof data !== "string") return;
@@ -408,7 +419,7 @@ function setDblClick(element, cell) {
     }
   }
 
-  const candsAndSwatch = /^!?[1-9]*[A-I]$/
+  const candsAndSwatch = /^!?[0-9]*[A-I]$/
   function setCellFromState(cell, data) {
     cell.solved = undefined;
     var swatch = '';
@@ -423,6 +434,8 @@ function setDblClick(element, cell) {
     if (cands.length>1 && cands[0]==='!') {
       var v = parseInt(cands[1]);
       confirmCell(cell,v-1)
+    } else if (cands==="0") {
+      for (var i=0; i<9; i++) cell[i]=true;
     } else {
       for (var i=0; i<9; i++) cell[i]=false;
       for (var i=0; i<cands.length; i++) {
@@ -446,19 +459,33 @@ function setDblClick(element, cell) {
     }
   }
 
-  function getExportString() {
+  function getEdgeString() {
+    var out = [];
+    for (var i=0; i<sudokuEdges.length; i++) {
+      for (var e=0; e<9; e++) {
+        out.push(sudokuEdges[i][e]);
+      }
+    }
+    return out.join(",").replace(/,+$/,'');
+  }
+
+
+  function getSolvedString() {
     var output = "";
+    var isBlank = true;
     for (var r=0; r<9; r++) {
       for (var c=0; c<9; c++) {
         var cell = sudoku[r][c];
         if (isSolved(cell)) {
           output = output + (cell.solved+1);
+          isBlank = false;
         } else {
           output = output + "0";
         }
       }
     }
-    return output;
+    if (isBlank) return "";
+    else return output;
   }
 
   function charFromSwatch(val) {
@@ -487,6 +514,8 @@ function setDblClick(element, cell) {
               cellstring = cellstring + (v+1);
             }
           }
+          if (cellstring==="123456789")
+            cellstring = "0";
         }
         cellstring = cellstring + charFromSwatch(cell.swatch);
         output.push(cellstring);
@@ -504,13 +533,35 @@ function setDblClick(element, cell) {
   }
 
   function exportButton() {
-    var output = getExportString();
-    $("#exportfield").val(output);
+    var data = getSolvedString();
+    data = data.replace(/0+$/, "")
+    makeExportLink(data);
   }
 
   function statefulExportButton() {
-    var output = getStatefulExportString();
-    $("#exportfield").val(output);
+    var data = getStatefulExportString();
+    data = data.replace(/0?(,0)+$/, "")
+    makeExportLink(data);
+  }
+
+  function makeExportLink(data) {
+    var URLentries = [];
+
+    var flags = getFlagString();
+    if (flags)
+      URLentries.push(flags);
+
+    var edge = getEdgeString();
+    if (edge)
+      URLentries.push(`edge=${edge}`);
+
+    if (data)
+      URLentries.push(`data=${data}`);
+
+    var URL = "?" + URLentries.join("&");
+
+    // var URL = `?${flags}${edges}&data=${data}`
+    $("#exportLink").attr("href", URL);
   }
 
   function getQueryVariable(variable) {
@@ -519,7 +570,7 @@ function setDblClick(element, cell) {
     for (var i=0;i<vars.length;i++) {
       var pair = vars[i].split("=");
       if(pair[0] == variable) {
-        return pair[1];
+        return decodeURIComponent(pair[1]);
       }
     }
     return false;
@@ -539,7 +590,7 @@ function setDblClick(element, cell) {
       var [givens, solution] = line.split(",");
       if (total%1000===0) {
         console.log([total, finished, incomplete, errors].join(" / "));
-        refresh();
+        // refresh();
       }
       total = total + 1;
       var myOutput = completeSilently(givens);
@@ -556,7 +607,7 @@ function setDblClick(element, cell) {
       console.log(incomplete +" incomplete.");
       console.log(errors+" resulted in errors.");
       logging = true;
-      refresh();
+      // refresh();
     });
   }
 
@@ -631,10 +682,12 @@ function setDblClick(element, cell) {
   }
 
   function refreshEdges(group, val1, val2) {
-    group.edge1.toggleClass("fullySet", group.sandwichFullySet===true);
-    group.edge2.toggleClass("fullySet", group.sandwichFullySet===true);
-    group.edge1.text(val1);
-    group.edge2.text(val2);
+    // if (group.edge1 && group.edge2) {
+      group.edge1.toggleClass("fullySet", group.sandwichFullySet===true);
+      group.edge2.toggleClass("fullySet", group.sandwichFullySet===true);
+      group.edge1.text(val1);
+      group.edge2.text(val2);
+    // }
   }
 
   // rebuild the table

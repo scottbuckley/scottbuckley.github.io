@@ -10,6 +10,7 @@
     "Simple",
     "Tough",
     "Diabolical",
+    "X Sudoku",
     "Anti-Knight",
     "Sandwich"
   ];
@@ -27,12 +28,6 @@
       enabled: true,
       category: "Simple"
     },
-    { name:  "Antiknight Eliminations",
-      sname: "AK Elims",
-      func:  antiknightElims,
-      enabled:false,
-      category: "Anti-Knight"
-    },
     { name:  "Hidden Singles",
       sname: "Hdn 1s",
       func:  hiddenSingles,
@@ -44,6 +39,18 @@
       func:  intersectionRemoval,
       enabled: true,
       category: "Simple"
+    },
+    { name:  "Antiknight Eliminations",
+      sname: "AK Elims",
+      func:  antiknightElims,
+      enabled:false,
+      category: "Anti-Knight"
+    },
+    { name:  "X Sudoku Eliminations",
+      sname: "X Elims",
+      func:  xsudokuElims,
+      enabled:false,
+      category: "X Sudoku"
     },
     { name:  "Naked Pairs",
       sname: "Nkd 2s",
@@ -159,7 +166,7 @@
     while(makeSomeChange(false));
     if (checkErrors()) return "ERROR";
     if (getSolvedCount() < 81) return "INCOMPLETE";
-    return getExportString();
+    return getSolvedString();
   }
 
   // log to console iff "logging" is true.
@@ -268,7 +275,7 @@ function clearAfterConfirm(cell) {
 function confirmCell(cell, v) {
   var changed = !isSolved(cell) || v!==cell.solved;
   newCellsConfirmed.push(cell);
-  for (var i=0; i<cell.length; i++) {
+  for (var i=0; i<9; i++) {
     cell[i] = false;
   }
   cell[v] = true;
@@ -348,12 +355,114 @@ function boxNum(r, c) {
 
 
 
+/*
+    XX    XX     SSSSS  UU   UU DDDDD    OOOOO  KK  KK UU   UU
+     XX  XX     SS      UU   UU DD  DD  OO   OO KK KK  UU   UU
+      XXXX       SSSSS  UU   UU DD   DD OO   OO KKKK   UU   UU
+     XX  XX          SS UU   UU DD   DD OO   OO KK KK  UU   UU
+    XX    XX     SSSSS   UUUUU  DDDDDD   OOOO0  KK  KK  UUUUU
+*/
+
+  var sudokuDiags = undefined;
+  function xsudokuElims() {
+    if (sudokuDiags===undefined)
+      buildSudokuDiags();
+
+    if (xsudokuHiddenSingles()) return true;
+    if (xsudokuClearAdjs()) return true;
+    return false;
+  }
+
+  function clearAdjGroup(group, prependText="") {
+    var solved = [];
+    var unsolved = [];
+    for (var c=0; c<9; c++)
+      if (isSolved(group[c]))
+        solved.push(group[c].solved);
+      else
+        unsolved.push(group[c]);
+    
+    var changed = false;
+    for (var c=0; c<unsolved.length; c++) {
+      var cell = unsolved[c];
+      for (var i=0; i<solved.length; i++) {
+        var v = solved[i];
+        if (cell[v]) {
+          cell[v] = false;
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) consolelog(prependText+`Cleared adjacent candidates to confirmed cells in ${group.groupName}`);
+    return changed;
+  }
+
+  function xsudokuClearAdjs() {
+    var changed = false;
+    for (var i=0; i<sudokuDiags.length; i++)
+      if (clearAdjGroup(sudokuDiags[i], "[x sudoku] ")) changed = true;
+    return changed;
+  }
+
+  function buildSudokuDiags() {
+    sudokuDiags = [[],[]];
+    for (var i=0; i<9; i++) {
+      sudokuDiags[0].push(sudoku[i][i]);
+      sudokuDiags[1].push(sudoku[i][8-i]);
+    }
+    sudokuDiags[0].groupName = "Diagonal \\";
+    sudokuDiags[1].groupName = "Diagonal /";
+  }
+
+  function xsudokuHiddenSingles() {
+    var changed = false;
+    for (var i=0; i<sudokuDiags.length; i++) {
+      if (hiddenSinglesGroup(sudokuDiags[i], "[x sudoku] ")) changed = true;
+    }
+    return changed;
+  }
+
+
 
   //   SSSSS    AAA   NN   NN DDDDD   WW      WW IIIII  CCCCC  HH   HH
   //  SS       AAAAA  NNN  NN DD  DD  WW      WW  III  CC    C HH   HH
   //   SSSSS  AA   AA NN N NN DD   DD WW   W  WW  III  CC      HHHHHHH
   //       SS AAAAAAA NN  NNN DD   DD  WW WWW WW  III  CC    C HH   HH
   //   SSSSS  AA   AA NN   NN DDDDDD    WW   WW  IIIII  CCCCC  HH   HH
+
+
+  var sandwichStaticFinished = false;
+  function sandwichElims() {
+    if (!sandwichStaticFinished) {
+      // these do ALMOST the same thing, but not exactly the same thing
+      // if i improved one of them, they would be equivalent
+      if (everyRowColSandwich(sandwichOneWayInside)) return true;
+      if (everyRowColSandwich(sandwichOneWayOutside)) return true;
+      else sandwichStaticFinished = true; // all static analyses are finished, so don't try again later
+    }
+
+    // clear impossible distances from 1/9s
+    if (everyRowColSandwich(sandwichKnown19Distances)) return true;
+
+    // clear 1/9s too close to both sides (dynamic to cells with 1/9s disabled)
+    if (everyRowColSandwich(sandwichClearMiddle19s)) return true;
+
+    // set known 1/9s when outer sum is done
+    if (everyRowColSandwich(sandwichOuterDone)) return true;
+
+    // when there are exactly two known 1/9s, sometimes we can restrict candidates
+    // inside and outside these cells
+    if (everyRowColSandwich(sandwichTwoKnown19s)) return true;
+
+    // check every candidate 1 and 9 to see if there could be a 9 or 1 in range
+    if (everyRowColSandwich(sanwichIndividual19Eligibility)) return true;
+
+    // restrict cells known to be outside to outside-applicable candidates
+    if (everyRowColSandwich(outsideCandidates)) return true;
+
+    return false;
+  }
 
   // call a function on every row and column, given
   // the row/col, its edge value, and its label.
@@ -404,18 +513,12 @@ function boxNum(r, c) {
     if (isSolved(cell))
       return (cell.solved===0 || cell.solved===8);
     for (var v=1; v<8; v++)
-      if (cell[v] || cell.solved===v)
+      if (cell[v])
         return false;
     return true;
   }
 
-  function couldBeVal(cell, v) {
-    return (cell[v] || cell.solved===v);
-  }
-
-  function couldBe1(cell) { return couldBeVal(cell, 0); }
-  function couldBe9(cell) { return couldBeVal(cell, 8); }
-  function couldBe1or9(cell) { return couldBe1(cell) || couldBe9(cell);}
+  function couldBe1or9(cell) { return cell[0] || cell[8]; }
 
   // returns the indexes in group that match the filter
   // returns [] if more than 'max' are found
@@ -518,7 +621,7 @@ function boxNum(r, c) {
       var thisCellOK = false;
       for (var vi=0; vi<candList.length; vi++) {
         var v = candList[vi];
-        if (cell[v] || cell.solved === v) {
+        if (cell[v]) {
           thisCellOK = true;
           break;
         }
@@ -533,14 +636,14 @@ function boxNum(r, c) {
     for (var i=ind-far-1; i<ind-close; i++) {
       if (i<0) continue;
       var cell = group[i];
-      if (cell[cand] || cell.solved===cand)
+      if (cell[cand])
         if (rangeCanSupportSum(group, sw, i, ind))
           return true;
     }
     for (var i=ind+close+1; i<=ind+far+1; i++) {
       if (i>=9) continue;
       var cell = group[i];
-      if (cell[cand] || cell.solved===cand)
+      if (cell[cand])
         if (rangeCanSupportSum(group,sw,ind,i))
           return true;
     }
@@ -818,13 +921,13 @@ function boxNum(r, c) {
     for (var c=0; c<cellsIn.length; c++) {
       var cell = cellsIn[c];
       for (var v=1; v<8; v++)
-        if (cell[v] || cell.solved===v)
+        if (cell[v])
           candsIn[v] = true;
     }
     for (var c=0; c<cellsOut.length; c++) {
       var cell = cellsOut[c];
       for (var v=1; v<8; v++)
-        if (cell[v] || cell.solved===v)
+        if (cell[v])
           candsOut[v] = true;
     }
 
@@ -974,42 +1077,6 @@ function boxNum(r, c) {
     return changed;
   }
 
-  
-  var sandwichStaticFinished = false;
-  function sandwichElims() {
-    if (!sandwichStaticFinished) {
-      // these do ALMOST the same thing, but not exactly the same thing
-      // if i improved one of them, they would be equivalent
-      if (everyRowColSandwich(sandwichOneWayInside)) return true;
-      if (everyRowColSandwich(sandwichOneWayOutside)) return true;
-      else sandwichStaticFinished = true; // all static analyses are finished, so don't try again later
-    }
-
-    // clear impossible distances from 1/9s
-    if (everyRowColSandwich(sandwichKnown19Distances)) return true;
-
-    // clear 1/9s too close to both sides (dynamic to cells with 1/9s disabled)
-    if (everyRowColSandwich(sandwichClearMiddle19s)) return true;
-
-    // set known 1/9s when outer sum is done
-    if (everyRowColSandwich(sandwichOuterDone)) return true;
-
-    // consider if every candidate 1 OR 9 has any 9s or 1s in range
-    // if (everyRowColSandwich(sandwichOtherCandInRange)) return true;
-
-    // when there are exactly two known 1/9s, sometimes we can restrict candidates
-    // inside and outside these cells
-    if (everyRowColSandwich(sandwichTwoKnown19s)) return true;
-
-    // check every candidate 1 and 9 to see if there could be a 9 or 1 in range
-    if (everyRowColSandwich(sanwichIndividual19Eligibility)) return true;
-
-    // restrict cells known to be outside to outside-applicable candidates
-    if (everyRowColSandwich(outsideCandidates)) return true;
-
-    return false;
-  }
-
 
 
 
@@ -1054,50 +1121,37 @@ function boxNum(r, c) {
     return false;
   }
 
+  function hiddenSinglesGroup(group, prependText="") {
+    var counts = [0,0,0,0,0,0,0,0,0];
+    var inds = [];
+    for (var v=0; v<9; v++)
+      for (var c=0; c<9; c++)
+        if (group[c][v]) {
+          counts[v]++;
+          inds[v] = c;
+        }
+    
+    var changed = false;
+    for (var v=0; v<9; v++) {
+      if (counts[v]===1) {
+        var cell = group[inds[v]];
+        if (confirmCell(cell,v)) {
+          consolelog(prependText + `Hidden single ${v+1} found in ${group.groupName}.`);
+          changed = true;
+        }
+      }
+    }
+    return changed;
+  } 
+
   function hiddenSingles() {
-    // var changedCells = [];
-    // var changedCellLabels = [];
-    var changedGroups = [];
-    for (var i=0; i<9; i++) {
-      var row = sudoku[i];
-      var col = sudokuCols[i];
-      var box = sudokuBoxes[i];
-      var groups = [row, col, box];
-      var counts = [[0,0,0,0,0,0,0,0,0],
-                    [0,0,0,0,0,0,0,0,0],
-                    [0,0,0,0,0,0,0,0,0]];
-
-      // count each item's possibility count in each row/col/box
-      for (var g=0; g<groups.length; g++) {
-        var group = groups[g]; // row, col, or box
-        for (var c=0; c<9; c++) {
-          var cell = group[c];
-          for (var v=0; v<9; v++) {
-            if (cell[v]) counts[g][v]++;
-          }
-        }
-      }
-
-      // set any 1s to that cell
-      for (var g=0; g<groups.length; g++) {
-        var group = groups[g];
-        for (var v=0; v<9; v++) {
-          if (counts[g][v] === 1) {
-            var cell = findSingleCase(group, v);
-            confirmCell(cell, v);
-            if (changedGroups.indexOf(group.groupName) === -1) {
-              changedGroups.push(group.groupName);
-            }
-          }
-        }
-      }
+    var changed = false;
+    for (var g=0; g<9; g++) {
+      if (hiddenSinglesGroup(sudoku[g]))      changed = true;
+      if (hiddenSinglesGroup(sudokuCols[g]))  changed = true;
+      if (hiddenSinglesGroup(sudokuBoxes[g])) changed = true;
     }
-    if (changedGroups.length > 0) {
-      changedGroups.sort();
-      consolelog("Hidden Singles found in " + changedGroups.join(", ") + ".");
-      return true;
-    }
-    return false;
+    return changed;
   }
 
 /*
@@ -2871,13 +2925,13 @@ function boxNum(r, c) {
 
   function sandwichEnabled() {
     for (var i=0; i<strats.length; i++)
-      if (strats[i].category="Sandwich" && strats[i].enabled) return true;
+      if (strats[i].category==="Sandwich" && strats[i].enabled) return true;
     return false;
   }
 
   function antiknightEnabled() {
     for (var i=0; i<strats.length; i++)
-      if (strats[i].category="Anti-Knight" && strats[i].enabled) return true;
+      if (strats[i].category==="Anti-Knight" && strats[i].enabled) return true;
     return false;
   }
 
@@ -2994,8 +3048,10 @@ function boxNum(r, c) {
     sudokuCols = [];
     sudokuBoxes = [];
     sudokuCellsByPos = [];
-    // sudokuEdges = [];
     newCellsConfirmed = [];
+
+    // for special strategies
+    sudokuDiags = undefined;
     sandwichStaticFinished = false;
 
     // fill lists with empty lists
