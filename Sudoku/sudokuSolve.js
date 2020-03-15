@@ -286,29 +286,39 @@
     };
   }
 
+  function hasLessThanNCandidates(n) {
+    return function(cell) {
+      var count = 0;
+      for (var v=0; v<9; v++)
+        if (cell[v])
+          if (++count >= n) return false;
+      return (count<n);
+    };
+  }
+
   function fst(arr) { return arr[0]; };
   function snd(arr) { return arr[1]; };
 
   function moreThanLeft(group, n) {
-    return (getUnsolvedCells(group) > n);
+    return (getUnsolvedCells(group).length > n);
   }
 
-  function moreThanTwoLeft(group) { return moreThanLeft(group, 2) };
+  function moreThanTwoLeft(group)   { return moreThanLeft(group, 2) };
   function moreThanThreeLeft(group) { return moreThanLeft(group, 3) };
-  function moreThanFourLeft(group) { return moreThanLeft(group, 4) };
+  function moreThanFourLeft(group)  { return moreThanLeft(group, 4) };
 
 
-    // the cells that have two candidates
-    function getTwos(group) {
-      return getUnsolvedCells(group)
-        .filter(hasNCandidates(2))
-    }
+  // the cells that have two candidates
+  function getTwos(group) {
+    return getUnsolvedCells(group)
+      .filter(hasNCandidates(2))
+  }
 
-    // get the cells that have three candidates
-    function getThrees(group) {
-      return getUnsolvedCells(group)
-        .filter(hasNCandidates(3))
-    }
+  // get the cells that have three candidates
+  function getThreesOrLess(group) {
+    return getUnsolvedCells(group)
+      .filter(hasLessThanNCandidates(4))
+  }
 
 
 
@@ -477,6 +487,73 @@
     return map;
   }
 
+
+  function combinedCandidateCount(cell1, cell2) {
+    var count=0;
+    for (var v=0; v<9; v++) {
+      if (cell1[v] || cell2[v]) count++;
+    }
+    return count;
+  }
+
+  function combinedCandidateCount3(cell1, cell2, cell3) {
+    var count=0;
+    for (var v=0; v<9; v++) {
+      if (cell1[v] || cell2[v] || cell3[v]) count++;
+    }
+    return count;
+  }
+
+  function combinedCandidateCount4(cell1, cell2, cell3, cell4) {
+    var count=0;
+    for (var v=0; v<9; v++) {
+      if (cell1[v] || cell2[v] || cell3[v] || cell4[v]) count++;
+    }
+    return count;
+  }
+
+  function combinedCandidates(cell1, cell2) {
+    var candidates = [];
+    for (var v=0; v<9; v++) {
+      if (cell1[v] || cell2[v]) {
+        candidates.push(v);
+      }
+    }
+    return candidates;
+  }
+
+  function combinedCandidates3(cell1, cell2, cell3) {
+    var candidates = [];
+    for (var v=0; v<9; v++)
+      if (cell1[v] || cell2[v] || cell3[v])
+        candidates.push(v);
+    return candidates;
+  }
+
+  function combinedCandidates4(cell1, cell2, cell3, cell4) {
+    var candidates = [];
+    for (var v=0; v<9; v++) {
+      if (cell1[v] || cell2[v] || cell3[v] || cell4[v]) {
+        candidates.push(v);
+      }
+    }
+    return candidates;
+  }
+
+  function clearCands(group, cands) {
+    var changed = false;
+    for (var c=0; c<group.length; c++) {
+      var cell = group[c];
+      for (var i=0; i<cands.length; i++) {
+        var v = cands[i];
+        if (cell[v]) {
+          changed = true;
+          cell[v] = false;
+        }
+      }
+    }
+    return changed;
+  }
 
 
 
@@ -852,6 +929,54 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     }
     return changed;
   }
+
+
+/*
+    NN   NN KK  KK DDDDD      TTTTTTT RRRRRR  IIIII PPPPPP  LL      EEEEEEE
+    NNN  NN KK KK  DD  DD       TTT   RR   RR  III  PP   PP LL      EE
+    NN N NN KKKK   DD   DD      TTT   RRRRRR   III  PPPPPP  LL      EEEEE
+    NN  NNN KK KK  DD   DD      TTT   RR  RR   III  PP      LL      EE
+    NN   NN KK  KK DDDDDD       TTT   RR   RR IIIII PP      LLLLLLL EEEEEEE
+*/
+
+
+  function nakedTriples() {
+    return everyGroup(nakedTriplesGroup);
+  }
+
+  function nakedTriplesGroup(group, preText="") {
+    var unsolved = getUnsolvedCells(group);
+    if (unsolved.length <= 3) return false;
+
+    var threeOrLess = unsolved.filter(hasLessThanNCandidates(4));
+
+    // there needs to be at least three
+    if (threeOrLess.length < 3) return false;
+
+    for (var i1=0; i1<threeOrLess.length; i1++) {
+      var cell1 = threeOrLess[i1];
+      for (var i2=0; i2<i1; i2++) {
+        var cell2 = threeOrLess[i2];
+        if (combinedCandidateCount(cell1, cell2) !== 3) continue;
+        // at this point we have two cells whose combined cell count is 3.
+        // if we can find a third that still holds this, we are in business.
+        for (var i3=i1+1; i3<threeOrLess.length; i3++) {
+          var cell3 = threeOrLess[i3];
+          var cands = combinedCandidates3(cell1, cell2, cell3);
+          if (combinedCandidateCount3(cell1, cell2, cell3) !== 3)  continue;
+          // at this point we have three cells (cell1,cell2,cell3) with a combined
+          // candidate count of 3.
+          var cands = combinedCandidates3(cell1, cell2, cell3);
+          var notThese = (c) => c.pos!==cell1.pos && c.pos!==cell2.pos && c.pos!==cell3.pos;
+          if (clearCands(group.filter(notThese), cands)) {
+            consolelog(preText+`Naked Triple ${vstr(...cands)} found in ${group.groupName}.`);
+          }
+        }
+      }
+    }
+    return false;
+  }
+
 
 /*
     XX    XX     SSSSS  UU   UU DDDDD    OOOOO  KK  KK UU   UU
@@ -1635,137 +1760,6 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
 
 
 
-/*
-    NN   NN KK  KK DDDDD      TTTTTTT RRRRRR  IIIII PPPPPP  LL      EEEEEEE
-    NNN  NN KK KK  DD  DD       TTT   RR   RR  III  PP   PP LL      EE
-    NN N NN KKKK   DD   DD      TTT   RRRRRR   III  PPPPPP  LL      EEEEE
-    NN  NNN KK KK  DD   DD      TTT   RR  RR   III  PP      LL      EE
-    NN   NN KK  KK DDDDDD       TTT   RR   RR IIIII PP      LLLLLLL EEEEEEE
-*/
-
-  function combinedCandidateCount(cell1, cell2) {
-    var count=0;
-    for (var v=0; v<9; v++) {
-      if (cell1[v] || cell2[v]) count++;
-    }
-    return count;
-  }
-
-  function combinedCandidateCount3(cell1, cell2, cell3) {
-    var count=0;
-    for (var v=0; v<9; v++) {
-      if (cell1[v] || cell2[v] || cell3[v]) count++;
-    }
-    return count;
-  }
-
-  function combinedCandidateCount4(cell1, cell2, cell3, cell4) {
-    var count=0;
-    for (var v=0; v<9; v++) {
-      if (cell1[v] || cell2[v] || cell3[v] || cell4[v]) count++;
-    }
-    return count;
-  }
-
-  function combinedCandidates(cell1, cell2) {
-    var candidates = [];
-    for (var v=0; v<9; v++) {
-      if (cell1[v] || cell2[v]) {
-        candidates.push(v);
-      }
-    }
-    return candidates;
-  }
-
-  function combinedCandidates3(cell1, cell2, cell3) {
-    var candidates = [];
-    for (var v=0; v<9; v++) {
-      if (cell1[v] || cell2[v] || cell3[v]) {
-        candidates.push(v);
-      }
-    }
-    return candidates;
-  }
-
-  function combinedCandidates4(cell1, cell2, cell3, cell4) {
-    var candidates = [];
-    for (var v=0; v<9; v++) {
-      if (cell1[v] || cell2[v] || cell3[v] || cell4[v]) {
-        candidates.push(v);
-      }
-    }
-    return candidates;
-  }
-
-  function clearNakedTriple(group, i1, i2, i3, cand1, cand2, cand3) {
-    var changed = false;
-    for (var c=0; c<9; c++) {
-      if (c!==i1 && c!==i2 && c!==i3) {
-        var cell = group[c];
-        changed = changed || cell[cand1] || cell[cand2] || cell[cand3];
-        cell[cand1] = false;
-        cell[cand2] = false;
-        cell[cand3] = false;
-      }
-    }
-    return changed;
-  }
-
-  function clearNakedQuad(group, i1, i2, i3, i4, cand1, cand2, cand3, cand4) {
-    var changed = false;
-    for (var c=0; c<9; c++) {
-      if (c!==i1 && c!==i2 && c!==i3 && c!==i4) {
-        var cell = group[c];
-        changed = changed || cell[cand1] || cell[cand2] || cell[cand3] || cell[cand4];
-        cell[cand1] = false;
-        cell[cand2] = false;
-        cell[cand3] = false;
-        cell[cand4] = false;
-      }
-    }
-    return changed;
-  }
-
-  function nakedTriplesGroup(group) {
-    if (!moreThanThreeLeft(group)) return false;
-
-    //get the indexes of items with three or fewer options
-    var threeOrLessInds = [];
-    for (var c=0; c<9; c++) {
-      if ( (!isSolved(group[c])) && candidateCount(group[c]) <= 3) {
-        threeOrLessInds.push(c);
-      }
-    }
-
-    // there needs to be at least three
-    if (threeOrLessInds.length < 3) return false;
-
-    // find if any three of these cells contain three candidates in total
-    for (var i1=0; i1<threeOrLessInds.length; i1++) {
-      var ii1 = threeOrLessInds[i1];
-      for (var i2=0; i2<i1; i2++) {
-        var ii2 = threeOrLessInds[i2];
-        if (combinedCandidateCount(group[ii1], group[ii2]) === 3) {
-          // at this point we have two cells whose combined cell count is 3.
-          // if we can find a third that still holds this, we are in business.
-          for (var i3=i1+1; i3<threeOrLessInds.length; i3++) {
-            var ii3 = threeOrLessInds[i3];
-            if (combinedCandidateCount3(group[ii1], group[ii2], group[ii3]) === 3) {
-              var cands = combinedCandidates3(group[ii1], group[ii2], group[ii3]);
-              if (clearNakedTriple(group, ii1,ii2,ii3, cands[0], cands[1], cands[2])) {
-                consolelog("Naked Triple " + vstr(...cands) + " found in " + group.groupName + ".");
-                return true;
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  function nakedTriples() {
-    return everyGroup(nakedTriplesGroup);
-  }
 
 /*
     NN   NN KK  KK DDDDD       QQQQQ  UU   UU   AAA   DDDDD
@@ -1775,7 +1769,12 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     NN   NN KK  KK DDDDDD      QQQQ Q  UUUUU  AA   AA DDDDDD
 */
 
-  function nakedQuadsGroup(group) {
+
+  function nakedQuads() {
+    return everyGroup(nakedQuadsGroup);
+  }
+
+  function nakedQuadsGroup(group, preText="") {
     if (!moreThanFourLeft(group)) return false;
 
     //get the indexes of items with four or fewer options
@@ -1823,9 +1822,22 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     return false;
   }
 
-  function nakedQuads() {
-    return everyGroup(nakedQuadsGroup);
+
+  function clearNakedQuad(group, i1, i2, i3, i4, cand1, cand2, cand3, cand4) {
+    var changed = false;
+    for (var c=0; c<9; c++) {
+      if (c!==i1 && c!==i2 && c!==i3 && c!==i4) {
+        var cell = group[c];
+        changed = changed || cell[cand1] || cell[cand2] || cell[cand3] || cell[cand4];
+        cell[cand1] = false;
+        cell[cand2] = false;
+        cell[cand3] = false;
+        cell[cand4] = false;
+      }
+    }
+    return changed;
   }
+
 
 /*
     HH   HH DDDDD   NN   NN    TTTTTTT RRRRRR  IIIII PPPPPP  LL      EEEEEEE
@@ -2517,7 +2529,7 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
   function ZWingsBox(box) {
     // get the cells in this box with two and three candidates
     var twos   = getTwos(box);
-    var threes = getThrees(box);
+    var threes = getThreesOrLess(box);
 
     if (twos.length   === 0) return false;
     if (threes.length === 0) return false;

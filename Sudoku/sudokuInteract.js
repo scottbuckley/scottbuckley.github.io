@@ -50,7 +50,7 @@
 */
 
   // how long to wait between applying solving steps.
-  const stepDelay = 0;
+  const stepDelay = 50;
   const flashDelay = Math.max(10, stepDelay*0.9);
 
 
