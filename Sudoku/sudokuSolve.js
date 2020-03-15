@@ -89,6 +89,13 @@
       enabled: true,
       category: "Simple"
     },
+    {
+      name:  "Hidden Quads",
+      sname: "Hdn 4s",
+      func:  hiddenQuads,
+      enabled:true,
+      category:"Simple"
+    },
     { name:  "X-Wings",
       sname: "XWings",
       func:  XWings,
@@ -469,13 +476,8 @@
 
   function countPossibleCells(group, v) {
     var count = 0;
-    for (var c=0; c<9; c++) {
-      var cell = group[c];
-      if (!isSolved(cell)) {
-        if (cell[v])
-          count++;
-      }
-    }
+    for (var c=0; c<group.length; c++)
+      if (group[c][v]) count++;
     return count;
   }
 
@@ -553,6 +555,57 @@
       }
     }
     return changed;
+  }
+
+
+
+  // "or" on binary strings
+  function mapOr(map1, map2) {
+    var out = "";
+    for (var i=0; i<map1.length; i++)
+      if (map1.charAt(i)==="1" || map2.charAt(i)==="1")
+        out = out + "1";
+      else
+        out = out + "0";
+    return out;
+  }
+
+  function mapOrCount(map1, map2) {
+    var count = 0;
+    for (var i=0; i<map1.length; i++)
+      if (map1.charAt(i)==="1" || map2.charAt(i)==="1") count++;
+    return count;
+  }
+
+  function mapOrCount3(map1, map2, map3) {
+    var count = 0;
+    for (var i=0; i<map1.length; i++)
+      if (map1.charAt(i)==="1" || map2.charAt(i)==="1" || map3.charAt(i)==="1") count++;
+    return count;
+  }
+
+  function mapOrCount4(map1, map2, map3, map4) {
+    var count = 0;
+    for (var i=0; i<map1.length; i++)
+      if (map1.charAt(i)==="1" || map2.charAt(i)==="1" || map3.charAt(i)==="1" || map4.charAt(i)==="1") count++;
+    return count;
+  }
+
+
+
+  function cellHasCands(cell, cands) {
+    for (var i=0; i<cands.length; i++)
+      if (cell[cands[i]]) return true;
+    return false;
+  }
+
+
+  function vstr() {
+    return "(" + Array.from(arguments).map(v => v+1).join(",") + ")";
+  }
+
+  function comand3(a, b, c) {
+    return "" + (a+1) + ", " + (b+1) + ", and " + (c+1);
   }
 
 
@@ -904,7 +957,7 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
       for (var i2=0; i2<i1; i2++) {
         var v2 = vals[i2];
         if (maps[i2] === maps[i1])
-          if (clearHiddenPair(unsolved, v2, v1, maps[i1])) {
+          if (clearHidden(unsolved,[v2,v1])) {
             consolelog(preText+`Hidden Pair ${vstr(v1,v2)} found in ${group.groupName}.`);
             return true;
           }
@@ -913,19 +966,16 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     return false;
   }
 
-  function clearHiddenPair(group, v1, v2, map) {
+  function clearHidden(group, vals) {
     var changed = false;
-    for (var c=0; c<9; c++) {
-      if (map.charAt(c) === "1") {
-        var cell = group[c];
-        for (var v=0; v<9; v++) {
-          if (v !== v1 && v !== v2)
-            if (cell[v]) {
-              changed = true;
-              cell[v] = false;
-            }
+    for (var c=0; c<group.length; c++) {
+      var cell = group[c];
+      if (!cellHasCands(cell, vals)) continue;
+      for (var v=0; v<9; v++)
+        if (cell[v] && vals.indexOf(v)===-1) {
+          cell[v] = false;
+          changed = true;
         }
-      }
     }
     return changed;
   }
@@ -938,7 +988,6 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     NN  NNN KK KK  DD   DD      TTT   RR  RR   III  PP      LL      EE
     NN   NN KK  KK DDDDDD       TTT   RR   RR IIIII PP      LLLLLLL EEEEEEE
 */
-
 
   function nakedTriples() {
     return everyGroup(nakedTriplesGroup);
@@ -975,6 +1024,105 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
       }
     }
     return false;
+  }
+
+
+
+  /*
+      HH   HH DDDDD   NN   NN    TTTTTTT RRRRRR  IIIII PPPPPP  LL      EEEEEEE
+      HH   HH DD  DD  NNN  NN      TTT   RR   RR  III  PP   PP LL      EE
+      HHHHHHH DD   DD NN N NN      TTT   RRRRRR   III  PPPPPP  LL      EEEEE
+      HH   HH DD   DD NN  NNN      TTT   RR  RR   III  PP      LL      EE
+      HH   HH DDDDDD  NN   NN      TTT   RR   RR IIIII PP      LLLLLLL EEEEEEE
+  */
+
+  function hiddenTriples() {
+    return everyGroup(hiddenTripleGroup);
+  }
+
+  function hiddenTripleGroup(group, preText="") {
+    // we need four or more open cells for this to work
+    var unsolved = getUnsolvedCells(group);
+    if (unsolved.length <= 3) return false;
+
+    //get the values that are found in three or fewer cells
+    var vals = [];
+    for (var v=0; v<9; v++) {
+      var possibleCells = countPossibleCells(unsolved, v);
+      if (possibleCells <= 3 && possibleCells > 0)
+        vals.push(v);
+    }
+
+    // get group maps for all values
+    var maps = [];
+    for (var vi=0; vi<vals.length; vi++)
+      maps.push(getGroupMap(unsolved, vals[vi]));
+
+    // check if any three overlap to three cells
+    for (var i1=0; i1<maps.length; i1++) {
+      for (var i2=0; i2<i1; i2++) {
+        if (mapOrCount(maps[i1], maps[i2]) === 3) {
+          for (var i3=i1+1; i3<maps.length; i3++) {
+            if (mapOrCount3(maps[i1], maps[i2], maps[i3]) === 3) {
+              if (clearHidden(group, [vals[i1], vals[i2], vals[i3]])){
+                consolelog(preText+`Hidden Triple ${vstr(vals[i2],vals[i1],vals[i3])} found in ${group.groupName}.`);
+                return true;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+
+  /*
+  HH   HH DDDDD   NN   NN     QQQQQ  UU   UU   AAA   DDDDD
+  HH   HH DD  DD  NNN  NN    QQ   QQ UU   UU  AAAAA  DD  DD
+  HHHHHHH DD   DD NN N NN    QQ   QQ UU   UU AA   AA DD   DD
+  HH   HH DD   DD NN  NNN    QQ  QQ  UU   UU AAAAAAA DD   DD
+  HH   HH DDDDDD  NN   NN     QQQQ Q  UUUUU  AA   AA DDDDDD
+  */
+
+  function hiddenQuads() {
+    return everyGroup(hiddenQuadGroup);
+  }
+
+  function hiddenQuadGroup(group, preText="") {
+    // we need four or more open cells for this to work
+    var unsolved = getUnsolvedCells(group);
+    if (unsolved.length <= 4) return false;
+
+    //get the values that are found in four or fewer cells
+    var vals = [];
+    for (var v=0; v<9; v++) {
+      var possibleCells = countPossibleCells(unsolved, v);
+      if (possibleCells <= 4 && possibleCells > 0)
+        vals.push(v);
+    }
+
+    // get group maps for all values
+    var maps = [];
+    for (var vi=0; vi<vals.length; vi++)
+      maps.push(getGroupMap(unsolved, vals[vi]));
+
+    // check if any three overlap to three cells
+    for (var i1=0; i1<maps.length; i1++) {
+      for (var i2=i1+1; i2<maps.length; i2++) {
+        if (mapOrCount(maps[i1], maps[i2]) > 4) continue;
+        for (var i3=i2+1; i3<maps.length; i3++) {
+          if (mapOrCount3(maps[i1], maps[i2], maps[i3]) > 4) continue;
+          for (var i4=i3+1; i4<maps.length; i4++) {
+            if (mapOrCount4(maps[i1], maps[i2], maps[i3], maps[i4]) === 4) {
+              if (clearHidden(group, [vals[i1], vals[i2], vals[i3], vals[i4]])) {
+                consolelog(preText+`Hidden Quad ${vstr(vals[i1],vals[i2],vals[i3],vals[i4])} found in ${group.groupName}.`);
+                return true;
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
 
@@ -1838,110 +1986,6 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     return changed;
   }
 
-
-/*
-    HH   HH DDDDD   NN   NN    TTTTTTT RRRRRR  IIIII PPPPPP  LL      EEEEEEE
-    HH   HH DD  DD  NNN  NN      TTT   RR   RR  III  PP   PP LL      EE
-    HHHHHHH DD   DD NN N NN      TTT   RRRRRR   III  PPPPPP  LL      EEEEE
-    HH   HH DD   DD NN  NNN      TTT   RR  RR   III  PP      LL      EE
-    HH   HH DDDDDD  NN   NN      TTT   RR   RR IIIII PP      LLLLLLL EEEEEEE
-*/
-
-  function mapCount(map) {
-    var count = 0;
-    for (var i=0; i<map.length; i++)
-      if (map.charAt(i) === "1") count++;
-    return count;
-  }
-
-  function mapOr(map1, map2) {
-    var out = "";
-    for (var i=0; i<map1.length; i++) {
-      if (map1.charAt(i)==="1" || map2.charAt(i)==="1")
-        out = out + "1";
-      else
-        out = out + "0";
-    }
-    return out;
-  }
-
-  function mapOrCount(map1, map2) {
-    var count = 0;
-    for (var i=0; i<map1.length; i++)
-      if (map1.charAt(i)==="1" || map2.charAt(i)==="1") count++;
-    return count;
-  }
-
-  function mapOrCount3(map1, map2, map3) {
-    var count = 0;
-    for (var i=0; i<map1.length; i++)
-      if (map1.charAt(i)==="1" || map2.charAt(i)==="1" || map3.charAt(i)==="1") count++;
-    return count;
-  }
-
-  function clearHiddenTriple(group, v1, v2, v3) {
-    var changed = false;
-    for (var c=0; c<9; c++) {
-      var cell = group[c];
-      if ((!isSolved(cell)) && (cell[v1] || cell[v2] || cell[v2])) {
-        for (var v=0; v<9; v++) {
-          if (v!==v1 && v!==v2 && v!==v3) {
-            changed = changed || cell[v];
-            cell[v] = false;
-          }
-        }
-      }
-    }
-    return changed;
-  }
-
-  function hiddenTripleGroup(group) {
-    // we need four or more open cells for this to work
-    if (!moreThanThreeLeft(group)) return false;
-
-    //get the values that are found in three or fewer cells
-    var vals = [];
-    for (var v=0; v<9; v++) {
-      var possibleCells = countPossibleCells(group, v);
-      if (possibleCells <= 3 && possibleCells > 0)
-        vals.push(v);
-    }
-
-    // get group maps for all values
-    var maps = [];
-    for (var vi=0; vi<vals.length; vi++) {
-      maps.push(getGroupMap(group, vals[vi]));
-    }
-
-    // check if any three overlap to three cells
-    for (var i1=0; i1<maps.length; i1++) {
-      for (var i2=0; i2<i1; i2++) {
-        if (mapOrCount(maps[i1], maps[i2]) === 3) {
-          for (var i3=i1+1; i3<maps.length; i3++) {
-            // consolelog(maps, i1, i2, i3);
-            if (mapOrCount3(maps[i1], maps[i2], maps[i3]) === 3) {
-              if (clearHiddenTriple(group, vals[i1], vals[i2], vals[i3])){
-                consolelog("Hidden Triple " + vstr(vals[i2],vals[i1],vals[i3]) + " found in " + group.groupName + ".");
-                return true;
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  function vstr() {
-    return "(" + Array.from(arguments).map(v => v+1).join(",") + ")";
-  }
-
-  function comand3(a, b, c) {
-    return "" + (a+1) + ", " + (b+1) + ", and " + (c+1);
-  }
-
-  function hiddenTriples() {
-    return everyGroup(hiddenTripleGroup);
-  }
 
 
 /*
