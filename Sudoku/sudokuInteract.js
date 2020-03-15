@@ -36,7 +36,8 @@
 
   // antiknight 1: ?antiknight=true&data=000010000000302000009000300020000040300000005040000060004000700000108000000090000
 
-  // x-sudoku 1: ?xsudoku=true&data=000000000001408300080020070070364050008209700040781090060090010002807500000000000
+  // x-sudoku 1 (needs scc on diags): ?xsudoku=true&data=000000000001408300080020070070364050008209700040781090060090010002807500000000000
+  // x-sudoku 2: 
 
 /*
      ######   #######  ##    ## ######## ####  ######
@@ -234,16 +235,16 @@ function changeCell(cell) {
   var input = prompt("Enter the digits that are candidates for this cell. 0=all");
   if (input === null) return;
   if (input === "0") {
-    cell['solved'] = undefined;
+    cell.solved = undefined;
+    cell.isSolved = undefined;
     for (var v=0; v<9; v++)
       cell[v] = true;
   } else if (input.length === 1) {
     var v = parseInt(input);
-    cell['solved'] = v-1;
-    for (var v=0; v<9; v++)
-      cell[v] = false;
+    confirmCell(cell,v-1);
   } else if (input.length > 1) {
-    cell['solved'] = undefined;
+    cell.solved = undefined;
+    cell.isSolved = undefined;
     for (var v=0; v<9; v++)
       cell[v] = false;
     for (var i=0; i<input.length; i++) {
@@ -408,6 +409,8 @@ function setDblClick(element, cell) {
         var ch = parseInt(data.charAt(i));
         if (ch > 0)
           confirmCell(sudoku[r][c], ch-1);
+        else
+          blankCell(sudoku[r][c]);
       }
     } else if (data.match(statefulRegexp)) {
       data = data.split(',');
@@ -422,6 +425,9 @@ function setDblClick(element, cell) {
   const candsAndSwatch = /^!?[0-9]*[A-I]$/
   function setCellFromState(cell, data) {
     cell.solved = undefined;
+    cell.isSolved = undefined;
+    cell.adjCleared = undefined;
+
     var swatch = '';
     var cands = '';
     if (data.match(candsAndSwatch)) {
@@ -435,7 +441,7 @@ function setDblClick(element, cell) {
       var v = parseInt(cands[1]);
       confirmCell(cell,v-1)
     } else if (cands==="0") {
-      for (var i=0; i<9; i++) cell[i]=true;
+      blankCell(cell);
     } else {
       for (var i=0; i<9; i++) cell[i]=false;
       for (var i=0; i<cands.length; i++) {
@@ -768,6 +774,19 @@ function setDblClick(element, cell) {
 
 
 
+  function blankCell(cell) {
+    cell.solved = undefined;
+    cell.isSolved = undefined;
+    for (var i=0; i<9; i++)
+      cell[i] = true;
+  }
+  
+  function toggleCandidate(cell, v) {
+    if (isSolved(cell)) return false;
+    cell[v] = !cell[v];
+    return true;
+  }
+
 
 
 
@@ -798,17 +817,6 @@ function setDblClick(element, cell) {
     refresh();
     refreshUndoLog();
   }
-
-  // clears stateful information after an 'undo'
-  function undoWipe() {
-    sandwichStaticFinished = false;
-    for (var i=0; i<9; i++) {
-      var row = sudoku[i];
-      var col = sudokuCols[i];
-      row.sandwichFullySet = col.sandwichFullySet = false;
-    }
-  }
-
 
   function refreshUndoLog() {
     var labels = undoStack.map(d => d[0]).reverse();

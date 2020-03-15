@@ -6,6 +6,7 @@
   //       ##    ##    ##   ##   #########    ##          ##
   // ##    ##    ##    ##    ##  ##     ##    ##    ##    ##
   //  ######     ##    ##     ## ##     ##    ##     ######
+
   const strat_categories = [
     "Simple",
     "Tough",
@@ -154,7 +155,6 @@
   var sudokuCellsByPos = [];      
   var sudokuEdges = [[],[],[],[]];
 
-  var newCellsConfirmed = []; // keep track of new cells as they are confirmed.
   var undoStack = [];
 
 
@@ -179,9 +179,6 @@
   // some progress was made.
   function makeSomeChange(flash=true) {
     for (var s=0; s<strats.length; s++) {
-      // only (auto) clear adj if new cells listed
-      if (s===0 &&newCellsConfirmed.length===0) continue;
-
       // perform strategy and optionally flash button
       var strat = strats[s];
       if (strat.enabled && strat.func()) {
@@ -240,7 +237,7 @@
     ##     ## ##       ##       ##        ##       ##    ##  ##    ##
     ##     ## ######## ######## ##        ######## ##     ##  ######
 */
-//meowmeow
+
 
 
 function isNumber(v) {
@@ -251,42 +248,7 @@ function isNumber(v) {
 }
 
 function isSolved(cell) {
-  return isNumber(cell.solved);
-}
-
-function clearAfterConfirm(cell) {
-  var changed = false;
-  if (isSolved(cell)) {
-    var v = cell.solved;
-    cell[v] = false;
-    var row = sudoku[cell.row];
-    var col = sudokuCols[cell.col];
-    var box = sudokuBoxes[cell.box]
-    for (var i=0; i<row.length; i++) {
-      changed = changed || row[i][v] || col[i][v] || box[i][v];
-      row[i][v] = false;
-      col[i][v] = false;
-      box[i][v] = false;
-    }
-  }
-  return changed;
-}
-
-function confirmCell(cell, v) {
-  var changed = !isSolved(cell) || v!==cell.solved;
-  newCellsConfirmed.push(cell);
-  for (var i=0; i<9; i++) {
-    cell[i] = false;
-  }
-  cell[v] = true;
-  cell['solved'] = v;
-  return changed;
-}
-
-function toggleCandidate(cell, v) {
-  if (isSolved(cell)) return false;
-  cell[v] = !cell[v];
-  return true;
+  return cell.isSolved;
 }
 
 function topEdge()    { return sudokuEdges[0]; }
@@ -311,6 +273,23 @@ function boxNum(r, c) {
   } else return -1;
 }
 
+function getSingleEdgeValue_Col(ind) {
+  if (ind>=9) return undefined;
+  var top    = topEdge()[ind];
+  var bottom = bottomEdge()[ind];
+  if (isNumber(top)) return top;
+  if (isNumber(bottom)) return bottom;
+  return undefined;
+}
+
+function getSingleEdgeValue_Row(ind) {
+  if (ind>=9) return undefined;
+  var left  = leftEdge()[ind];
+  var right = rightEdge()[ind];
+  if (isNumber(left)) return left;
+  if (isNumber(right)) return right;
+  return undefined;
+}
 
 
 
@@ -325,33 +304,282 @@ function boxNum(r, c) {
   // ##    ## ##     ## ##         ## ##   ##       ##    ##  ##    ##
   //  ######   #######  ########    ###    ######## ##     ##  ######
 
-
-
-
-
-  //  EEEEEEE DDDDD     GGGG  EEEEEEE
-  //  EE      DD  DD   GG  GG EE
-  //  EEEEE   DD   DD GG      EEEEE
-  //  EE      DD   DD GG   GG EE
-  //  EEEEEEE DDDDDD   GGGGGG EEEEEEE
-
-  function getSingleEdgeValue_Col(ind) {
-    if (ind>=9) return undefined;
-    var top    = topEdge()[ind];
-    var bottom = bottomEdge()[ind];
-    if (isNumber(top)) return top;
-    if (isNumber(bottom)) return bottom;
-    return undefined;
+  // sometimes there is state that helps to avoid
+  // recalculation. after an 'undo' all of this should
+  // be wiped clean, as this state can be corrupt.
+  function undoWipe() {
+    sandwichStaticFinished = false;
+    everyRowCol(g => g.sandwichFullySet = false);
+    everyCell(c => c.adjCleared = false);
   }
 
-  function getSingleEdgeValue_Row(ind) {
-    if (ind>=9) return undefined;
-    var left  = leftEdge()[ind];
-    var right = rightEdge()[ind];
-    if (isNumber(left)) return left;
-    if (isNumber(right)) return right;
-    return undefined;
+/*
+     CCCCC   OOOOO  NN   NN FFFFFFF IIIII RRRRRR  MM    MM
+    CC    C OO   OO NNN  NN FF       III  RR   RR MMM  MMM
+    CC      OO   OO NN N NN FFFF     III  RRRRRR  MM MM MM
+    CC    C OO   OO NN  NNN FF       III  RR  RR  MM    MM
+     CCCCC   OOOO0  NN   NN FF      IIIII RR   RR MM    MM
+*/
+
+
+function confirmCell(cell, v) {
+  var changed = !isSolved(cell) || v!==cell.solved;
+  for (var i=0; i<9; i++)
+    cell[i] = false;
+  cell[v] = true;
+  cell.isSolved = true;
+  cell.solved = v;
+  clearSolvedLists(cell);
+  return changed;
+}
+
+function clearSolvedLists(cell) {
+  var row = sudoku[cell.row];
+  var col = sudokuCols[cell.col];
+  var box = sudokuBoxes[cell.box];
+  row.solvedCellsCache = row.unsolvedCellsCache = undefined;
+  col.solvedCellsCache = col.unsolvedCellsCache = undefined;
+  box.solvedCellsCache = box.unsolvedCellsCache = undefined;
+}
+
+function getSolvedUnsolvedCells(group, useCache=true) {
+  if (group.solvedCellsCache === undefined || group.unsolvedCellsCache === undefined || useCache===false) {
+    group.solvedCellsCache = [];
+    group.unsolvedCellsCache = [];
+    for (var c=0; c<group.length; c++) {
+      var cell = group[c];
+      if (isSolved(cell))
+        group.solvedCellsCache.push(cell);
+      else
+        group.unsolvedCellsCache.push(cell);
+    }
   }
+  return [group.solvedCellsCache, group.unsolvedCellsCache];
+}
+
+/*
+     CCCCC  LL      EEEEEEE   AAA   RRRRRR       AAA   DDDDD       JJJ
+    CC    C LL      EE       AAAAA  RR   RR     AAAAA  DD  DD      JJJ
+    CC      LL      EEEEE   AA   AA RRRRRR     AA   AA DD   DD     JJJ
+    CC    C LL      EE      AAAAAAA RR  RR     AAAAAAA DD   DD JJ  JJJ
+     CCCCC  LLLLLLL EEEEEEE AA   AA RR   RR    AA   AA DDDDDD   JJJJJ
+*/
+
+  // clear candidates from all cells visible to newly confirmed cells.
+  function clearAdjacents() {
+    if (everyCell(cell => {
+      if (!isSolved(cell)) return false;
+      if (cell.adjCleared) return false;
+      cell.adjCleared = true;
+      return clearAfterConfirm(cell);
+    })) {
+      consolelog('Cleared candidates adjacent to confirmed cells.');
+      return true;
+    } return false;
+  }
+
+  function clearAfterConfirm(cell) {
+    var changed = false;
+    if (!isSolved(cell)) return false;
+    var v = cell.solved;
+    var row = sudoku[cell.row];
+    var col = sudokuCols[cell.col];
+    var box = sudokuBoxes[cell.box]
+    for (var i=0; i<9; i++) {
+      changed = changed || row[i][v] || col[i][v] || box[i][v];
+      row[i][v] = false;
+      col[i][v] = false;
+      box[i][v] = false;
+    }
+    return changed;
+  }
+
+
+
+/*
+    HH   HH DDDDD   NN   NN     SSSSS  IIIII NN   NN   GGGG  LL      EEEEEEE  SSSSS
+    HH   HH DD  DD  NNN  NN    SS       III  NNN  NN  GG  GG LL      EE      SS
+    HHHHHHH DD   DD NN N NN     SSSSS   III  NN N NN GG      LL      EEEEE    SSSSS
+    HH   HH DD   DD NN  NNN         SS  III  NN  NNN GG   GG LL      EE           SS
+    HH   HH DDDDDD  NN   NN     SSSSS  IIIII NN   NN  GGGGGG LLLLLLL EEEEEEE  SSSSS
+*/
+
+function hiddenSingles() {
+  var changed = false;
+  for (var g=0; g<9; g++) {
+    if (hiddenSinglesGroup(sudoku[g]))      changed = true;
+    if (hiddenSinglesGroup(sudokuCols[g]))  changed = true;
+    if (hiddenSinglesGroup(sudokuBoxes[g])) changed = true;
+  }
+  return changed;
+}
+
+function hiddenSinglesGroup(group, prependText="") {
+  var counts = [0,0,0,0,0,0,0,0,0];
+  var inds = [];
+  for (var v=0; v<9; v++)
+    for (var c=0; c<9; c++)
+      if (group[c][v]) {
+        counts[v]++;
+        inds[v] = c;
+      }
+  
+  var changed = false;
+  for (var v=0; v<9; v++) {
+    if (counts[v]===1) {
+      var cell = group[inds[v]];
+      if (confirmCell(cell,v)) {
+        consolelog(prependText + `Hidden Single ${v+1} found in ${group.groupName}.`);
+        changed = true;
+      }
+    }
+  }
+  return changed;
+} 
+
+/*
+  NN   NN KK  KK DDDDD       SSSSS  IIIII NN   NN   GGGG  LL      EEEEEEE  SSSSS
+  NNN  NN KK KK  DD  DD     SS       III  NNN  NN  GG  GG LL      EE      SS
+  NN N NN KKKK   DD   DD     SSSSS   III  NN N NN GG      LL      EEEEE    SSSSS
+  NN  NNN KK KK  DD   DD         SS  III  NN  NNN GG   GG LL      EE           SS
+  NN   NN KK  KK DDDDDD      SSSSS  IIIII NN   NN  GGGGGG LLLLLLL EEEEEEE  SSSSS
+*/
+
+
+function nakedSingles() {
+  return everyCell(cell => {
+    var v = getOnlyCandidate(cell);
+    if (v===undefined) return false;
+    confirmCell(cell,v);
+    consolelog(`Naked Single ${v+1} at ${cell.pos}.`);
+    return true;
+  });
+}
+
+function getOnlyCandidate(cell) {
+  var knownCand = undefined;
+  for (var v=0; v<9; v++) if (cell[v]) {
+    if (knownCand !== undefined) return undefined;
+    knownCand = v;
+  }
+  return knownCand;
+}
+
+
+
+/*
+    IIIII NN   NN TTTTTTT EEEEEEE RRRRRR   SSSSS  EEEEEEE  CCCCC  TTTTTTT    RRRRRR  MM    MM VV     VV LL
+     III  NNN  NN   TTT   EE      RR   RR SS      EE      CC    C   TTT      RR   RR MMM  MMM VV     VV LL
+     III  NN N NN   TTT   EEEEE   RRRRRR   SSSSS  EEEEE   CC        TTT      RRRRRR  MM MM MM  VV   VV  LL
+     III  NN  NNN   TTT   EE      RR  RR       SS EE      CC    C   TTT      RR  RR  MM    MM   VV VV   LL
+    IIIII NN   NN   TTT   EEEEEEE RR   RR  SSSSS  EEEEEEE  CCCCC    TTT      RR   RR MM    MM    VVV    LLLLLLL
+*/
+
+function intersectionRemoval() {
+  var changes = [];
+
+  for (var i=0; i<9; i++) {
+    var row = sudoku[i];
+    var col = sudokuCols[i];
+    var box = sudokuBoxes[i];
+
+    var rowConfines    = optionsConfined(row, 'box');
+    var colConfines    = optionsConfined(col, 'box');
+    var boxConfinesRow = optionsConfined(box, 'row');
+    var boxConfinesCol = optionsConfined(box, 'col');
+    
+    for (var v=0; v<9; v++) {
+      if (rowConfines[v] >= 0) {
+        // clear v from the box, apart from this row
+        var intersectedBox = sudokuBoxes[rowConfines[v]];
+        if (clearExceptGroup(intersectedBox, 'row', i, v)) {
+          changes.push([row, intersectedBox, v]);
+        }
+      }
+      if (colConfines[v] >= 0) {
+        // clear v from the box, apart rom this col
+        var intersectedBox = sudokuBoxes[colConfines[v]];
+        if (clearExceptGroup(intersectedBox, 'col', i, v)) {
+          changes.push([col, intersectedBox, v]);
+        }
+      }
+      if (boxConfinesRow[v] >= 0) {
+        // clear v from the row, apart from this box
+        var intersectedRow = sudoku[boxConfinesRow[v]];
+        if (clearExceptGroup(intersectedRow, 'box', i, v)) {
+          changes.push([box, intersectedRow, v]);
+        }
+      }
+      if (boxConfinesCol[v] >= 0) {
+        // clear v from the col, apart from this box
+        var intersectedCol = sudokuCols[boxConfinesCol[v]];
+        if (clearExceptGroup(intersectedCol, 'box', i, v)) {
+          changes.push([box, intersectedCol, v]);
+        }
+      }
+    } 
+  } 
+
+  if (changes.length === 0) return false;
+  for (var i=0; i<changes.length; i++) {
+    var [group1,group2,v] = changes[i];
+    consolelog(`Intersection on value ${v+1} between ${group1.groupName} and ${group2.groupName}.`);
+  }
+  return true;
+}
+
+// return a list of indexes (values of 'otherGrop')
+// where v's candidates are all in otherGroup=out[v]
+function optionsConfined(group, otherGroup) {
+  var useFun = (typeof otherGroup === "function");
+  var mins = [10, 10, 10, 10, 10, 10, 10, 10, 10];
+  var maxs = [-1, -1, -1, -1, -1, -1, -1, -1, -1];
+
+  // get the min and max value for grouptype (row/col/box) for
+  // each cell holding each value.
+  for (var c=0; c<9; c++) {
+    var cell = group[c];
+    for (var v=0; v<9; v++) {
+      if (cell[v]) {
+        if (useFun) {
+          mins[v] = Math.min(mins[v], otherGroup(cell));
+          maxs[v] = Math.max(maxs[v], otherGroup(cell));
+        } else {
+          mins[v] = Math.min(mins[v], cell[otherGroup]);
+          maxs[v] = Math.max(maxs[v], cell[otherGroup]);
+        }
+      }
+    }
+  }
+
+  // when the min is the max, store that value in the below array.
+  var totals = [-1, -1, -1, -1, -1, -1, -1, -1, -1];
+  for (var v=0; v<9; v++) {
+    if (mins[v] == maxs[v]) {
+      totals[v] = mins[v];
+    }
+  }
+
+  return totals;
+}
+
+
+function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
+  var useFun = (typeof otherGroupType === "function");
+  var changed = false;
+  for (var i=0; i<9; i++) {
+    var cell = thisgroup[i];
+    if ((useFun && (otherGroupType(cell) !== otherGroupVal))
+    || (!useFun && (cell[otherGroupType] !== otherGroupVal))) {
+      if (cell[v]) {
+        cell[v] = false;
+        changed = true;
+      }
+    }
+  }
+  return changed;
+}
+
 
 
 
@@ -368,32 +596,28 @@ function boxNum(r, c) {
     if (sudokuDiags===undefined)
       buildSudokuDiags();
 
-    if (xsudokuHiddenSingles()) return true;
     if (xsudokuClearAdjs()) return true;
+    if (xsudokuHiddenSingles()) return true;
+    if (xsudokuIntersections()) return true;
+    if (xsudokuNakedPairs()) return true;
     return false;
   }
 
   function clearAdjGroup(group, prependText="") {
-    var solved = [];
-    var unsolved = [];
-    for (var c=0; c<9; c++)
-      if (isSolved(group[c]))
-        solved.push(group[c].solved);
-      else
-        unsolved.push(group[c]);
-    
+    // don't use cache, as diags cache are not cleared on confirm
+    var [solved,unsolved] = getSolvedUnsolvedCells(group, false);
+
     var changed = false;
-    for (var c=0; c<unsolved.length; c++) {
-      var cell = unsolved[c];
-      for (var i=0; i<solved.length; i++) {
-        var v = solved[i];
-        if (cell[v]) {
-          cell[v] = false;
+    for (var s=0; s<solved.length; s++) {
+      var v = solved[s].solved;
+      for (var i=0; i<unsolved.length; i++) {
+        if (unsolved[i][v]) {
+          unsolved[i][v] = false;
           changed = true;
         }
       }
     }
-
+    
     if (changed) consolelog(prependText+`Cleared adjacent candidates to confirmed cells in ${group.groupName}`);
     return changed;
   }
@@ -417,11 +641,70 @@ function boxNum(r, c) {
 
   function xsudokuHiddenSingles() {
     var changed = false;
-    for (var i=0; i<sudokuDiags.length; i++) {
+    for (var i=0; i<sudokuDiags.length; i++)
       if (hiddenSinglesGroup(sudokuDiags[i], "[x sudoku] ")) changed = true;
-    }
     return changed;
   }
+
+  function xsudokuNakedPairs() {
+    var changed = false;
+    for (var i=0; i<sudokuDiags.length; i++)
+      if (nakedPairsGroup(sudokuDiags[i],"[x sudoku] ")) changed = true;
+    return changed;
+  }
+
+  function xsudokuIntersections() {
+    var changed = false;
+
+    // diag only having cands in one box
+    for (var i=0; i<sudokuDiags.length; i++) {
+      var diag = sudokuDiags[i];
+      var confined = optionsConfined(diag,"box");
+      for (var v=0; v<9; v++) {
+        if (confined[v]>=0) {
+          var box = sudokuBoxes[confined[v]];
+          if (clearExceptGroup(box,isDiag(i),true,v)) {
+            changed = true;
+            consolelog(`[x sudoku] Intersection on ${v+1} between ${diag.groupName} and ${box.groupName}.`);
+          }
+        }
+      }
+    }
+
+    // boxes only having cands in one diag
+    for (var b=0; b<9; b+=2) {
+      var box = sudokuBoxes[b];
+      var confined = optionsConfined(box, isEitherDiag);
+      for (var v=0; v<9; v++) {
+        if (confined[v]>=0) {
+          var diag = sudokuDiags[confined[v]];
+          if (clearExceptGroup(diag,"box",b,v)) {
+            changed = true;
+            consolelog(`[x sudoku] Intersection on ${v+1} between ${box.groupName} and ${diag.groupName}.`);
+          }
+        }
+      }
+    }
+
+    return changed;
+  }
+
+  function isDiag(ind) {
+    if (ind===0) return function(cell) {
+      return (cell.row===cell.col)
+    };
+    else return function(cell) {
+      return (cell.row===(8-cell.col));
+    };
+  }
+
+  function isEitherDiag(cell) {
+    if (cell.row===cell.col) return 0;
+    if (cell.row===(8-cell.col)) return 1;
+    return -1;
+  }
+
+  
 
 
 
@@ -1082,228 +1365,6 @@ function boxNum(r, c) {
 
 
 
-/*
-     CCCCC  LL      EEEEEEE   AAA   RRRRRR       AAA   DDDDD       JJJ
-    CC    C LL      EE       AAAAA  RR   RR     AAAAA  DD  DD      JJJ
-    CC      LL      EEEEE   AA   AA RRRRRR     AA   AA DD   DD     JJJ
-    CC    C LL      EE      AAAAAAA RR  RR     AAAAAAA DD   DD JJ  JJJ
-     CCCCC  LLLLLLL EEEEEEE AA   AA RR   RR    AA   AA DDDDDD   JJJJJ
-*/
-
-  // clear candidates from all cells visible to newly confirmed cells.
-  function clearAdjacents() {
-    var changed = false;
-    while(newCellsConfirmed.length > 0) {
-      var cell = newCellsConfirmed.pop();
-      if (isSolved(cell)) {
-        changed = clearAfterConfirm(cell) || changed;
-      } else {
-        // somehow one of the cells in newCellsConfirmed isn't solved.
-        // this should never happen - something is broken somewhere.
-        console.error("Something went very wrong with newCellsConfirmed.");
-      }
-    }
-    if (changed) consolelog("Cleared candidates adjacent to confirmed cells.");
-    return changed;
-  }
-
-
-/*
-    HH   HH DDDDD   NN   NN     SSSSS  IIIII NN   NN   GGGG  LL      EEEEEEE  SSSSS
-    HH   HH DD  DD  NNN  NN    SS       III  NNN  NN  GG  GG LL      EE      SS
-    HHHHHHH DD   DD NN N NN     SSSSS   III  NN N NN GG      LL      EEEEE    SSSSS
-    HH   HH DD   DD NN  NNN         SS  III  NN  NNN GG   GG LL      EE           SS
-    HH   HH DDDDDD  NN   NN     SSSSS  IIIII NN   NN  GGGGGG LLLLLLL EEEEEEE  SSSSS
-*/
-  function findSingleCase(coll, val) {
-    for (var i=0; i<9; i++)
-      if (coll[i][val]) return coll[i];
-    return false;
-  }
-
-  function hiddenSinglesGroup(group, prependText="") {
-    var counts = [0,0,0,0,0,0,0,0,0];
-    var inds = [];
-    for (var v=0; v<9; v++)
-      for (var c=0; c<9; c++)
-        if (group[c][v]) {
-          counts[v]++;
-          inds[v] = c;
-        }
-    
-    var changed = false;
-    for (var v=0; v<9; v++) {
-      if (counts[v]===1) {
-        var cell = group[inds[v]];
-        if (confirmCell(cell,v)) {
-          consolelog(prependText + `Hidden single ${v+1} found in ${group.groupName}.`);
-          changed = true;
-        }
-      }
-    }
-    return changed;
-  } 
-
-  function hiddenSingles() {
-    var changed = false;
-    for (var g=0; g<9; g++) {
-      if (hiddenSinglesGroup(sudoku[g]))      changed = true;
-      if (hiddenSinglesGroup(sudokuCols[g]))  changed = true;
-      if (hiddenSinglesGroup(sudokuBoxes[g])) changed = true;
-    }
-    return changed;
-  }
-
-/*
-    NN   NN KK  KK DDDDD       SSSSS  IIIII NN   NN   GGGG  LL      EEEEEEE  SSSSS
-    NNN  NN KK KK  DD  DD     SS       III  NNN  NN  GG  GG LL      EE      SS
-    NN N NN KKKK   DD   DD     SSSSS   III  NN N NN GG      LL      EEEEE    SSSSS
-    NN  NNN KK KK  DD   DD         SS  III  NN  NNN GG   GG LL      EE           SS
-    NN   NN KK  KK DDDDDD      SSSSS  IIIII NN   NN  GGGGGG LLLLLLL EEEEEEE  SSSSS
-*/
-
-  function candidateCount(cell) {
-    var n = 0;
-    for (var i=0; i<9; i++) if (cell[i]) n++;
-    return n;
-  }
-
-  function getSingleOption(cell) {
-    for (var i=0; i<9; i++) if (cell[i]) return i;
-    return -1;
-  }
-
-  function nakedSingles() {
-    var singles = [];
-    for (var r=0; r<9; r++) {
-      for (var c=0; c<9; c++) {
-        var cell = sudoku[r][c];
-        if (candidateCount(cell) === 1) {
-          singles.push(cell);
-        }
-      }
-    }
-    var changes = [];
-    var changeVal = -1;
-    for (var i=0; i<singles.length; i++) {
-      var cell = singles[i];
-      var v = getSingleOption(cell);
-      confirmCell(cell, v);
-      changes.push(cell.pos);
-      changeVal = v;
-    }
-    if (changes.length === 1) {
-      consolelog("Naked Single (" + (changeVal+1) + ") found at " + changes[0] + ".");
-      return true;
-    } else if (changes.length > 1) {
-      consolelog("Naked Singles found at " + changes.join(", ") + ".");
-      return true;
-    }
-    return false;
-  }
-
-/*
-    IIIII NN   NN TTTTTTT EEEEEEE RRRRRR   SSSSS  EEEEEEE  CCCCC  TTTTTTT    RRRRRR  MM    MM VV     VV LL
-     III  NNN  NN   TTT   EE      RR   RR SS      EE      CC    C   TTT      RR   RR MMM  MMM VV     VV LL
-     III  NN N NN   TTT   EEEEE   RRRRRR   SSSSS  EEEEE   CC        TTT      RRRRRR  MM MM MM  VV   VV  LL
-     III  NN  NNN   TTT   EE      RR  RR       SS EE      CC    C   TTT      RR  RR  MM    MM   VV VV   LL
-    IIIII NN   NN   TTT   EEEEEEE RR   RR  SSSSS  EEEEEEE  CCCCC    TTT      RR   RR MM    MM    VVV    LLLLLLL
-*/
-
-  function optionsConfined(group, otherGroupType) {
-    var mins = [10, 10, 10, 10, 10, 10, 10, 10, 10];
-    var maxs = [-1, -1, -1, -1, -1, -1, -1, -1, -1];
-
-    // get the min and max value for grouptype (row/col/box) for
-    // each cell holding each value.
-    for (var c=0; c<9; c++) {
-      var cell = group[c];
-      for (var v=0; v<9; v++) {
-        if (cell[v]) {
-          mins[v] = Math.min(mins[v], cell[otherGroupType]);
-          maxs[v] = Math.max(maxs[v], cell[otherGroupType]);
-        }
-      }
-    }
-
-    // when the min is the max, store that value in the below array.
-    var totals = [-1, -1, -1, -1, -1, -1, -1, -1, -1];
-    for (var v=0; v<9; v++) {
-      if (mins[v] == maxs[v]) {
-        totals[v] = mins[v];
-      }
-    }
-
-    return totals;
-  }
-
-
-  function clearExceptGroup(thisgroup, othergrouptype, othergroup, v) {
-    var changed = false;
-    for (var i=0; i<9; i++) {
-      var cell = thisgroup[i];
-      if (cell[othergrouptype] !== othergroup) {
-        if (cell[v]) {
-          cell[v] = false;
-          changed = true;
-        }
-      }
-    }
-    return changed;
-  }
-
-  function intersectionRemoval() {
-    var changes = [];
-
-    for (var i=0; i<9; i++) {
-      var row = sudoku[i];
-      var col = sudokuCols[i];
-      var box = sudokuBoxes[i];
-
-      var rowConfines    = optionsConfined(row, 'box');
-      var colConfines    = optionsConfined(col, 'box');
-      var boxConfinesRow = optionsConfined(box, 'row');
-      var boxConfinesCol = optionsConfined(box, 'col');
-      
-      for (var v=0; v<9; v++) {
-        if (rowConfines[v] >= 0) {
-          // clear v from the box, apart from this row
-          var intersectedBox = sudokuBoxes[rowConfines[v]];
-          if (clearExceptGroup(intersectedBox, 'row', i, v)) {
-            changes.push([row, intersectedBox, v]);
-          }
-        }
-        if (colConfines[v] >= 0) {
-          // clear v from the box, apart rom this col
-          var intersectedBox = sudokuBoxes[colConfines[v]];
-          if (clearExceptGroup(intersectedBox, 'col', i, v)) {
-            changes.push([col, intersectedBox, v]);
-          }
-        }
-        if (boxConfinesRow[v] >= 0) {
-          // clear v from the row, apart from this box
-          var intersectedRow = sudoku[boxConfinesRow[v]];
-          if (clearExceptGroup(intersectedRow, 'box', i, v)) {
-            changes.push([box, intersectedRow, v]);
-          }
-        }
-        if (boxConfinesCol[v] >= 0) {
-          // clear v from the col, apart from this box
-          var intersectedCol = sudokuCols[boxConfinesCol[v]];
-          if (clearExceptGroup(intersectedCol, 'box', i, v)) {
-            changes.push([box, intersectedCol, v]);
-          }
-        }
-      } 
-    } 
-
-    if (changes.length === 0) return false;
-    for (var i=0; i<changes.length; i++) {
-      var [group1,group2,v] = changes[i];
-      consolelog("Intersection on value " + (v+1) + " between " + group1.groupName + " and " + group2.groupName + ".");
-    }
-    return true;
-  }
 
 
 /*
@@ -1313,6 +1374,12 @@ function boxNum(r, c) {
     NN  NNN KK KK  DD   DD    PP      AAAAAAA  III  RR  RR       SS
     NN   NN KK  KK DDDDDD     PP      AA   AA IIIII RR   RR  SSSSS
 */
+
+  function candidateCount(cell) {
+    var n = 0;
+    for (var i=0; i<9; i++) if (cell[i]) n++;
+    return n;
+  }
 
   function moreThanLeft(group, n) {
     var count = 0;
@@ -1398,14 +1465,23 @@ function boxNum(r, c) {
     return changes;
   }
 
+  function everyCell(func) {
+    var changed = false;
+    for (var r=0; r<9; r++)
+      for (var c=0; c<9; c++)
+        if (func(sudoku[r][c]))
+          changed = true;
+    return changed;
+  }
+
   function everyRowCol(groupFunc) {
     var changed = false;
     var groupings = [sudoku, sudokuCols];
-    for (var g=0; g<3; g++) {
+    for (var g=0; g<2; g++) {
       var grouping = groupings[g];
       for (var i=0; i<9; i++) {
-        var group = grouping[i];
-        changed = groupFunc(group) || changed;
+        if (groupFunc(grouping[i]))
+          changed = true;
       }
     }
     return changed;
@@ -1443,9 +1519,9 @@ function boxNum(r, c) {
     return changed;
   }
 
-  function nakedPairsGroup(group) {
-    // changed = false;
-    var changes = [];
+  function nakedPairsGroup(group, preText="") {
+    var changed = false;
+    // var changes = [];
     if (moreThanTwoLeft(group)){
       var twos = getTwos(group);
       for (var t1=0; t1<twos.length; t1++) {
@@ -1453,23 +1529,27 @@ function boxNum(r, c) {
           if (sameCandidates(twos[t1], twos[t2])) {
             var [cand1, cand2] = getCandidates(twos[t1])
             if (clearNakedPair(group,cand1,cand2,twos[t1],twos[t2])) {
-              changes.push([group, cand1, cand2]);
+              // changes.push([group, cand1, cand2]);
+              consolelog(preText+`Naked pair ${vstr2(cand1,cand2)} found in ${group.groupName}.`);
+              changed = true;
             }
           }
         }
       }
     }
-    return changes;
+    // return changes;
+    return changed;
   }
 
   function nakedPairs() {
-    var changes = everyGroupConcat(nakedPairsGroup);
-    if (changes.length === 0) return false;
-    for (var i=0; i<changes.length; i++) {
-      var [group,cand1,cand2] = changes[i];
-      consolelog("Naked Pair " + vstr2(cand1,cand2) + " found in " + group.groupName + ".");
-    }
-    return true;
+    return everyGroup(nakedPairsGroup);
+    // var changes = everyGroupConcat(nakedPairsGroup);
+    // if (changes.length === 0) return false;
+    // for (var i=0; i<changes.length; i++) {
+      // var [group,cand1,cand2] = changes[i];
+      // consolelog("Naked Pair " + vstr2(cand1,cand2) + " found in " + group.groupName + ".");
+    // }
+    // return true;
   }
 
 /*
@@ -3048,7 +3128,6 @@ function boxNum(r, c) {
     sudokuCols = [];
     sudokuBoxes = [];
     sudokuCellsByPos = [];
-    newCellsConfirmed = [];
 
     // for special strategies
     sudokuDiags = undefined;
