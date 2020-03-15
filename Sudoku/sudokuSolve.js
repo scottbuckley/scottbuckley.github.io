@@ -355,11 +355,22 @@
 
 
   // the values that are in two cells
+  function getValCounts(group) {
+    var counts = [0,0,0,0,0,0,0,0,0];
+    var unsolved = getUnsolvedCells(group);
+    for (var c=0; c<unsolved.length; c++) {
+      var cell = unsolved[c];
+        for (var v=0; v<9; v++)
+          if (cell[v]) counts[v]++;
+    }
+    return counts;
+  }
+
   function getValTwos(group) {
     var vals = [];
+    var counts = getValCounts(group);
     for (var v=0; v<9; v++)
-      if (countPossibleCells(group, v) === 2)
-      vals.push(v);
+      if (counts[v]===2) vals.push(v);
     return vals;
   }
 
@@ -443,6 +454,27 @@
 
   function sameCell(cell1, cell2) {
     return (cell1.pos === cell2.pos);
+  }
+
+
+  function countPossibleCells(group, v) {
+    var count = 0;
+    for (var c=0; c<9; c++) {
+      var cell = group[c];
+      if (!isSolved(cell)) {
+        if (cell[v])
+          count++;
+      }
+    }
+    return count;
+  }
+
+  function getGroupMap(group, v) {
+    var map = "";
+    for (var c=0; c<group.length; c++)
+        if (group[c][v]) map += "1";
+        else             map += "0";
+    return map;
   }
 
 
@@ -534,76 +566,76 @@ function clearSolvedLists(cell) {
   }
 
 
+  /*
+    NN   NN KK  KK DDDDD       SSSSS  IIIII NN   NN   GGGG  LL      EEEEEEE  SSSSS
+    NNN  NN KK KK  DD  DD     SS       III  NNN  NN  GG  GG LL      EE      SS
+    NN N NN KKKK   DD   DD     SSSSS   III  NN N NN GG      LL      EEEEE    SSSSS
+    NN  NNN KK KK  DD   DD         SS  III  NN  NNN GG   GG LL      EE           SS
+    NN   NN KK  KK DDDDDD      SSSSS  IIIII NN   NN  GGGGGG LLLLLLL EEEEEEE  SSSSS
+  */
 
-/*
-    HH   HH DDDDD   NN   NN     SSSSS  IIIII NN   NN   GGGG  LL      EEEEEEE  SSSSS
-    HH   HH DD  DD  NNN  NN    SS       III  NNN  NN  GG  GG LL      EE      SS
-    HHHHHHH DD   DD NN N NN     SSSSS   III  NN N NN GG      LL      EEEEE    SSSSS
-    HH   HH DD   DD NN  NNN         SS  III  NN  NNN GG   GG LL      EE           SS
-    HH   HH DDDDDD  NN   NN     SSSSS  IIIII NN   NN  GGGGGG LLLLLLL EEEEEEE  SSSSS
-*/
 
-function hiddenSingles() {
-  var changed = false;
-  for (var g=0; g<9; g++) {
-    if (hiddenSinglesGroup(sudoku[g]))      changed = true;
-    if (hiddenSinglesGroup(sudokuCols[g]))  changed = true;
-    if (hiddenSinglesGroup(sudokuBoxes[g])) changed = true;
+  function nakedSingles() {
+    return everyCell(cell => {
+      var v = getOnlyCandidate(cell);
+      if (v===undefined) return false;
+      confirmCell(cell,v);
+      consolelog(`Naked Single ${v+1} at ${cell.pos}.`);
+      return true;
+    });
   }
-  return changed;
-}
 
-function hiddenSinglesGroup(group, prependText="") {
-  var counts = [0,0,0,0,0,0,0,0,0];
-  var inds = [];
-  for (var v=0; v<9; v++)
-    for (var c=0; c<9; c++)
-      if (group[c][v]) {
-        counts[v]++;
-        inds[v] = c;
-      }
-  
-  var changed = false;
-  for (var v=0; v<9; v++) {
-    if (counts[v]===1) {
-      var cell = group[inds[v]];
-      if (confirmCell(cell,v)) {
-        consolelog(prependText + `Hidden Single ${v+1} found in ${group.groupName}.`);
-        changed = true;
+  function getOnlyCandidate(cell) {
+    var knownCand = undefined;
+    for (var v=0; v<9; v++) if (cell[v]) {
+      if (knownCand !== undefined) return undefined;
+      knownCand = v;
+    }
+    return knownCand;
+  }
+
+
+
+  /*
+      HH   HH DDDDD   NN   NN     SSSSS  IIIII NN   NN   GGGG  LL      EEEEEEE  SSSSS
+      HH   HH DD  DD  NNN  NN    SS       III  NNN  NN  GG  GG LL      EE      SS
+      HHHHHHH DD   DD NN N NN     SSSSS   III  NN N NN GG      LL      EEEEE    SSSSS
+      HH   HH DD   DD NN  NNN         SS  III  NN  NNN GG   GG LL      EE           SS
+      HH   HH DDDDDD  NN   NN     SSSSS  IIIII NN   NN  GGGGGG LLLLLLL EEEEEEE  SSSSS
+  */
+
+  function hiddenSingles() {
+    var changed = false;
+    for (var g=0; g<9; g++) {
+      if (hiddenSinglesGroup(sudoku[g]))      changed = true;
+      if (hiddenSinglesGroup(sudokuCols[g]))  changed = true;
+      if (hiddenSinglesGroup(sudokuBoxes[g])) changed = true;
+    }
+    return changed;
+  }
+
+  function hiddenSinglesGroup(group, prependText="") {
+    var counts = [0,0,0,0,0,0,0,0,0];
+    var inds = [];
+    for (var v=0; v<9; v++)
+      for (var c=0; c<9; c++)
+        if (group[c][v]) {
+          counts[v]++;
+          inds[v] = c;
+        }
+    
+    var changed = false;
+    for (var v=0; v<9; v++) {
+      if (counts[v]===1) {
+        var cell = group[inds[v]];
+        if (confirmCell(cell,v)) {
+          consolelog(prependText + `Hidden Single ${v+1} found in ${group.groupName}.`);
+          changed = true;
+        }
       }
     }
-  }
-  return changed;
-} 
-
-/*
-  NN   NN KK  KK DDDDD       SSSSS  IIIII NN   NN   GGGG  LL      EEEEEEE  SSSSS
-  NNN  NN KK KK  DD  DD     SS       III  NNN  NN  GG  GG LL      EE      SS
-  NN N NN KKKK   DD   DD     SSSSS   III  NN N NN GG      LL      EEEEE    SSSSS
-  NN  NNN KK KK  DD   DD         SS  III  NN  NNN GG   GG LL      EE           SS
-  NN   NN KK  KK DDDDDD      SSSSS  IIIII NN   NN  GGGGGG LLLLLLL EEEEEEE  SSSSS
-*/
-
-
-function nakedSingles() {
-  return everyCell(cell => {
-    var v = getOnlyCandidate(cell);
-    if (v===undefined) return false;
-    confirmCell(cell,v);
-    consolelog(`Naked Single ${v+1} at ${cell.pos}.`);
-    return true;
-  });
-}
-
-function getOnlyCandidate(cell) {
-  var knownCand = undefined;
-  for (var v=0; v<9; v++) if (cell[v]) {
-    if (knownCand !== undefined) return undefined;
-    knownCand = v;
-  }
-  return knownCand;
-}
-
+    return changed;
+  } 
 
 
 /*
@@ -766,6 +798,60 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
   }
 
 
+  /*
+      HH   HH DDDDD   NN   NN    PPPPPP    AAA   IIIII RRRRRR   SSSSS
+      HH   HH DD  DD  NNN  NN    PP   PP  AAAAA   III  RR   RR SS
+      HHHHHHH DD   DD NN N NN    PPPPPP  AA   AA  III  RRRRRR   SSSSS
+      HH   HH DD   DD NN  NNN    PP      AAAAAAA  III  RR  RR       SS
+      HH   HH DDDDDD  NN   NN    PP      AA   AA IIIII RR   RR  SSSSS
+  */
+
+
+  function hiddenPairs() {
+    return everyGroup(hiddenPairsGroup);
+  }
+
+  function hiddenPairsGroup(group, preText="") {
+    var unsolved = getUnsolvedCells(group);
+    if (unsolved.length <= 2) return false;
+
+    // the values that are only in two cells
+    var vals = getValTwos(group);
+
+    // make a map (over the unsolveds) of where each value is available.
+    // check if any two values are available in the same two cells.
+    var maps = [];
+    for (var i1=0; i1<vals.length; i1++) {
+      var v1 = vals[i1];
+      maps[i1] = getGroupMap(unsolved, v1);
+      for (var i2=0; i2<i1; i2++) {
+        var v2 = vals[i2];
+        if (maps[i2] === maps[i1])
+          if (clearHiddenPair(unsolved, v2, v1, maps[i1])) {
+            consolelog(preText+`Hidden Pair ${vstr(v1,v2)} found in ${group.groupName}.`);
+            return true;
+          }
+      }
+    }
+    return false;
+  }
+
+  function clearHiddenPair(group, v1, v2, map) {
+    var changed = false;
+    for (var c=0; c<9; c++) {
+      if (map.charAt(c) === "1") {
+        var cell = group[c];
+        for (var v=0; v<9; v++) {
+          if (v !== v1 && v !== v2)
+            if (cell[v]) {
+              changed = true;
+              cell[v] = false;
+            }
+        }
+      }
+    }
+    return changed;
+  }
 
 /*
     XX    XX     SSSSS  UU   UU DDDDD    OOOOO  KK  KK UU   UU
@@ -1834,7 +1920,7 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
   }
 
   function vstr() {
-    return "(" + arguments.join(",") + ")";
+    return "(" + Array.from(arguments).map(v => v+1).join(",") + ")";
   }
 
   function comand3(a, b, c) {
@@ -1845,111 +1931,6 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     return everyGroup(hiddenTripleGroup);
   }
 
-/*
-    HH   HH DDDDD   NN   NN    PPPPPP    AAA   IIIII RRRRRR   SSSSS
-    HH   HH DD  DD  NNN  NN    PP   PP  AAAAA   III  RR   RR SS
-    HHHHHHH DD   DD NN N NN    PPPPPP  AA   AA  III  RRRRRR   SSSSS
-    HH   HH DD   DD NN  NNN    PP      AAAAAAA  III  RR  RR       SS
-    HH   HH DDDDDD  NN   NN    PP      AA   AA IIIII RR   RR  SSSSS
-*/
-
-  function countPossibleCells(group, v) {
-    var count = 0;
-    for (var c=0; c<9; c++) {
-      var cell = group[c];
-      if (!isSolved(cell)) {
-        if (cell[v])
-          count++;
-      }
-    }
-    return count;
-  }
-
-  function getCellMap(cell) {
-    if (isSolved(cell)) return "000000000";
-    var map = "";
-    for (var v=0; v<9; v++) {
-      if (cell[v])
-        map = map + "1";
-      else
-        map = map + "0";
-    }
-    return map;
-  }
-
-  function getGroupMap(group, v) {
-    var map = "";
-    for (var c=0; c<9; c++) {
-      var cell = group[c];
-      if (isSolved(cell)) {
-        map = map + "0";
-      } else {
-        if (cell[v])
-          map = map + "1";
-        else
-          map = map + "0";
-      }
-    }
-    return map;
-  }
-
-  function listOfNine(x) {
-    return [x,x,x,x,x,x,x,x,x];
-  }
-  function listOf(x, n) {
-    var out = [];
-    for (var i=0; i<n; i++)
-      out.push(x);
-    return out;
-  }
-
-  function clearHiddenPair(group, v1, v2, map) {
-    var changed = false;
-    for (var c=0; c<9; c++) {
-      if (map.charAt(c) === "1") {
-        var cell = group[c];
-        for (var v=0; v<9; v++) {
-          if (v !== v1 && v !== v2) {
-            if (cell[v]) {
-              changed = true;
-              cell[v] = false;
-            }
-          }
-        }
-      }
-    }
-    return changed;
-  }
-
-  
-  function hiddenPairsGroup(group) {
-    if (!moreThanTwoLeft(group)) return []
-    var vals = getValTwos(group); // the values that are only in two cells
-    var maps = [];
-    for (var i1=0; i1<vals.length; i1++) {
-      var v1 = vals[i1];
-      maps.push(getGroupMap(group, v1));
-      for (var i2=0; i2<i1; i2++) {
-        var v2 = vals[i2];
-        if (maps[i2] === maps[i1]) {
-          if (clearHiddenPair(group, v2, v1, maps[i1])) {
-            return [[group, v2, v1]];
-          }
-        }
-      }
-    }
-    return [];
-  }
-
-  function hiddenPairs() {
-    var changes = everyGroupConcat(hiddenPairsGroup);
-    if (changes.length === 0) return false;
-    for (var i=0; i<changes.length; i++) {
-      var [group,v1,v2] = changes[i];
-      consolelog("Hidden Pair " + vstr(v1,v2) + " found in " + group.groupName + ".");
-    }
-    return true;
-  }
 
 /*
     XX    XX        WW      WW IIIII NN   NN   GGGG   SSSSS
@@ -2002,7 +1983,6 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
 
   function XWingsAux(groups, groupType) {
     for (var v=0; v<9; v++) {
-      // var maps = listOfNine("000000000");
       var groupInds = [];
       var maps = [];
       for (var g=0; g<9; g++) {
