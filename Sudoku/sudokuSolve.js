@@ -240,56 +240,210 @@
 
 
 
-function isNumber(v) {
-  if (isNaN(v)) return false;
-  if (v === null) return false;
-  if (typeof v === "number") return true;
-  return false;
-}
+  function isNumber(v) {
+    if (isNaN(v)) return false;
+    if (v === null) return false;
+    if (typeof v === "number") return true;
+    return false;
+  }
 
-function isSolved(cell) {
-  return cell.isSolved;
-}
+  function isSolved(cell) {
+    return cell.isSolved;
+  }
 
-function topEdge()    { return sudokuEdges[0]; }
-function leftEdge()   { return sudokuEdges[1]; }
-function rightEdge()  { return sudokuEdges[2]; }
-function bottomEdge() { return sudokuEdges[3]; }
+  /* CANDIDATE STATS */
+  function getSolvedUnsolvedCells(group) {
+    if (group.canCache!==true || group.solvedCellsCache === undefined || group.unsolvedCellsCache === undefined) {
+      group.solvedCellsCache = [];
+      group.unsolvedCellsCache = [];
+      for (var c=0; c<group.length; c++) {
+        var cell = group[c];
+        if (isSolved(cell))
+          group.solvedCellsCache.push(cell);
+        else
+          group.unsolvedCellsCache.push(cell);
+      }
+    }
+    return [group.solvedCellsCache, group.unsolvedCellsCache];
+  }
+
+  function getSolvedCells(  group) { return fst(getSolvedUnsolvedCells(group)); };
+  function getUnsolvedCells(group) { return snd(getSolvedUnsolvedCells(group)); };
+
+  function candidateCount(cell) {
+    var n = 0;
+    for (var i=0; i<9; i++) if (cell[i]) n++;
+    return n;
+  }
+
+  function hasNCandidates(n) {
+    return function(cell) {
+      var count = 0;
+      for (var v=0; v<9; v++)
+        if (cell[v])
+          if (++count > n) return false;
+      return (count===n);
+    };
+  }
+
+  function fst(arr) { return arr[0]; };
+  function snd(arr) { return arr[1]; };
+
+  function moreThanLeft(group, n) {
+    return (getUnsolvedCells(group) > n);
+  }
+
+  function moreThanTwoLeft(group) { return moreThanLeft(group, 2) };
+  function moreThanThreeLeft(group) { return moreThanLeft(group, 3) };
+  function moreThanFourLeft(group) { return moreThanLeft(group, 4) };
 
 
-function boxNum(r, c) {
-  if (r<3) {
-    if (c<3) return 0;
-    if (c<6) return 1;
-    if (c<9) return 2;
-  } else if (r<6) {
-    if (c<3) return 3;
-    if (c<6) return 4;
-    if (c<9) return 5;
-  } else if (r<9) {
-    if (c<3) return 6;
-    if (c<6) return 7;
-    if (c<9) return 8;
-  } else return -1;
-}
+    // the cells that have two candidates
+    function getTwos(group) {
+      return getUnsolvedCells(group)
+        .filter(hasNCandidates(2))
+    }
 
-function getSingleEdgeValue_Col(ind) {
-  if (ind>=9) return undefined;
-  var top    = topEdge()[ind];
-  var bottom = bottomEdge()[ind];
-  if (isNumber(top)) return top;
-  if (isNumber(bottom)) return bottom;
-  return undefined;
-}
+    // get the cells that have three candidates
+    function getThrees(group) {
+      return getUnsolvedCells(group)
+        .filter(hasNCandidates(3))
+    }
 
-function getSingleEdgeValue_Row(ind) {
-  if (ind>=9) return undefined;
-  var left  = leftEdge()[ind];
-  var right = rightEdge()[ind];
-  if (isNumber(left)) return left;
-  if (isNumber(right)) return right;
-  return undefined;
-}
+
+
+  /* BOX NUMBERS */
+  function boxNum(r, c) {
+    if (r<3) {
+      if (c<3) return 0;
+      if (c<6) return 1;
+      if (c<9) return 2;
+    } else if (r<6) {
+      if (c<3) return 3;
+      if (c<6) return 4;
+      if (c<9) return 5;
+    } else if (r<9) {
+      if (c<3) return 6;
+      if (c<6) return 7;
+      if (c<9) return 8;
+    } else return -1;
+  }
+
+  /* EDGES */
+  function topEdge()    { return sudokuEdges[0]; }
+  function leftEdge()   { return sudokuEdges[1]; }
+  function rightEdge()  { return sudokuEdges[2]; }
+  function bottomEdge() { return sudokuEdges[3]; }
+
+  function getSingleEdgeValue_Col(ind) {
+    if (ind>=9) return undefined;
+    var top    = topEdge()[ind];
+    var bottom = bottomEdge()[ind];
+    if (isNumber(top)) return top;
+    if (isNumber(bottom)) return bottom;
+    return undefined;
+  }
+
+  function getSingleEdgeValue_Row(ind) {
+    if (ind>=9) return undefined;
+    var left  = leftEdge()[ind];
+    var right = rightEdge()[ind];
+    if (isNumber(left)) return left;
+    if (isNumber(right)) return right;
+    return undefined;
+  }
+
+
+  // the values that are in two cells
+  function getValTwos(group) {
+    var vals = [];
+    for (var v=0; v<9; v++)
+      if (countPossibleCells(group, v) === 2)
+      vals.push(v);
+    return vals;
+  }
+
+  function getCandidates(cell) {
+    var candidates = [];
+    for (var v=0; v<9; v++)
+      if (cell[v]) candidates.push(v);
+    return candidates;
+  }
+
+  function sameCandidates(cell1, cell2) {
+    for (var v=0; v<9; v++)
+      if (cell1[v] ^ cell2[v]) return false;
+    return true;
+  }
+
+  function everyGroupConcat(groupFunc) {
+    var changes = [];
+    var groupings = [sudoku, sudokuCols, sudokuBoxes];
+    for (var g=0; g<3; g++) {
+      var grouping = groupings[g];
+      for (var i=0; i<9; i++) {
+        var group = grouping[i];
+        var ch = groupFunc(group);
+        changes = changes.concat(ch);
+      }
+    }
+    return changes;
+  }
+
+  function everyGroupPush(groupFunc) {
+    var changes = [];
+    var groupings = [sudoku, sudokuCols, sudokuBoxes];
+    for (var g=0; g<3; g++) {
+      var grouping = groupings[g];
+      for (var i=0; i<grouping.length; i++) {
+        var group = grouping[i];
+        var ch = groupFunc(group);
+        if (ch) changes.push(ch);
+      }
+    }
+    return changes;
+  }
+
+  function everyCell(func) {
+    var changed = false;
+    for (var r=0; r<9; r++)
+      for (var c=0; c<9; c++)
+        if (func(sudoku[r][c]))
+          changed = true;
+    return changed;
+  }
+
+  function everyRowCol(groupFunc) {
+    var changed = false;
+    var groupings = [sudoku, sudokuCols];
+    for (var g=0; g<2; g++) {
+      var grouping = groupings[g];
+      for (var i=0; i<9; i++) {
+        if (groupFunc(grouping[i]))
+          changed = true;
+      }
+    }
+    return changed;
+  }
+
+  function everyGroup(groupFunc, noBoxes=false) {
+    var changed = false;
+    var groupings = [sudoku, sudokuCols, sudokuBoxes];
+    if (noBoxes) groupings = [sudoku,sudokuCols];
+    for (var g=0; g<3; g++) {
+      var grouping = groupings[g];
+      for (var i=0; i<9; i++) {
+        var group = grouping[i];
+        changed = groupFunc(group) || changed;
+      }
+    }
+    return changed;
+  }
+
+
+  function sameCell(cell1, cell2) {
+    return (cell1.pos === cell2.pos);
+  }
 
 
 
@@ -340,21 +494,6 @@ function clearSolvedLists(cell) {
   row.solvedCellsCache = row.unsolvedCellsCache = undefined;
   col.solvedCellsCache = col.unsolvedCellsCache = undefined;
   box.solvedCellsCache = box.unsolvedCellsCache = undefined;
-}
-
-function getSolvedUnsolvedCells(group, useCache=true) {
-  if (group.solvedCellsCache === undefined || group.unsolvedCellsCache === undefined || useCache===false) {
-    group.solvedCellsCache = [];
-    group.unsolvedCellsCache = [];
-    for (var c=0; c<group.length; c++) {
-      var cell = group[c];
-      if (isSolved(cell))
-        group.solvedCellsCache.push(cell);
-      else
-        group.unsolvedCellsCache.push(cell);
-    }
-  }
-  return [group.solvedCellsCache, group.unsolvedCellsCache];
 }
 
 /*
@@ -582,6 +721,51 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
 
 
 
+/*
+    NN   NN KK  KK DDDDD      PPPPPP    AAA   IIIII RRRRRR   SSSSS
+    NNN  NN KK KK  DD  DD     PP   PP  AAAAA   III  RR   RR SS
+    NN N NN KKKK   DD   DD    PPPPPP  AA   AA  III  RRRRRR   SSSSS
+    NN  NNN KK KK  DD   DD    PP      AAAAAAA  III  RR  RR       SS
+    NN   NN KK  KK DDDDDD     PP      AA   AA IIIII RR   RR  SSSSS
+*/
+
+  function nakedPairs() {
+    return everyGroup(nakedPairsGroup);
+  }
+
+  function nakedPairsGroup(group, preText="") {
+    var changed = false;
+    if (moreThanLeft(group)){
+      var twos = getTwos(group);
+      for (var t1=0; t1<twos.length; t1++) {
+        for (var t2=0; t2<t1; t2++) {
+          if (sameCandidates(twos[t1], twos[t2])) {
+            var [cand1, cand2] = getCandidates(twos[t1])
+            if (clearNakedPair(group,cand1,cand2,twos[t1],twos[t2])) {
+              consolelog(preText+`Naked Pair ${vstr(cand1,cand2)} found in ${group.groupName}.`);
+              changed = true;
+            }
+          }
+        }
+      }
+    }
+    return changed;
+  }
+
+  function clearNakedPair(group, val1, val2, cell1, cell2) {
+    var changed = false;
+    for (var c=0; c<9; c++) {
+      var cell = group[c];
+      if (!sameCell(cell, cell1) && !sameCell(cell, cell2)) {
+        changed = changed || cell[val1] || cell[val2];
+        cell[val1] = false;
+        cell[val2] = false;
+      }
+    }
+    return changed;
+  }
+
+
 
 /*
     XX    XX     SSSSS  UU   UU DDDDD    OOOOO  KK  KK UU   UU
@@ -604,8 +788,7 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
   }
 
   function clearAdjGroup(group, prependText="") {
-    // don't use cache, as diags cache are not cleared on confirm
-    var [solved,unsolved] = getSolvedUnsolvedCells(group, false);
+    var [solved,unsolved] = getSolvedUnsolvedCells(group);
 
     var changed = false;
     for (var s=0; s<solved.length; s++) {
@@ -1366,192 +1549,6 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
 
 
 
-
-/*
-    NN   NN KK  KK DDDDD      PPPPPP    AAA   IIIII RRRRRR   SSSSS
-    NNN  NN KK KK  DD  DD     PP   PP  AAAAA   III  RR   RR SS
-    NN N NN KKKK   DD   DD    PPPPPP  AA   AA  III  RRRRRR   SSSSS
-    NN  NNN KK KK  DD   DD    PP      AAAAAAA  III  RR  RR       SS
-    NN   NN KK  KK DDDDDD     PP      AA   AA IIIII RR   RR  SSSSS
-*/
-
-  function candidateCount(cell) {
-    var n = 0;
-    for (var i=0; i<9; i++) if (cell[i]) n++;
-    return n;
-  }
-
-  function moreThanLeft(group, n) {
-    var count = 0;
-    for (var i=0; i<9; i++)
-      if (!isSolved(group[i]))
-        count++;
-    return (count > n);
-  }
-
-  function moreThanTwoLeft(group)   { return moreThanLeft(group, 2); }
-  function moreThanThreeLeft(group) { return moreThanLeft(group, 3); }
-  function moreThanFourLeft(group)  { return moreThanLeft(group, 4); }
-
-  // the cells that have two candidates
-  function getTwos(group) {
-    var cells = [];
-    for (var c=0; c<9; c++)
-      if (candidateCount(group[c]) === 2)
-        cells.push(group[c]);
-    return cells;
-  }
-
-  // get the cells that have three candidates
-  function getThrees(group) {
-    var cells = [];
-    for (var c=0; c<9; c++)
-      if (candidateCount(group[c]) === 3)
-        cells.push(group[c]);
-    return cells;
-  }
-
-  // the values that are in two cells
-  function getValTwos(group) {
-    var vals = [];
-    for (var v=0; v<9; v++)
-      if (countPossibleCells(group, v) === 2)
-      vals.push(v);
-    return vals;
-  }
-
-  function getCandidates(cell) {
-    var candidates = [];
-    for (var v=0; v<9; v++) {
-      if (cell[v])
-        candidates.push(v);
-    }
-    return candidates;
-  }
-
-  function sameCandidates(cell1, cell2) {
-    for (var v=0; v<9; v++) {
-      if (cell1[v] ^ cell2[v])
-        return false;
-    }
-    return true;
-  }
-
-  function everyGroupConcat(groupFunc) {
-    var changes = [];
-    var groupings = [sudoku, sudokuCols, sudokuBoxes];
-    for (var g=0; g<3; g++) {
-      var grouping = groupings[g];
-      for (var i=0; i<9; i++) {
-        var group = grouping[i];
-        var ch = groupFunc(group);
-        changes = changes.concat(ch);
-      }
-    }
-    return changes;
-  }
-
-  function everyGroupPush(groupFunc) {
-    var changes = [];
-    var groupings = [sudoku, sudokuCols, sudokuBoxes];
-    for (var g=0; g<3; g++) {
-      var grouping = groupings[g];
-      for (var i=0; i<grouping.length; i++) {
-        var group = grouping[i];
-        var ch = groupFunc(group);
-        if (ch) changes.push(ch);
-      }
-    }
-    return changes;
-  }
-
-  function everyCell(func) {
-    var changed = false;
-    for (var r=0; r<9; r++)
-      for (var c=0; c<9; c++)
-        if (func(sudoku[r][c]))
-          changed = true;
-    return changed;
-  }
-
-  function everyRowCol(groupFunc) {
-    var changed = false;
-    var groupings = [sudoku, sudokuCols];
-    for (var g=0; g<2; g++) {
-      var grouping = groupings[g];
-      for (var i=0; i<9; i++) {
-        if (groupFunc(grouping[i]))
-          changed = true;
-      }
-    }
-    return changed;
-  }
-
-  function everyGroup(groupFunc, noBoxes=false) {
-    var changed = false;
-    var groupings = [sudoku, sudokuCols, sudokuBoxes];
-    if (noBoxes) groupings = [sudoku,sudokuCols];
-    for (var g=0; g<3; g++) {
-      var grouping = groupings[g];
-      for (var i=0; i<9; i++) {
-        var group = grouping[i];
-        changed = groupFunc(group) || changed;
-      }
-    }
-    return changed;
-  }
-
-
-  function sameCell(cell1, cell2) {
-    return (cell1.pos === cell2.pos);
-  }
-
-  function clearNakedPair(group, val1, val2, cell1, cell2) {
-    var changed = false;
-    for (var c=0; c<9; c++) {
-      var cell = group[c];
-      if (!sameCell(cell, cell1) && !sameCell(cell, cell2)) {
-        changed = changed || cell[val1] || cell[val2];
-        cell[val1] = false;
-        cell[val2] = false;
-      }
-    }
-    return changed;
-  }
-
-  function nakedPairsGroup(group, preText="") {
-    var changed = false;
-    // var changes = [];
-    if (moreThanTwoLeft(group)){
-      var twos = getTwos(group);
-      for (var t1=0; t1<twos.length; t1++) {
-        for (var t2=0; t2<t1; t2++) {
-          if (sameCandidates(twos[t1], twos[t2])) {
-            var [cand1, cand2] = getCandidates(twos[t1])
-            if (clearNakedPair(group,cand1,cand2,twos[t1],twos[t2])) {
-              // changes.push([group, cand1, cand2]);
-              consolelog(preText+`Naked pair ${vstr2(cand1,cand2)} found in ${group.groupName}.`);
-              changed = true;
-            }
-          }
-        }
-      }
-    }
-    // return changes;
-    return changed;
-  }
-
-  function nakedPairs() {
-    return everyGroup(nakedPairsGroup);
-    // var changes = everyGroupConcat(nakedPairsGroup);
-    // if (changes.length === 0) return false;
-    // for (var i=0; i<changes.length; i++) {
-      // var [group,cand1,cand2] = changes[i];
-      // consolelog("Naked Pair " + vstr2(cand1,cand2) + " found in " + group.groupName + ".");
-    // }
-    // return true;
-  }
-
 /*
     NN   NN KK  KK DDDDD      TTTTTTT RRRRRR  IIIII PPPPPP  LL      EEEEEEE
     NNN  NN KK KK  DD  DD       TTT   RR   RR  III  PP   PP LL      EE
@@ -1670,7 +1667,7 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
             if (combinedCandidateCount3(group[ii1], group[ii2], group[ii3]) === 3) {
               var cands = combinedCandidates3(group[ii1], group[ii2], group[ii3]);
               if (clearNakedTriple(group, ii1,ii2,ii3, cands[0], cands[1], cands[2])) {
-                consolelog("Naked Triple " + vstr3(...cands) + " found in " + group.groupName + ".");
+                consolelog("Naked Triple " + vstr(...cands) + " found in " + group.groupName + ".");
                 return true;
               }
             }
@@ -1727,7 +1724,7 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
                   var candidates = combinedCandidates4(group[c1], group[c2], group[c3], group[c4]);
                   var [cand1,cand2,cand3,cand4] = candidates;
                   if (clearNakedQuad(group, c1, c2, c3, c4, cand1, cand2, cand3, cand4)) {
-                    consolelog("Naked Quad " + vstr4(cand1,cand2,cand3,cand4) + " found in " + group.groupName + ".");
+                    consolelog("Naked Quad " + vstr(cand1,cand2,cand3,cand4) + " found in " + group.groupName + ".");
                     return true;
                   }
                 }
@@ -1826,7 +1823,7 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
             // consolelog(maps, i1, i2, i3);
             if (mapOrCount3(maps[i1], maps[i2], maps[i3]) === 3) {
               if (clearHiddenTriple(group, vals[i1], vals[i2], vals[i3])){
-                consolelog("Hidden Triple " + vstr3(vals[i2],vals[i1],vals[i3]) + " found in " + group.groupName + ".");
+                consolelog("Hidden Triple " + vstr(vals[i2],vals[i1],vals[i3]) + " found in " + group.groupName + ".");
                 return true;
               }
             }
@@ -1836,16 +1833,8 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     }
   }
 
-  function vstr2(a, b) {
-    return "(" + (a+1) + ", " + (b+1) + ")";
-  }
-
-  function vstr3(a, b, c) {
-    return "(" + (a+1) + ", " + (b+1) + ", " + (c+1) + ")";
-  }
-
-  function vstr4(a, b, c, d) {
-    return "(" + (a+1) + ", " + (b+1) + ", " + (c+1) + ", " + (d+1) + ")";
+  function vstr() {
+    return "(" + arguments.join(",") + ")";
   }
 
   function comand3(a, b, c) {
@@ -1957,7 +1946,7 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     if (changes.length === 0) return false;
     for (var i=0; i<changes.length; i++) {
       var [group,v1,v2] = changes[i];
-      consolelog("Hidden Pair " + vstr2(v1,v2) + " found in " + group.groupName + ".");
+      consolelog("Hidden Pair " + vstr(v1,v2) + " found in " + group.groupName + ".");
     }
     return true;
   }
@@ -2449,7 +2438,7 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     }
     if (changed) {
       var cands = combinedCandidates3(pivot, wing1, wing2);
-      consolelog("Y-Wing "+vstr3(...cands)+" pivoted on " + pivot.pos + " with wings at " + wing1.pos + " and " + wing2.pos + ".");
+      consolelog("Y-Wing "+vstr(...cands)+" pivoted on " + pivot.pos + " with wings at " + wing1.pos + " and " + wing2.pos + ".");
       return true;
     }
     return false;
@@ -2571,7 +2560,7 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
               var Z = commonCandidate(cellXZ, cellYZ);
               if (clearZWing(sudokuCols[cellXYZ.col], Z, cellXYZ.box, cellXYZ)) {
                 var cands = getCandidates(cellXYZ);
-                consolelog("XYZ-Wing "+vstr3(...cands)+" pivoted on "+cellXYZ.pos+" with wings at "+cellXZ.pos+" and "+cellYZ.pos+".");
+                consolelog("XYZ-Wing "+vstr(...cands)+" pivoted on "+cellXYZ.pos+" with wings at "+cellXZ.pos+" and "+cellYZ.pos+".");
                 return true;
               } else {
                 break; // there can't be another YZ - that would be a naked pair/triple
@@ -2590,7 +2579,7 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
               var Z = commonCandidate(cellXZ, cellYZ);
               if (clearZWing(sudoku[cellXYZ.row], Z, cellXYZ.box, cellXYZ)) {
                 var cands = getCandidates(cellXYZ);
-                consolelog("XYZ-Wing "+vstr3(...cands)+" pivoted on "+cellXYZ.pos+" with wings at "+cellXZ.pos+" and "+cellYZ.pos+".");
+                consolelog("XYZ-Wing "+vstr(...cands)+" pivoted on "+cellXYZ.pos+" with wings at "+cellXZ.pos+" and "+cellYZ.pos+".");
                 return true;
               } else {
                 break; // there can't be another YZ - that would be a naked pair/triple
@@ -3143,10 +3132,13 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     for (var i=0; i<9; i++) {
       sudoku[i].groupName = "Row " + (i+1);
       sudoku[i].groupType = "row";
+      sudoku[i].canCache = true;
       sudokuCols[i].groupName = "Col " + (i+1);
       sudokuCols[i].groupType = "col";
+      sudokuCols[i].canCache = true;
       sudokuBoxes[i].groupName = "Box " + (i+1);
       sudokuBoxes[i].groupType = "box";
+      sudokuBoxes[i].canCache = true;
     }
 
     // make all cells
