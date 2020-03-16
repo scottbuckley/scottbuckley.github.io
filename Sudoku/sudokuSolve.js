@@ -111,7 +111,7 @@
     { name:  "Z-Wings",
       sname: "ZWings",
       func:  ZWings,
-      enabled: true,
+      enabled: false,
       category: "Tough"
     },
     { name:  "Swordfish",
@@ -534,11 +534,9 @@
 
   function combinedCandidates4(cell1, cell2, cell3, cell4) {
     var candidates = [];
-    for (var v=0; v<9; v++) {
-      if (cell1[v] || cell2[v] || cell3[v] || cell4[v]) {
+    for (var v=0; v<9; v++)
+      if (cell1[v] || cell2[v] || cell3[v] || cell4[v])
         candidates.push(v);
-      }
-    }
     return candidates;
   }
 
@@ -1064,7 +1062,7 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
         if (mapOrCount(maps[i1], maps[i2]) === 3) {
           for (var i3=i1+1; i3<maps.length; i3++) {
             if (mapOrCount3(maps[i1], maps[i2], maps[i3]) === 3) {
-              if (clearHidden(group, [vals[i1], vals[i2], vals[i3]])){
+              if (clearHidden(unsolved, [vals[i1], vals[i2], vals[i3]])){
                 consolelog(preText+`Hidden Triple ${vstr(vals[i2],vals[i1],vals[i3])} found in ${group.groupName}.`);
                 return true;
               }
@@ -1076,13 +1074,73 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
   }
 
 
-  /*
-  HH   HH DDDDD   NN   NN     QQQQQ  UU   UU   AAA   DDDDD
-  HH   HH DD  DD  NNN  NN    QQ   QQ UU   UU  AAAAA  DD  DD
-  HHHHHHH DD   DD NN N NN    QQ   QQ UU   UU AA   AA DD   DD
-  HH   HH DD   DD NN  NNN    QQ  QQ  UU   UU AAAAAAA DD   DD
-  HH   HH DDDDDD  NN   NN     QQQQ Q  UUUUU  AA   AA DDDDDD
-  */
+
+/*
+    NN   NN KK  KK DDDDD       QQQQQ  UU   UU   AAA   DDDDD
+    NNN  NN KK KK  DD  DD     QQ   QQ UU   UU  AAAAA  DD  DD
+    NN N NN KKKK   DD   DD    QQ   QQ UU   UU AA   AA DD   DD
+    NN  NNN KK KK  DD   DD    QQ  QQ  UU   UU AAAAAAA DD   DD
+    NN   NN KK  KK DDDDDD      QQQQ Q  UUUUU  AA   AA DDDDDD
+*/
+
+
+  function nakedQuads() {
+    return everyGroup(nakedQuadsGroup);
+  }
+
+  function nakedQuadsGroup(group, preText="") {
+
+    // need at least five cells
+    var unsolved = getUnsolvedCells(group);
+    if (unsolved.length < 5) return false;
+
+    var fourOrLess = unsolved.filter(hasLessThanNCandidates(5));
+
+    // there needs to be at least four
+    if (fourOrLess.length < 4) return false;
+
+    // find out if any four of these cells contain four candidates in total
+    for (var i1=0; i1<fourOrLess.length; i1++) {
+      var cell1 = fourOrLess[i1];
+      for (var i2=i1+1; i2<fourOrLess.length; i2++) {
+        var cell2 = fourOrLess[i2];
+        var candCount_c1c2 = combinedCandidateCount(cell1, cell2);
+        if (candCount_c1c2 === 3 || candCount_c1c2 === 4) {
+          // at this point we have two cells with a combined candidate count of three or four.
+          for (var i3=i2+1; i3<fourOrLess.length; i3++) {
+            var cell3 = fourOrLess[i3];
+            var candCount_c1c2c3 = combinedCandidateCount3(cell1, cell2, cell3);
+            if (candCount_c1c2c3 === 4) {
+              // at this point we have three cells with a combined candidate count of four.
+              for (var i4=i3+1; i4<fourOrLess.length; i4++) {
+                var cell4 = fourOrLess[i4];
+                var candCount_all = combinedCandidateCount4(cell1, cell2, cell3, cell4);
+                if (candCount_all === 4) {
+                  // we have four cells that can only be four values. this is a naked quad.
+                  var cands = combinedCandidates4(cell1, cell2, cell3, cell4);
+                  var notThese = (c) => c.pos!==cell1.pos && c.pos!==cell2.pos && c.pos!==cell3.pos && c.pos !== cell4.pos;
+                  if (clearCands(unsolved.filter(notThese), cands)) {
+                    consolelog(preText+`Naked Quad ${vstr(...cands)} found in ${group.groupName}.`);
+                    return true;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+
+/*
+    HH   HH DDDDD   NN   NN     QQQQQ  UU   UU   AAA   DDDDD
+    HH   HH DD  DD  NNN  NN    QQ   QQ UU   UU  AAAAA  DD  DD
+    HHHHHHH DD   DD NN N NN    QQ   QQ UU   UU AA   AA DD   DD
+    HH   HH DD   DD NN  NNN    QQ  QQ  UU   UU AAAAAAA DD   DD
+    HH   HH DDDDDD  NN   NN     QQQQ Q  UUUUU  AA   AA DDDDDD
+*/
 
   function hiddenQuads() {
     return everyGroup(hiddenQuadGroup);
@@ -1909,84 +1967,6 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
 
 
 
-/*
-    NN   NN KK  KK DDDDD       QQQQQ  UU   UU   AAA   DDDDD
-    NNN  NN KK KK  DD  DD     QQ   QQ UU   UU  AAAAA  DD  DD
-    NN N NN KKKK   DD   DD    QQ   QQ UU   UU AA   AA DD   DD
-    NN  NNN KK KK  DD   DD    QQ  QQ  UU   UU AAAAAAA DD   DD
-    NN   NN KK  KK DDDDDD      QQQQ Q  UUUUU  AA   AA DDDDDD
-*/
-
-
-  function nakedQuads() {
-    return everyGroup(nakedQuadsGroup);
-  }
-
-  function nakedQuadsGroup(group, preText="") {
-    if (!moreThanFourLeft(group)) return false;
-
-    //get the indexes of items with four or fewer options
-    var fourOrLessInds = [];
-    for (var c=0; c<9; c++) {
-      if ( (!isSolved(group[c])) && candidateCount(group[c]) <= 4) {
-        fourOrLessInds.push(c);
-      }
-    }
-
-    // there needs to be at least four
-    if (fourOrLessInds.length < 4) return false;
-
-    // find out if any four of these cells contain four candidates in total
-    for (var i1=0; i1<fourOrLessInds.length; i1++) {
-      var c1 = fourOrLessInds[i1];
-      for (var i2=i1+1; i2<fourOrLessInds.length; i2++) {
-        var c2 = fourOrLessInds[i2];
-        var candCount_c1c2 = combinedCandidateCount(group[c1], group[c2]);
-        if (candCount_c1c2 === 3 || candCount_c1c2 === 4) {
-          // at this point we have two cells with a combined candidate count of three or four.
-          for (var i3=i2+1; i3<fourOrLessInds.length; i3++) {
-            var c3 = fourOrLessInds[i3];
-            var candCount_c1c2c3 = combinedCandidateCount3(group[c1], group[c2], group[c3]);
-            if (candCount_c1c2c3 === 4) {
-              // at this point we have three cells with a combined candidate count of four.
-              for (var i4=i3+1; i4<fourOrLessInds.length; i4++) {
-                var c4 = fourOrLessInds[i4];
-                var candCount_all = combinedCandidateCount4(group[c1], group[c2], group[c3], group[c4]);
-                if (candCount_all === 4) {
-                  // we have four cells that can only be four values. this is a naked quad.
-                  var candidates = combinedCandidates4(group[c1], group[c2], group[c3], group[c4]);
-                  var [cand1,cand2,cand3,cand4] = candidates;
-                  if (clearNakedQuad(group, c1, c2, c3, c4, cand1, cand2, cand3, cand4)) {
-                    consolelog("Naked Quad " + vstr(cand1,cand2,cand3,cand4) + " found in " + group.groupName + ".");
-                    return true;
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-    return false;
-  }
-
-
-  function clearNakedQuad(group, i1, i2, i3, i4, cand1, cand2, cand3, cand4) {
-    var changed = false;
-    for (var c=0; c<9; c++) {
-      if (c!==i1 && c!==i2 && c!==i3 && c!==i4) {
-        var cell = group[c];
-        changed = changed || cell[cand1] || cell[cand2] || cell[cand3] || cell[cand4];
-        cell[cand1] = false;
-        cell[cand2] = false;
-        cell[cand3] = false;
-        cell[cand4] = false;
-      }
-    }
-    return changed;
-  }
-
-
 
 /*
     XX    XX        WW      WW IIIII NN   NN   GGGG   SSSSS
@@ -2557,7 +2537,8 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
      ZZ           WW WWW WW  III  NN  NNN GG   GG      SS
     ZZZZZ          WW   WW  IIIII NN   NN  GGGGGG  SSSSS
 */
-
+// 901500046425090081860010020502000000019000460600000002196040253200060817000001694
+// breaks this
   function clearZWing(rowcol, z, box, pivot) {
     var changed = false;
     for (var c=0; c<9; c++) {
