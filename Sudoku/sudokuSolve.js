@@ -473,6 +473,13 @@
     return (cell1.pos === cell2.pos);
   }
 
+  function groupHasNCells(group, v, total) {
+    var count = 0;
+    for (var i=0; i<group.length; i++)
+      if (group[i][v]) if (++count > total) return false;
+    return (count === total);
+  }
+
 
   function countPossibleCells(group, v) {
     var count = 0;
@@ -1182,6 +1189,137 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
       }
     }
   }
+
+
+
+/*
+    XX    XX        WW      WW IIIII NN   NN   GGGG   SSSSS
+     XX  XX         WW      WW  III  NNN  NN  GG  GG SS
+      XXXX   _____  WW   W  WW  III  NN N NN GG       SSSSS
+     XX  XX          WW WWW WW  III  NN  NNN GG   GG      SS
+    XX    XX          WW   WW  IIIII NN   NN  GGGGGG  SSSSS
+*/
+
+  function XWings() {
+    return XWingsAux(sudoku) || XWingsAux(sudokuCols);
+  }
+
+  function XWingsAux(groups) {
+    for (var v=0; v<9; v++) {
+      var twoGroups = [];
+      var maps = [];
+      for (var g=0; g<9; g++) {
+        var group = groups[g];
+        if (groupHasNCells(group, v, 2)) {
+          var map = getGroupMap(group, v);
+          twoGroups.push(group);
+          maps.push(map);
+          for (var g2i=0; g2i<twoGroups.length-1; g2i++) {
+            if (maps[g2i] === map) {
+              // we have an x-wing
+              var y1 = map.indexOf("1");
+              var y2 = map.lastIndexOf("1");
+              var group2 = twoGroups[g2i];
+              if (clearXWing(groups, v, group, group2, y1, y2)) {
+                consolelog(`X-Wing on value ${v+1} found in ${group2.groupName} and ${group.groupName}.`);
+                return true;
+              }
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+
+  function clearXWing(groups, v, group1, group2, y1, y2) {
+    var changed = false;
+    for (var g=0; g<9; g++) {
+      if (g!==group1.index && g!==group2.index) {
+        if (groups[g][y1][v] || groups[g][y2][v]) {
+          groups[g][y1][v] = false;
+          groups[g][y2][v] = false;
+          changed = true;
+        }
+      }
+    }
+    return changed;
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /*
@@ -1969,86 +2107,6 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
 
 
 /*
-    XX    XX        WW      WW IIIII NN   NN   GGGG   SSSSS
-     XX  XX         WW      WW  III  NNN  NN  GG  GG SS
-      XXXX   _____  WW   W  WW  III  NN N NN GG       SSSSS
-     XX  XX          WW WWW WW  III  NN  NNN GG   GG      SS
-    XX    XX          WW   WW  IIIII NN   NN  GGGGGG  SSSSS
-*/
-
-  String.prototype.nthIndexOf = function(pattern, n) {
-    var i = -1;
-    while (n-- && i++ < this.length) {
-      i = this.indexOf(pattern, i);
-      if (i < 0) break;
-    }
-    return i;
-  }
-
-  function getFirst1(str) {
-    for (var i=0; i<str.length; i++) {
-      if (str.charAt(i)==="1") return i;
-    }
-    return -1;
-  }
-  function getSecond1(str) {
-    var passed1 = false;
-    for (var i=0; i<str.length; i++) {
-      if (str.charAt(i)==="1") {
-        if (passed1) {
-          return i;
-        } else {
-          passed1 = true;
-        }
-      }
-    }
-    return -1;
-  }
-
-  function clearXWing(groups, v, g1, g2, y1, y2) {
-    var changed = false;
-    for (var g=0; g<9; g++) {
-      if (g!==g1 && g!==g2) {
-        changed = changed || groups[g][y1][v] || groups[g][y2][v];
-        groups[g][y1][v] = false;
-        groups[g][y2][v] = false;
-      }
-    }
-    return changed;
-  }
-
-  function XWingsAux(groups, groupType) {
-    for (var v=0; v<9; v++) {
-      var groupInds = [];
-      var maps = [];
-      for (var g=0; g<9; g++) {
-        var group = groups[g];
-        if (countPossibleCells(group, v) === 2) {
-          groupInds.push(g);
-          var map = getGroupMap(group, v);
-          maps.push(map);
-          for (var g2i=0; g2i<groupInds.length-1; g2i++) { //don't compare with yourself
-            if (maps[g2i] === map) {
-              var y1 = getFirst1(map);
-              var y2 = getSecond1(map);
-              var g2 = groupInds[g2i];
-              if (clearXWing(groups, v, g2, g, y1, y2)) {
-                consolelog("X-Wing on value " + (v+1) + " found on " + groupType + " " + (g2+1) + " and " + (g+1) + ".");
-                return true;
-              }
-            }
-          }
-        }
-      }
-    }
-    return false;
-  }
-
-  function XWings() {
-    return XWingsAux(sudoku, "rows") || XWingsAux(sudokuCols, "cols");
-  }
-
-/*
     FFFFFFF IIIII NN   NN NN   NN EEEEEEE DDDDD      XX    XX
     FF       III  NNN  NN NNN  NN EE      DD  DD      XX  XX
     FFFF     III  NN N NN NN N NN EEEEE   DD   DD      XXXX
@@ -2084,8 +2142,8 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
   // output: if these maps constitute a finned xwing, the index (base 1)
   // of the side of the xwing with the fin. otherwise "false".
   function FinnedMapMatch(twoMap, moreMap) {
-    var y1 = getFirst1(twoMap);
-    var y2 = getSecond1(twoMap);
+    var y1 = twoMap.indexOf("y1");
+    var y2 = twoMap.lastIndexOf("y1");
     var b1 = blockInd(y1);
     var b2 = blockInd(y2);
 
@@ -2680,6 +2738,16 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     return false;
   }
 
+
+  String.prototype.nthIndexOf = function(pattern, n) {
+    var i = -1;
+    while (n-- && i++ < this.length) {
+      i = this.indexOf(pattern, i);
+      if (i < 0) break;
+    }
+    return i;
+  }
+
   function swordfish() {
     return swordfishAux(sudoku, "rows") || swordfishAux(sudokuCols, "cols");
   }
@@ -3149,12 +3217,15 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     for (var i=0; i<9; i++) {
       sudoku[i].groupName = "Row " + (i+1);
       sudoku[i].groupType = "row";
+      sudoku[i].index = i;
       sudoku[i].canCache = true;
       sudokuCols[i].groupName = "Col " + (i+1);
       sudokuCols[i].groupType = "col";
+      sudokuCols[i].index = i;
       sudokuCols[i].canCache = true;
       sudokuBoxes[i].groupName = "Box " + (i+1);
       sudokuBoxes[i].groupType = "box";
+      sudokuBoxes[i].index = i;
       sudokuBoxes[i].canCache = true;
     }
 
