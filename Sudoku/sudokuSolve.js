@@ -310,15 +310,14 @@
     return (getUnsolvedCells(group).length > n);
   }
 
-  function moreThanTwoLeft(group)   { return moreThanLeft(group, 2) };
   function moreThanThreeLeft(group) { return moreThanLeft(group, 3) };
   function moreThanFourLeft(group)  { return moreThanLeft(group, 4) };
 
 
   // the cells that have two candidates
   function getTwos(group) {
-    return getUnsolvedCells(group)
-      .filter(hasNCandidates(2))
+    if (group.canCache) return getUnsolvedCells(group).filter(hasNCandidates(2));
+    else                return group                  .filter(hasNCandidates(2));
   }
 
   // get the cells that have three candidates
@@ -441,14 +440,16 @@
     return changed;
   }
 
-  function everyRowCol(groupFunc) {
+  function everyRowCol(groupFunc, multiple=true) {
     var changed = false;
     var groupings = [sudoku, sudokuCols];
     for (var g=0; g<2; g++) {
       var grouping = groupings[g];
       for (var i=0; i<9; i++) {
-        if (groupFunc(grouping[i]))
+        if (groupFunc(grouping[i])) {
+          if (!multiple) return true;
           changed = true;
+        }
       }
     }
     return changed;
@@ -499,25 +500,22 @@
 
   function combinedCandidateCount(cell1, cell2) {
     var count=0;
-    for (var v=0; v<9; v++) {
+    for (var v=0; v<9; v++)
       if (cell1[v] || cell2[v]) count++;
-    }
     return count;
   }
 
   function combinedCandidateCount3(cell1, cell2, cell3) {
     var count=0;
-    for (var v=0; v<9; v++) {
+    for (var v=0; v<9; v++)
       if (cell1[v] || cell2[v] || cell3[v]) count++;
-    }
     return count;
   }
 
   function combinedCandidateCount4(cell1, cell2, cell3, cell4) {
     var count=0;
-    for (var v=0; v<9; v++) {
+    for (var v=0; v<9; v++)
       if (cell1[v] || cell2[v] || cell3[v] || cell4[v]) count++;
-    }
     return count;
   }
 
@@ -611,6 +609,52 @@
 
   function comand3(a, b, c) {
     return "" + (a+1) + ", " + (b+1) + ", and " + (c+1);
+  }
+
+
+  function candidateXOR(cell1, cell2) {
+    var out = [];
+    for (var v=0; v<9; v++)
+      if (cell1[v] !== cell2[v])
+        out.push(v);
+    return out;
+  }
+
+  function cellHasExactlyCands(cell, cands) {
+    for (var v=0; v<9; v++) {
+      if (cell[v]) {
+        if (cands.indexOf(v)===-1) return false;
+      } else {
+        if (cands.indexOf(v)!==-1) return false;
+      }
+    }
+    return true;
+  }
+
+  function findByCands(group, cands) {
+    for (var c=0; c<group.length; c++)
+      if (cellHasExactlyCands(group[c], cands))
+        return group[c];
+    return undefined;
+  }
+
+  function boxRow(box) {
+    if (box<0 || box>8) return -1;
+    if (box<3) return 0;
+    if (box<6) return 1;
+    if (box<9) return 2;
+  }
+  function boxCol(box) {
+    if (box<0 || box>8) return -1;
+    return box%3;
+  }
+
+  // returns ONE common candidate between cell1 and cell2
+  // returns -1 if there are none.
+  function commonCandidate(cell1, cell2) {
+    for (var v=0; v<9; v++)
+      if (cell1[v] && cell2[v]) return v;
+    return -1;
   }
 
 
@@ -1232,7 +1276,6 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     return false;
   }
 
-
   function clearXWing(groups, v, group1, group2, y1, y2) {
     var changed = false;
     for (var g=0; g<9; g++) {
@@ -1246,6 +1289,133 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     }
     return changed;
   }
+
+
+
+/*
+    YY   YY        WW      WW IIIII NN   NN   GGGG   SSSSS
+    YY   YY        WW      WW  III  NNN  NN  GG  GG SS
+     YYYYY  _____  WW   W  WW  III  NN N NN GG       SSSSS
+      YYY           WW WWW WW  III  NN  NNN GG   GG      SS
+      YYY            WW   WW  IIIII NN   NN  GGGGGG  SSSSS
+*/
+
+  function YWings() {
+    return everyRowCol(YWingAux, false);
+  }
+
+  function YWingAux(group) {
+
+    var unsolved = getUnsolvedCells(group);
+    if (unsolved.length < 3) return false;
+
+    // all members must have two candidates
+    var twos = getTwos(unsolved);
+    for (var t1=0; t1<twos.length; t1++) {
+      for (var t2=t1+1; t2<twos.length; t2++) {
+        var cell1 = twos[t1];
+        var cell2 = twos[t2];
+        if (combinedCandidateCount(cell1, cell2) === 3) {
+          // two 2-cells in this group can be three candidates together
+          // if there's a cell visible to one of them that completes the three,
+          // that forms a Y-wing.
+
+          // the final cell needs the candidates apart from the common one
+          var finalCellCands = candidateXOR(cell1, cell2);
+
+          // if they are not in the same box, search the boxes of both ends for the final cell
+          if (cell1.box !== cell2.box) {
+            var wing2 = findByCands(sudokuBoxes[cell1.box], finalCellCands);
+            if (wing2 && !sameCell(wing2, cell2)) {
+              var pivot = cell1; var wing1 = cell2;
+              if (clearYWing(pivot, wing1, wing2)) return true;
+            } else {
+              wing2 = findByCands(sudokuBoxes[cell2.box], finalCellCands);
+              if (wing2 && !sameCell(wing2, cell1)) {
+                var pivot = cell2; var wing1 = cell1;
+                if (clearYWing(pivot, wing1, wing2)) return true;
+              }
+            }
+          }
+
+          // figure out which group is perpendicular (rows/cols)
+          var otherGroups, otherGroupIndex;
+          if (group.groupType === "row") {
+            otherGroups = sudokuCols;
+            otherGroupIndex = "col";
+          } else {
+            otherGroups = sudoku;
+            otherGroupIndex = "row";
+          }
+
+          // search the perpendicular group for the final cell
+          var wing2 = findByCands(otherGroups[cell1[otherGroupIndex]], finalCellCands);
+          if (wing2) {
+            var pivot = cell1; var wing1 = cell2;
+            if (clearYWing(pivot, wing1, wing2)) return true;
+          } else {
+            wing2 = findByCands(otherGroups[cell2[otherGroupIndex]], finalCellCands);
+            if (wing2) {
+              var pivot = cell2; var wing1 = cell1;
+              if (clearYWing(pivot, wing1, wing2)) return true;
+            }
+          }          
+        }
+      }
+    }
+    return false;
+  }
+
+  // given a Y-Wing with given pivot and wings, try to clear some candidates
+  function clearYWing(pivot, wing1, wing2) {
+    var changed = false;
+    var v = commonCandidate(wing1, wing2);
+    var covisible = YWcoVisibleCells(wing1, wing2, v);
+    for (var i=0; i<covisible.length; i++) {
+      var cell = covisible[i];
+      if (cell[v] && !sameCell(cell, pivot)) {
+        changed = true;
+        cell[v] = false;
+      }
+    }
+    if (changed) {
+      var cands = combinedCandidates3(pivot, wing1, wing2);
+      consolelog(`Y-Wing ${vstr(...cands)} pivoted on ${pivot.pos} with wings ${wing1.pos} and ${wing2.pos}.`);
+    }
+    return changed;
+  }
+
+  // cells visible to both cell1 and cell2 (not in the same box)
+  // also need to contain the candidate "v"
+  function YWcoVisibleCells(cell1, cell2, v) {
+    var cells = [];
+    if (boxRow(cell1.box)===boxRow(cell2.box)) {
+      // wings share a box row
+      var box1 = sudokuBoxes[cell1.box];
+      var box2 = sudokuBoxes[cell2.box];
+      for (var i=0; i<9; i++) {
+        if (box1[v] && box1[i].row === cell2.row && !sameCell(box1[i],cell2)) cells.push(box1[i]);
+        if (box2[v] && box2[i].row === cell1.row && !sameCell(box2[i],cell1)) cells.push(box2[i]);
+      }
+    } else if (boxCol(cell1.box)===boxCol(cell2.box)) {
+      // wings share a box col
+      var box1 = sudokuBoxes[cell1.box];
+      var box2 = sudokuBoxes[cell2.box];
+      for (var i=0; i<9; i++) {
+        if (box1[v] && box1[i].col === cell2.col && !sameCell(box1[i],cell2)) cells.push(box1[i]);
+        if (box2[v] && box2[i].col === cell1.col && !sameCell(box2[i],cell1)) cells.push(box2[i]);
+      }
+    } else {
+      // no common box row or col. can only be two shared cells (one will be the pivot)
+      var corner1 = sudoku[cell1.row][cell2.col];
+      var corner2 = sudoku[cell2.row][cell1.col];
+      if (corner1[v]) cells.push(corner1);
+      if (corner2[v]) cells.push(corner2);
+    }
+    return cells;
+  }
+
+
 
 
 
@@ -2412,181 +2582,6 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
 
 
 
-/*
-    YY   YY        WW      WW IIIII NN   NN   GGGG   SSSSS
-    YY   YY        WW      WW  III  NNN  NN  GG  GG SS
-     YYYYY  _____  WW   W  WW  III  NN N NN GG       SSSSS
-      YYY           WW WWW WW  III  NN  NNN GG   GG      SS
-      YYY            WW   WW  IIIII NN   NN  GGGGGG  SSSSS
-*/
-
-  function candidateXOR(cell1, cell2) {
-    var out = [];
-    for (var v=0; v<9; v++)
-      if (cell1[v] !== cell2[v])
-        out.push(v);
-    return out;
-  }
-
-  function cellHasExactlyCands(cell, cands) {
-    for (var v=0; v<9; v++) {
-      if (cands.indexOf(v)===-1) {
-        if (cell[v]) return false;
-      } else {
-        if (!cell[v]) return false;
-      }
-    }
-    return true;
-  }
-
-  function findByCands(group, cands) {
-    for (var c=0; c<9; c++) {
-      var cell = group[c];
-      if (cellHasExactlyCands(cell, cands)) {
-        return cell;
-      }
-    }
-    return false;
-  }
-
-  function boxRow(box) {
-    if (box===0 || box===1 || box===2) return 0;
-    if (box===3 || box===4 || box===5) return 1;
-    if (box===6 || box===7 || box===8) return 2;
-    return -1;
-  }
-  function boxCol(box) {
-    if (box===0 || box===3 || box===6) return 0;
-    if (box===1 || box===4 || box===7) return 1;
-    if (box===2 || box===5 || box===8) return 2;
-    return -1;
-  }
-
-  function YWcoVisibleCells(cell1, cell2) {
-    var cells = [];
-    if (boxRow(cell1.box)===boxRow(cell2.box)) {
-      // wings share a box row
-      var box1 = sudokuBoxes[cell1.box];
-      var box2 = sudokuBoxes[cell2.box];
-      for (var i=0; i<9; i++) {
-        if (box1[i].row === cell2.row && box1[i]!==cell2 && !isSolved(box1[i])) cells.push(box1[i]);
-        if (box2[i].row === cell1.row && box2[i]!==cell1 && !isSolved(box2[i])) cells.push(box2[i]);
-      }
-    } else if (boxCol(cell1.box)===boxCol(cell2.box)) {
-      // wings share a box col
-      var box1 = sudokuBoxes[cell1.box];
-      var box2 = sudokuBoxes[cell2.box];
-      for (var i=0; i<9; i++) {
-        if (box1[i].col === cell2.col && box1[i]!==cell2 && !isSolved(box1[i])) cells.push(box1[i]);
-        if (box2[i].col === cell1.col && box2[i]!==cell1 && !isSolved(box2[i])) cells.push(box2[i]);
-      }
-    } else {
-      // no common box row or col. must only be two shared cells (one will be the pivot)
-      var corner1 = sudoku[cell1.row][cell2.col];
-      var corner2 = sudoku[cell2.row][cell1.col];
-      if (!isSolved(corner1)) cells.push(corner1);
-      if (!isSolved(corner2)) cells.push(corner2);
-    }
-    return cells;
-  }
-
-  function commonCandidate(cell1, cell2) {
-    // returns ONE common candidate between cell1 and cell2
-    // returns -1 if there are none.
-    for (var v=0; v<9; v++) {
-      if (cell1[v] && cell2[v]) return v;
-    }
-    return -1;
-  }
-
-  function clearYWing(pivot, wing1, wing2) {
-    var changed = false;
-    var covisible = YWcoVisibleCells(wing1, wing2);
-    var v = commonCandidate(wing1, wing2);
-    for (var i=0; i<covisible.length; i++) {
-      var cell = covisible[i];
-      if (cell !== pivot) {
-        changed = changed || cell[v];
-        cell[v] = false;
-      }
-    }
-    if (changed) {
-      var cands = combinedCandidates3(pivot, wing1, wing2);
-      consolelog("Y-Wing "+vstr(...cands)+" pivoted on " + pivot.pos + " with wings at " + wing1.pos + " and " + wing2.pos + ".");
-      return true;
-    }
-    return false;
-  }
-
-  function YWingRC(group) {
-    // consolelog("checking for y-wings...");
-    // there needs to be at least three open spots in this group
-    if (moreThanTwoLeft(group)){
-      // all members must have two candidates
-      var twos = getTwos(group);
-      for (var t1=0; t1<twos.length; t1++) {
-        for (var t2=t1+1; t2<twos.length; t2++) {
-          var cell1 = twos[t1];
-          var cell2 = twos[t2];
-          if (combinedCandidateCount(cell1, cell2) === 3) {
-            // two 2-cells in this group can be three candidates together
-            var finalCellCands = candidateXOR(cell1, cell2);
-
-            // if they are not in the same box, search the boxes of both ends for the final cell
-            if (cell1.box !== cell2.box) {
-              var wing2 = findByCands(sudokuBoxes[cell1.box], finalCellCands);
-              if (wing2 && wing2.row!==cell2.row && wing2.col!==cell2.col) {
-                var pivot = cell1; var wing1 = cell2;
-                if (clearYWing(pivot, wing1, wing2)) return true;
-              } else {
-                wing2 = findByCands(sudokuBoxes[cell2.box], finalCellCands);
-                if (wing2 && wing2.row!==cell1.row && wing2.col!==cell1.col) {
-                  var pivot = cell2; var wing1 = cell1;
-                  if (clearYWing(pivot, wing1, wing2)) return true;
-                }
-              }
-            }
-
-            // search the perpendicular group for the final cell
-            if (group.groupType === "row") {
-              var wing2 = findByCands(sudokuCols[cell1.col], finalCellCands);
-              if (wing2) {
-                var pivot = cell1; var wing1 = cell2;
-                if (clearYWing(pivot, wing1, wing2)) return true;
-              } else {
-                wing2 = findByCands(sudokuCols[cell2.col], finalCellCands);
-                if (wing2) {
-                  var pivot = cell2; var wing1 = cell1;
-                  if (clearYWing(pivot, wing1, wing2)) return true;
-                }
-              }
-            } else if (group.groupType === "col") {
-              var wing2 = findByCands(sudoku[cell1.row], finalCellCands);
-              if (wing2) {
-                var pivot = cell1; var wing1 = cell2;
-                if (clearYWing(pivot, wing1, wing2)) return true;
-              } else {
-                wing2 = findByCands(sudoku[cell2.row], finalCellCands);
-                if (wing2) {
-                  var pivot = cell2; var wing1 = cell1;
-                  if (clearYWing(pivot, wing1, wing2)) return true;
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-    return false;
-  }
-
-  function YWings() {
-    for (var g=0; g<9; g++) {
-      if (YWingRC(sudoku[g]))     return true;
-      if (YWingRC(sudokuCols[g])) return true;
-    }
-    return false;
-  }
 
 /*
     ZZZZZ        WW      WW IIIII NN   NN   GGGG   SSSSS
