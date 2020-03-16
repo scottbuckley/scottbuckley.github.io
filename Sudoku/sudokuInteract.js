@@ -354,6 +354,13 @@ function setDblClick(element, cell) {
     }
   }
 
+  function updateAllCheckboxes() {
+    for (var i=0; i<strats.length; i++) {
+      var strat = strats[i];
+      strat.checkbox.prop('checked', strat.enabled);
+    }
+  }
+
   // deal with key presses
   function processKeys(e) {
     var shift = e.shiftKey;
@@ -603,9 +610,9 @@ function setDblClick(element, cell) {
       var myOutput = completeSilently(givens);
       if (myOutput === solution) {
         finished = finished + 1;
-      } else if ("myOutput"==="INCOMPLETE") {
+      } else if (myOutput==="INCOMPLETE") {
         incomplete = incomplete + 1;
-      } else if ("myOutput"==="ERROR") {
+      } else if (myOutput==="ERROR") {
         errors = errors + 1;
       }
     }, function(){

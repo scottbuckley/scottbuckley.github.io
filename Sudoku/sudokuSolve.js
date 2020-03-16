@@ -169,10 +169,12 @@
   // solve the sudoku as far as you can.
   // return the solution or "ERROR" or "INCOMPLETE".
   function completeSilently(data) {
+    logging = false;
     initSudokuData(data);
     while(makeSomeChange(false));
     if (checkErrors()) return "ERROR";
     if (getSolvedCount() < 81) return "INCOMPLETE";
+    logging = true;
     return getSolvedString();
   }
 
@@ -236,6 +238,55 @@
   }
 
 /*
+    ########  ########  ######   ########  ########  ######   ######  ####  #######  ##    ##
+    ##     ## ##       ##    ##  ##     ## ##       ##    ## ##    ##  ##  ##     ## ###   ##
+    ##     ## ##       ##        ##     ## ##       ##       ##        ##  ##     ## ####  ##
+    ########  ######   ##   #### ########  ######    ######   ######   ##  ##     ## ## ## ##
+    ##   ##   ##       ##    ##  ##   ##   ##             ##       ##  ##  ##     ## ##  ####
+    ##    ##  ##       ##    ##  ##    ##  ##       ##    ## ##    ##  ##  ##     ## ##   ###
+    ##     ## ########  ######   ##     ## ########  ######   ######  ####  #######  ##    ##
+*/
+
+  var regressionTests = [
+    { name: "Y-Wings",
+      strategies: ["Clear Adjacents", "Naked Singles", "Hidden Singles", "Intersection Removal", "Naked Pairs", "Y-Wings"],
+      datas: ["007000400060070030090203000005047609000000000908130200000705080070020090001000500",
+              "600000002208000400000520896030080057000060000720090080574012000002000701800000009",
+              "000000001004060208070320400900018000005000600000540009008037040609080300100000000",
+              "091700050700801000008469000073000000000396000000000280000684500000902001020007940"]
+    }
+  ];
+
+  function runAllTests() {
+    for (var t=0; t<regressionTests.length; t++)
+      runRegressionTest(regressionTests[t]);
+  }
+
+  function runRegressionTest(test) {
+    console.log(`Running test "${test.name}".`);
+    console.log("settings strategies...");
+    setStrats(test.strategies);
+    updateAllCheckboxes();
+    for (var d=0; d<test.datas.length; d++) {
+      var data = test.datas[d];
+      console.log(`running test ${d+1} of ${test.datas.length}...`);
+      console.log(`importing ${data}...`);
+      var result = completeSilently(data);
+      if (result === "INCOMPLETE" || result === "ERROR") {
+        console.error(`Test "${test.name}" failed with data "${data}".`);
+      }        
+      console.log(`result: ${result}.`);
+    }
+    return true;    
+  }
+
+  function setStrats(stratlist) {
+    for (var i=0; i<strats.length; i++)
+      strats[i].enabled = (stratlist.indexOf(strats[i].name)!==-1);
+  }
+
+
+/*
     ##     ## ######## ##       ########  ######## ########   ######
     ##     ## ##       ##       ##     ## ##       ##     ## ##    ##
     ##     ## ##       ##       ##     ## ##       ##     ## ##
@@ -244,8 +295,6 @@
     ##     ## ##       ##       ##        ##       ##    ##  ##    ##
     ##     ## ######## ######## ##        ######## ##     ##  ######
 */
-
-
 
   function isNumber(v) {
     if (isNaN(v)) return false;
@@ -657,6 +706,15 @@
     return -1;
   }
 
+  function notInGroup(cell, group) {
+    if (group.canCache) {
+      return (cell[group.groupType] !== group.index);
+    } else {
+      for (var c=0; c<group.length; c++)
+        if (sameCell(cell,group[c])) return false;
+      return true;
+    }
+  }
 
 
 
@@ -1308,7 +1366,7 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
 
     var unsolved = getUnsolvedCells(group);
     if (unsolved.length < 3) return false;
-
+    
     // all members must have two candidates
     var twos = getTwos(unsolved);
     for (var t1=0; t1<twos.length; t1++) {
@@ -1319,19 +1377,20 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
           // two 2-cells in this group can be three candidates together
           // if there's a cell visible to one of them that completes the three,
           // that forms a Y-wing.
-
+          
           // the final cell needs the candidates apart from the common one
           var finalCellCands = candidateXOR(cell1, cell2);
-
+          
           // if they are not in the same box, search the boxes of both ends for the final cell
           if (cell1.box !== cell2.box) {
             var wing2 = findByCands(sudokuBoxes[cell1.box], finalCellCands);
-            if (wing2 && !sameCell(wing2, cell2)) {
+            // there can only be one in this box, as two would mean a naked pair
+            if (wing2 && !sameCell(wing2, cell2) && notInGroup(wing2, group)) {
               var pivot = cell1; var wing1 = cell2;
               if (clearYWing(pivot, wing1, wing2)) return true;
             } else {
               wing2 = findByCands(sudokuBoxes[cell2.box], finalCellCands);
-              if (wing2 && !sameCell(wing2, cell1)) {
+              if (wing2 && !sameCell(wing2, cell1) && notInGroup(wing2, group)) {
                 var pivot = cell2; var wing1 = cell1;
                 if (clearYWing(pivot, wing1, wing2)) return true;
               }
@@ -1417,6 +1476,90 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
 
 
 
+/*
+    ZZZZZ        WW      WW IIIII NN   NN   GGGG   SSSSS
+       ZZ        WW      WW  III  NNN  NN  GG  GG SS
+      ZZ  _____  WW   W  WW  III  NN N NN GG       SSSSS
+     ZZ           WW WWW WW  III  NN  NNN GG   GG      SS
+    ZZZZZ          WW   WW  IIIII NN   NN  GGGGGG  SSSSS
+*/
+  // 901500046425090081860010020502000000019000460600000002196040253200060817000001694
+  // breaks this
+  function clearZWing(rowcol, z, box, pivot) {
+    var changed = false;
+    for (var c=0; c<9; c++) {
+      var cell = rowcol[c];
+      if (cell.box === box && !sameCell(cell, pivot)) {
+        changed = changed || cell[z];
+        cell[z] = false;
+      }
+    }
+    return changed;
+  }
+
+  function ZWingsBox(box) {
+    // get the cells in this box with two and three candidates
+    var twos   = getTwos(box);
+    var threes = getThreesOrLess(box);
+
+    if (twos.length   === 0) return false;
+    if (threes.length === 0) return false;
+    
+    for (var i2=0; i2<twos.length; i2++) {
+      for (var i3=0; i3<threes.length; i3++) {
+        if (combinedCandidateCount(twos[i2], threes[i3]) === 3) {
+          // this box has an XY and an XYZ
+          var cellXYZ = threes[i3];
+          var cellXZ  = twos[i2];
+
+          // look for the YZ cell in the pivot's column
+          if (cellXZ.col !== cellXYZ.col) for (var c=0; c<9; c++) {
+            var cellYZ = sudokuCols[cellXYZ.col][c];
+            if (cellYZ.box !== cellXYZ.box
+              && candidateCount(cellYZ) === 2
+              && combinedCandidateCount(cellYZ, cellXYZ) === 3
+              && !sameCandidates(cellYZ, cellXZ)) {
+              // we have a XYZ-wing
+              var Z = commonCandidate(cellXZ, cellYZ);
+              if (clearZWing(sudokuCols[cellXYZ.col], Z, cellXYZ.box, cellXYZ)) {
+                var cands = getCandidates(cellXYZ);
+                consolelog("XYZ-Wing "+vstr(...cands)+" pivoted on "+cellXYZ.pos+" with wings at "+cellXZ.pos+" and "+cellYZ.pos+".");
+                return true;
+              } else {
+                break; // there can't be another YZ - that would be a naked pair/triple
+              }
+            }
+          }
+
+          // look for the YZ cell in the pivot's row
+          if (cellXZ.row !== cellXYZ.row) for (var c=0; c<9; c++) {
+            var cellYZ = sudoku[cellXYZ.row][c];
+            if (cellYZ.box !== cellXYZ.box
+              && candidateCount(cellYZ) === 2
+              && combinedCandidateCount(cellYZ, cellXYZ) === 3
+              && !sameCandidates(cellYZ, cellXZ)) {
+              // we have a XYZ-wing
+              var Z = commonCandidate(cellXZ, cellYZ);
+              if (clearZWing(sudoku[cellXYZ.row], Z, cellXYZ.box, cellXYZ)) {
+                var cands = getCandidates(cellXYZ);
+                consolelog("XYZ-Wing "+vstr(...cands)+" pivoted on "+cellXYZ.pos+" with wings at "+cellXZ.pos+" and "+cellYZ.pos+".");
+                return true;
+              } else {
+                break; // there can't be another YZ - that would be a naked pair/triple
+              }
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  function ZWings() {
+    for (var b=0; b<9; b++)
+      if (ZWingsBox(sudokuBoxes[b])) return true;
+    return false;
+  }
 
 
 
@@ -2583,90 +2726,6 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
 
 
 
-/*
-    ZZZZZ        WW      WW IIIII NN   NN   GGGG   SSSSS
-       ZZ        WW      WW  III  NNN  NN  GG  GG SS
-      ZZ  _____  WW   W  WW  III  NN N NN GG       SSSSS
-     ZZ           WW WWW WW  III  NN  NNN GG   GG      SS
-    ZZZZZ          WW   WW  IIIII NN   NN  GGGGGG  SSSSS
-*/
-// 901500046425090081860010020502000000019000460600000002196040253200060817000001694
-// breaks this
-  function clearZWing(rowcol, z, box, pivot) {
-    var changed = false;
-    for (var c=0; c<9; c++) {
-      var cell = rowcol[c];
-      if (cell.box === box && !sameCell(cell, pivot)) {
-        changed = changed || cell[z];
-        cell[z] = false;
-      }
-    }
-    return changed;
-  }
-
-  function ZWingsBox(box) {
-    // get the cells in this box with two and three candidates
-    var twos   = getTwos(box);
-    var threes = getThreesOrLess(box);
-
-    if (twos.length   === 0) return false;
-    if (threes.length === 0) return false;
-    
-    for (var i2=0; i2<twos.length; i2++) {
-      for (var i3=0; i3<threes.length; i3++) {
-        if (combinedCandidateCount(twos[i2], threes[i3]) === 3) {
-          // this box has an XY and an XYZ
-          var cellXYZ = threes[i3];
-          var cellXZ  = twos[i2];
-
-          // look for the YZ cell in the pivot's column
-          if (cellXZ.col !== cellXYZ.col) for (var c=0; c<9; c++) {
-            var cellYZ = sudokuCols[cellXYZ.col][c];
-            if (cellYZ.box !== cellXYZ.box
-              && candidateCount(cellYZ) === 2
-              && combinedCandidateCount(cellYZ, cellXYZ) === 3
-              && !sameCandidates(cellYZ, cellXZ)) {
-              // we have a XYZ-wing
-              var Z = commonCandidate(cellXZ, cellYZ);
-              if (clearZWing(sudokuCols[cellXYZ.col], Z, cellXYZ.box, cellXYZ)) {
-                var cands = getCandidates(cellXYZ);
-                consolelog("XYZ-Wing "+vstr(...cands)+" pivoted on "+cellXYZ.pos+" with wings at "+cellXZ.pos+" and "+cellYZ.pos+".");
-                return true;
-              } else {
-                break; // there can't be another YZ - that would be a naked pair/triple
-              }
-            }
-          }
-
-          // look for the YZ cell in the pivot's row
-          if (cellXZ.row !== cellXYZ.row) for (var c=0; c<9; c++) {
-            var cellYZ = sudoku[cellXYZ.row][c];
-            if (cellYZ.box !== cellXYZ.box
-              && candidateCount(cellYZ) === 2
-              && combinedCandidateCount(cellYZ, cellXYZ) === 3
-              && !sameCandidates(cellYZ, cellXZ)) {
-              // we have a XYZ-wing
-              var Z = commonCandidate(cellXZ, cellYZ);
-              if (clearZWing(sudoku[cellXYZ.row], Z, cellXYZ.box, cellXYZ)) {
-                var cands = getCandidates(cellXYZ);
-                consolelog("XYZ-Wing "+vstr(...cands)+" pivoted on "+cellXYZ.pos+" with wings at "+cellXZ.pos+" and "+cellYZ.pos+".");
-                return true;
-              } else {
-                break; // there can't be another YZ - that would be a naked pair/triple
-              }
-            }
-          }
-        }
-      }
-    }
-    return false;
-  }
-
-  function ZWings() {
-    for (var b=0; b<9; b++)
-      if (ZWingsBox(sudokuBoxes[b])) return true;
-    return false;
-  }
 
 /*
      SSSSS  WW      WW  OOOOO  RRRRRR  DDDDD   FFFFFFF IIIII  SSSSS  HH   HH
