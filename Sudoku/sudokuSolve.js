@@ -10,7 +10,7 @@
   const strat_categories = [
     "Simple",
     "Tough",
-    "Diabolical",
+    "Extreme",
     "X Sudoku",
     "Anti-Knight",
     "Sandwich"
@@ -123,15 +123,15 @@
     { name:  "Simple Colors Chain",
       sname: "Smpl Clrs",
       func:  simpleColors,
-      enabled: true,
+      enabled: false,
       category: "Tough",
       aka: "Singles Chains"
     },
     { name:  "Finned X-Wings",
       sname: "Finned",
       func:  FinnedXWings,
-      enabled: true,
-      category: "Diabolical"
+      enabled: false,
+      category: "Extreme"
     },
   ];
 
@@ -271,6 +271,15 @@
               "008207090000000420400010056000980000006000100000023000760090004082000000040801200",
               "900850000050201000600030008005070012080000070730010500100020003000109020000043006"],
       url: "https://www.sudokuwiki.org/XYZ_Wing",
+    }, {
+      name: "Swordfish",
+      strategies: ["Clear Adjacents", "Naked Singles", "Hidden Singles", "Intersection Removal", "Hidden Pairs", "Swordfish"],
+      datas: ["008009000300057001000100009230000070005406100060000038900003000700840003000700600",
+              "980010020002700000000009010700040800600107002009030005040900000000005700070020039",
+              "108000067000050000000000030006100040450000900000093000200040010003002700807001005",
+              "107300040800006000050870630090000510000000007700060080000904000080100002410000000",
+              "300040000000007048000000907010003080400050020050008070500300000000000090609025300"],
+      url: "https://www.sudokuwiki.org/Sword_Fish_Strategy",
     }
   ];
 
@@ -1539,7 +1548,6 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
           // this box has an XY and an XYZ
           var cellXYZ = threes[i3];
           var cellXZ  = twos[i2];
-
           
           var groupsToCheck = [];
           if (cellXZ.col !== cellXYZ.col) groupsToCheck.push(sudokuCols);
@@ -1585,6 +1593,84 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
 
 
 
+/*
+     SSSSS  WW      WW  OOOOO  RRRRRR  DDDDD   FFFFFFF IIIII  SSSSS  HH   HH
+    SS      WW      WW OO   OO RR   RR DD  DD  FF       III  SS      HH   HH
+     SSSSS  WW   W  WW OO   OO RRRRRR  DD   DD FFFF     III   SSSSS  HHHHHHH
+         SS  WW WWW WW OO   OO RR  RR  DD   DD FF       III       SS HH   HH
+     SSSSS    WW   WW   OOOO0  RR   RR DDDDDD  FF      IIIII  SSSSS  HH   HH
+*/
+
+  function clearSwordfish(groups, v, g1, g2, g3, y1, y2, y3) {
+    var changed = false;
+    for (var g=0; g<9; g++) {
+      if (g!==g1 && g!==g2 && g!==g3) {
+        changed = changed || groups[g][y1][v] || groups[g][y2][v] || groups[g][y3][v];
+        groups[g][y1][v] = false;
+        groups[g][y2][v] = false;
+        groups[g][y3][v] = false;
+      }
+    }
+    return changed;
+  }
+
+  function swordfishAux(groups, groupType) {
+    // consider values separately
+    for (var v=0; v<9; v++) {
+      var groupInds = [];
+      var maps = [];
+      // consider each group (row or col)
+      for (var g=0; g<9; g++) {
+        var group = groups[g];
+        // we only care about groups with two or three candidates for v
+        var groupCellCount = countPossibleCells(group, v);
+        if (groupCellCount === 3 || groupCellCount === 2) {
+          groupInds.push(g);
+          // get a candidate map for v for this group
+          var map = getGroupMap(group, v);
+          // rememeber it for later
+          maps.push(map);
+          // look through all the previous maps to see if there are matches
+          for (var g2i=0; g2i<groupInds.length-1; g2i++) {
+            if (mapOrCount(map, maps[g2i]) === 3) {
+              // there are two groups that have three options together. find a third.
+              var map12 = mapOr(map, maps[g2i]); // save the first two for later
+              for (var g3i=g2i+1; g3i<groupInds.length-1; g3i++) {
+                if (mapOrCount(map12, maps[g3i]) === 3) {
+                  // there are three groups that have three options together.
+                  // this is a swordfish.
+                  var g2 = groupInds[g2i];
+                  var g3 = groupInds[g3i];
+                  var y1 = map12.nthIndexOf("1",1);
+                  var y2 = map12.nthIndexOf("1",2);
+                  var y3 = map12.nthIndexOf("1",3);
+                  if (clearSwordfish(groups,v,g,g2,g3,y1,y2,y3)) {
+                    consolelog("Swordfish on value "+(v+1)+" found on "+groupType+" "+comand3(g2,g3,g)+".");
+                    return true;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+
+  String.prototype.nthIndexOf = function(pattern, n) {
+    var i = -1;
+    while (n-- && i++ < this.length) {
+      i = this.indexOf(pattern, i);
+      if (i < 0) break;
+    }
+    return i;
+  }
+
+  function swordfish() {
+    return swordfishAux(sudoku, "rows") || swordfishAux(sudokuCols, "cols");
+  }
 
 
 
@@ -2748,84 +2834,6 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
 
 
 
-/*
-     SSSSS  WW      WW  OOOOO  RRRRRR  DDDDD   FFFFFFF IIIII  SSSSS  HH   HH
-    SS      WW      WW OO   OO RR   RR DD  DD  FF       III  SS      HH   HH
-     SSSSS  WW   W  WW OO   OO RRRRRR  DD   DD FFFF     III   SSSSS  HHHHHHH
-         SS  WW WWW WW OO   OO RR  RR  DD   DD FF       III       SS HH   HH
-     SSSSS    WW   WW   OOOO0  RR   RR DDDDDD  FF      IIIII  SSSSS  HH   HH
-*/
-
-  function clearSwordfish(groups, v, g1, g2, g3, y1, y2, y3) {
-    var changed = false;
-    for (var g=0; g<9; g++) {
-      if (g!==g1 && g!==g2 && g!==g3) {
-        changed = changed || groups[g][y1][v] || groups[g][y2][v] || groups[g][y3][v];
-        groups[g][y1][v] = false;
-        groups[g][y2][v] = false;
-        groups[g][y3][v] = false;
-      }
-    }
-    return changed;
-  }
-
-  function swordfishAux(groups, groupType) {
-    // consider values separately
-    for (var v=0; v<9; v++) {
-      var groupInds = [];
-      var maps = [];
-      // consider each group (row or col)
-      for (var g=0; g<9; g++) {
-        var group = groups[g];
-        // we only care about groups with two or three candidates for v
-        var groupCellCount = countPossibleCells(group, v);
-        if (groupCellCount === 3 || groupCellCount === 2) {
-          groupInds.push(g);
-          // get a candidate map for v for this group
-          var map = getGroupMap(group, v);
-          // rememeber it for later
-          maps.push(map);
-          // look through all the previous maps to see if there are matches
-          for (var g2i=0; g2i<groupInds.length-1; g2i++) {
-            if (mapOrCount(map, maps[g2i]) === 3) {
-              // there are two groups that have three options together. find a third.
-              var map12 = mapOr(map, maps[g2i]); // save the first two for later
-              for (var g3i=g2i+1; g3i<groupInds.length-1; g3i++) {
-                if (mapOrCount(map12, maps[g3i]) === 3) {
-                  // there are three groups that have three options together.
-                  // this is a swordfish.
-                  var g2 = groupInds[g2i];
-                  var g3 = groupInds[g3i];
-                  var y1 = map12.nthIndexOf("1",1);
-                  var y2 = map12.nthIndexOf("1",2);
-                  var y3 = map12.nthIndexOf("1",3);
-                  if (clearSwordfish(groups,v,g,g2,g3,y1,y2,y3)) {
-                    consolelog("Swordfish on value "+(v+1)+" found on "+groupType+" "+comand3(g2,g3,g)+".");
-                    return true;
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-    return false;
-  }
-
-
-  String.prototype.nthIndexOf = function(pattern, n) {
-    var i = -1;
-    while (n-- && i++ < this.length) {
-      i = this.indexOf(pattern, i);
-      if (i < 0) break;
-    }
-    return i;
-  }
-
-  function swordfish() {
-    return swordfishAux(sudoku, "rows") || swordfishAux(sudokuCols, "cols");
-  }
 
 /*
      CCCCC  LL      RRRRRR   SSSSS      CCCCC  HH   HH   AAA   IIIII NN   NN  SSSSS
