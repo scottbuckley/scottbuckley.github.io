@@ -283,12 +283,20 @@
               "107300040800006000050870630090000510000000007700060080000904000080100002410000000",
               "300040000000007048000000907010003080400050020050008070500300000000000090609025300"],
       url: "https://www.sudokuwiki.org/Sword_Fish_Strategy",
+    }, {
+      name: "Finned X-Wing",
+      strategies: ["Clear Adjacents", "Naked Singles", "Hidden Singles", "Intersection Removal", "Hidden Pairs", "Finned X-Wings"],
+      datas: ["900040000704080050080000100007600820620400000000000019000102000890700000000050003", ],
+      url: "https://www.sudokuwiki.org/Finned_X_Wing",
     }
   ];
 
   function runAllTests() {
+    var failure = false;
     for (var t=0; t<regressionTests.length; t++)
-      runRegressionTest(regressionTests[t]);
+      failure = !runRegressionTest(regressionTests[t]) || failure;
+    if (failure) console.error("NOT ALL TESTS PASSED");
+    else console.log("ALL TESTS PASSED");
   }
 
   function loadTestStrats(name) {
@@ -305,6 +313,7 @@
     console.log("settings strategies...");
     setStrats(test.strategies);
     updateAllCheckboxes();
+    var allPassed = true;
     for (var d=0; d<test.datas.length; d++) {
       var data = test.datas[d];
       console.log(`running test ${d+1} of ${test.datas.length}...`);
@@ -312,10 +321,11 @@
       var result = completeSilently(data);
       if (result === "INCOMPLETE" || result === "ERROR") {
         console.error(`Test "${test.name}" failed with data "${data}"`);
+        allPassed = false;
       }        
       console.log(`result: ${result}`);
     }
-    return true;    
+    return allPassed;    
   }
 
   function setStrats(stratlist) {
@@ -582,7 +592,7 @@
     var count = 0;
     for (var c=0; c<group.length; c++)
       if (group[c][v])
-        if (++count >= max) return count;
+        if (++count >= max) return max;
     return count;
   }
 
@@ -1676,7 +1686,123 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
 
 
 
+/*
+    FFFFFFF IIIII NN   NN NN   NN EEEEEEE DDDDD      XX    XX
+    FF       III  NNN  NN NNN  NN EE      DD  DD      XX  XX
+    FFFF     III  NN N NN NN N NN EEEEE   DD   DD      XXXX
+    FF       III  NN  NNN NN  NNN EE      DD   DD     XX  XX
+    FF      IIIII NN   NN NN   NN EEEEEEE DDDDDD     XX    XX
+*/
 
+  function FinnedXWings() {
+    return FinnedXWingsAux(sudoku) || FinnedXWingsAux(sudokuCols);
+  }
+
+  function FinnedXWingsAux(groups) {
+    // consider each value independently
+    for (var v=0; v<9; v++) {
+      var otherMaps = [];
+      
+      var twoGroups = [];
+      var twoMaps = [];
+      var finGroups = [];
+      var finMaps = [];
+      
+      // map out groups 
+      for (var g=0; g<9; g++) {
+        var group = groups[g];
+        var cellCount = countPossibleCells(group,v,5);
+        if (cellCount === 2) {
+          twoGroups.push(group);
+          twoMaps.push(getGroupMap(group, v));
+        } else if (cellCount === 3 || cellCount === 4) {
+          finGroups.push(group);
+          finMaps.push(getGroupMap(group, v));
+        }
+      }
+
+      // at this point twoGroups contains the group index of every group with exactly 2 candidates
+      // also 'twoMaps' contains the string map (0s and 1s) of value 'v' for that group.
+      // the same for 3/4 candidates and twoGroups/twoMaps.
+      for (var ti=0; ti<twoGroups.length; ti++) {
+        for (var fi=0; fi<finGroups.length; fi++) {
+          var twoMap = twoMaps[ti];
+          var moreMap = finMaps[fi];
+          var finMatch = finnedMapMatch(twoMap, moreMap);
+          if (finMatch !== false) {
+            // we have a finned x-wing
+            var twoGroup = twoGroups[ti];
+            var finGroup = finGroups[fi];
+            if (clearFinnedXWing(v, twoGroup, finGroup, finMatch)) {
+              consolelog(`Finned X-Wing on value ${v+1} found on ${twoGroup.groupName} and (fin) ${finGroup.groupName}.`);
+              return true;
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  function clearFinnedXWing(v, twoGroup, finGroup, fin) {
+    var crossGroup = sudoku[fin];
+    if (twoGroup.groupType === 'row')
+      crossGroup = sudokuCols[fin];
+    
+    var changed = false;
+    var finBlock = blockInd(finGroup.index);
+
+    // iterate through the crossGroup's intersection with the fin's block
+    for (var i=finBlock*3; i<(finBlock+1)*3; i++)
+      if (i!==twoGroup.index && i!==finGroup.index)
+        if (crossGroup[i][v]) {
+          crossGroup[i][v] = false;
+          changed = true;
+        }
+    return changed;
+  }
+
+  // input: list of nine 0s and 1s representing candidate presence.
+  // twoMap has exactly two 1s and moreMap has 3 or 4.
+  // output: if these maps constitute a finned xwing, the index
+  // of the side of the xwing with the fin. otherwise "false".
+  function finnedMapMatch(twoMap, moreMap) {
+    var y1 = twoMap.indexOf("1");
+    var y2 = twoMap.lastIndexOf("1");
+    var b1 = blockInd(y1);
+    var b2 = blockInd(y2);
+
+    // a finned x-wing must be over two blocks
+    if (b1===b2) return false;
+
+    // make sure moreMap includes the x-wing
+    if (moreMap[y1] !== '1') return false;
+    if (moreMap[y2] !== '1') return false;
+    
+    // figure out where the finned wing is
+    var withB1 = false;
+    var withB2 = false;
+    for (var i=0; i<9; i++) {
+      if (i !== y1 && i !== y2 && moreMap[i]==='1') {
+        var ib = blockInd(i);
+        if      (ib === b1) withB1 = true;
+        else if (ib === b2) withB2 = true;
+        else                return false; // candidates with neither blocks
+      }
+    }
+    if (withB1 &&  withB2) return false; // candidates with both blocks
+    // return which one index we start with
+    if (withB1) return y1;
+    if (withB2) return y2;
+    return false;
+  }
+
+  function blockInd(cellInd) {
+    if (cellInd<3) return 0;
+    if (cellInd<6) return 1;
+    return 2;
+  }
+  
 
 
 
@@ -2522,116 +2648,6 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
 
 
 
-/*
-    FFFFFFF IIIII NN   NN NN   NN EEEEEEE DDDDD      XX    XX
-    FF       III  NNN  NN NNN  NN EE      DD  DD      XX  XX
-    FFFF     III  NN N NN NN N NN EEEEE   DD   DD      XXXX
-    FF       III  NN  NNN NN  NNN EE      DD   DD     XX  XX
-    FF      IIIII NN   NN NN   NN EEEEEEE DDDDDD     XX    XX
-*/
-
-// does not catch this one 901500046425090081860010020502000000019000460600000002196040253200060817000001694
-
-  function clearFinnedXWing(v, y1, y2, x, groupType) {
-    var group = sudoku[x];
-    if (groupType === 'rows')
-      group = sudokuCols[x];
-    
-    var changed = false;
-    var clearBlock = blockInd(y2);
-    for (var i=clearBlock*3; i<(clearBlock+1)*3; i++) {
-      if (i!==y1 && i!==y2) {
-        changed = group[i][v] || changed;
-        group[i][v] = false;
-      }
-    }
-    return changed;
-  }
-
-
-  function blockInd(cellInd) {
-    if (cellInd<3) return 0;
-    if (cellInd<6) return 1;
-    return 2;
-  }
-
-  // input: list of nine 0s and 1s representing candidate presence.
-  // twoMap has exactly two 1s and moreMap has 3 or 4.
-  // output: if these maps constitute a finned xwing, the index (base 1)
-  // of the side of the xwing with the fin. otherwise "false".
-  function FinnedMapMatch(twoMap, moreMap) {
-    var y1 = twoMap.indexOf("y1");
-    var y2 = twoMap.lastIndexOf("y1");
-    var b1 = blockInd(y1);
-    var b2 = blockInd(y2);
-
-    // a finned x-wing must be over two blocks
-    if (b1===b2) return false;
-
-    // make sure moreMap includes the x-wing
-    if (moreMap[y1] !== '1') return false;
-    if (moreMap[y2] !== '1') return false;
-    
-    var withB1 = false;
-    var withB2 = false;
-    for (var i=0; i<9; i++) {
-      if (i !== y1 && i !== y2 && moreMap[i]==='1') {
-        var ib = blockInd(i);
-        if      (ib === b1) withB1 = true;
-        else if (ib === b2) withB2 = true;
-        else                return false; // candidates with neither blocks
-      }
-    }
-    if (withB1 &&  withB2) return false; // candidates with both blocks
-    // return which one index we start with
-    if (withB1) return y1 + 1;
-    if (withB2) return y2 + 1;
-    return false;
-  }
-
-  function FinnedXWingsAux(groups, groupType) {
-    for (var v=0; v<9; v++) { // values
-      var groupInds = [];
-      var otherGroupInds = [];
-      var maps = [];
-      var otherMaps = [];
-      // map out groups
-      for (var g=0; g<9; g++) {
-        var group = groups[g];
-        var cellCount = countPossibleCells(group, v);
-        if (cellCount === 2) {
-          groupInds.push(g);
-          maps.push(getGroupMap(group, v));
-        } else if (cellCount === 3 || cellCount === 4) {
-          otherGroupInds.push(g);
-          otherMaps.push(getGroupMap(group, v));
-        }
-      }
-      // at this point groupInds contains the group index of every group with exactly 2 candidates
-      // also 'maps' contains the string map (0s and 1s) of value 'v' for that group
-      for (var gi=0; gi<groupInds.length; gi++) {
-        for (var ogi=0; ogi<otherGroupInds.length; ogi++) {
-          var twoMap = maps[gi];
-          var moreMap = otherMaps[ogi];
-          var finMatch = FinnedMapMatch(twoMap, moreMap);
-          if (finMatch) {
-            // we have a finned x-wing
-            var twoInd = groupInds[gi];
-            var moreInd = otherGroupInds[ogi];
-            if (clearFinnedXWing(v, twoInd, moreInd, (finMatch-1), groupType)) {
-              consolelog("Finned X-Wing (" + (v+1) + ") found on " + groupType + " " + (twoInd+1) + " and (fin) " + (moreInd+1));
-              return true;
-            }
-          }
-        }
-      }
-    }
-    return false;
-  }
-
-  function FinnedXWings() {
-    return FinnedXWingsAux(sudoku, "rows") || FinnedXWingsAux(sudokuCols, "cols");
-  }
 
 
 /*
