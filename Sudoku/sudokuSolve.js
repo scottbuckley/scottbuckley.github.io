@@ -578,10 +578,11 @@
   }
 
 
-  function countPossibleCells(group, v) {
+  function countPossibleCells(group, v, max=99) {
     var count = 0;
     for (var c=0; c<group.length; c++)
-      if (group[c][v]) count++;
+      if (group[c][v])
+        if (++count >= max) return count;
     return count;
   }
 
@@ -761,6 +762,13 @@
         if (sameCell(cell,group[c])) return false;
       return true;
     }
+  }
+
+  function indicesFromMap(map) {
+    var out = [];
+    for (var i=0; i<map.length; i++)
+      if (map[i]==="1") out.push(i);
+    return out;
   }
 
 
@@ -1202,7 +1210,7 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     //get the values that are found in three or fewer cells
     var vals = [];
     for (var v=0; v<9; v++) {
-      var possibleCells = countPossibleCells(unsolved, v);
+      var possibleCells = countPossibleCells(unsolved, v, 3);
       if (possibleCells <= 3 && possibleCells > 0)
         vals.push(v);
     }
@@ -1310,7 +1318,7 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     //get the values that are found in four or fewer cells
     var vals = [];
     for (var v=0; v<9; v++) {
-      var possibleCells = countPossibleCells(unsolved, v);
+      var possibleCells = countPossibleCells(unsolved, v, 4);
       if (possibleCells <= 4 && possibleCells > 0)
         vals.push(v);
     }
@@ -1611,35 +1619,34 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
   function swordfishAux(groups, groupType) {
     // consider values separately
     for (var v=0; v<9; v++) {
-      var groupInds = [];
+      var possibleGroups = [];
       var maps = [];
       // consider each group (row or col)
       for (var g=0; g<9; g++) {
         var group = groups[g];
         // we only care about groups with two or three candidates for v
-        var groupCellCount = countPossibleCells(group, v);
+        var groupCellCount = countPossibleCells(group, v, 3);
         if (groupCellCount === 3 || groupCellCount === 2) {
-          groupInds.push(g);
           // get a candidate map for v for this group
           var map = getGroupMap(group, v);
           // rememeber it for later
+          possibleGroups.push(group);
           maps.push(map);
           // look through all the previous maps to see if there are matches
-          for (var g2i=0; g2i<groupInds.length-1; g2i++) {
+          for (var g2i=0; g2i<possibleGroups.length-1; g2i++) {
             if (mapOrCount(map, maps[g2i]) === 3) {
               // there are two groups that have three options together. find a third.
               var map12 = mapOr(map, maps[g2i]); // save the first two for later
-              for (var g3i=g2i+1; g3i<groupInds.length-1; g3i++) {
+              for (var g3i=g2i+1; g3i<possibleGroups.length-1; g3i++) {
                 if (mapOrCount(map12, maps[g3i]) === 3) {
                   // there are three groups that have three options together.
                   // this is a swordfish.
-                  var g2 = groupInds[g2i];
-                  var g3 = groupInds[g3i];
-                  var y1 = map12.nthIndexOf("1",1);
-                  var y2 = map12.nthIndexOf("1",2);
-                  var y3 = map12.nthIndexOf("1",3);
-                  if (clearSwordfish(groups,v,g,g2,g3,y1,y2,y3)) {
-                    consolelog("Swordfish on value "+(v+1)+" found on "+groupType+" "+comand3(g2,g3,g)+".");
+                  var group2 = possibleGroups[g2i];
+                  var group3 = possibleGroups[g3i];
+                  var [y1, y2, y3] = indicesFromMap(map12);
+                  var [g1,g2,g3] = [group.index, group2.index, group3.index];
+                  if (clearSwordfish(groups,v,g1,g2,g3,y1,y2,y3)) {
+                    consolelog(`Swordfish on value ${v+1} found on ${group.groupType} ${comand3(g2,g3,g1)}`);
                     return true;
                   }
                 }
@@ -1652,28 +1659,18 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     return false;
   }
 
-  String.prototype.nthIndexOf = function(pattern, n) {
-    var i = -1;
-    while (n-- && i++ < this.length) {
-      i = this.indexOf(pattern, i);
-      if (i < 0) break;
-    }
-    return i;
-  }
-
-  function clearSwordfish(groups, v, g1, g2, g3, y1, y2, y3) {
+  function clearSwordfish(groups, v, i1, i2, i3, y1, y2, y3) {
     var changed = false;
-    for (var g=0; g<9; g++) {
-      if (g!==g1 && g!==g2 && g!==g3) {
-        changed = changed || groups[g][y1][v] || groups[g][y2][v] || groups[g][y3][v];
-        groups[g][y1][v] = false;
-        groups[g][y2][v] = false;
-        groups[g][y3][v] = false;
-      }
-    }
+    for (var g=0; g<9; g++)
+      if (g!==i1 && g!==i2 && g!==i3)
+        if (groups[g][y1][v] || groups[g][y2][v] || groups[g][y3][v]) {
+          changed = true;
+          groups[g][y1][v] = false;
+          groups[g][y2][v] = false;
+          groups[g][y3][v] = false;
+        }
     return changed;
   }
-
 
 
 
