@@ -123,7 +123,7 @@
       enabled: true,
       category: "Tough"
     },
-    { name:  "Simple Colors Chain",
+    { name:  "Simple Color Chains",
       sname: "Smpl Clrs",
       func:  simpleColors,
       enabled: false,
@@ -288,6 +288,16 @@
       strategies: ["Clear Adjacents", "Naked Singles", "Hidden Singles", "Intersection Removal", "Hidden Pairs", "Finned X-Wings"],
       datas: ["900040000704080050080000100007600820620400000000000019000102000890700000000050003", ],
       url: "https://www.sudokuwiki.org/Finned_X_Wing",
+    }, {
+      name: "Simple Color Chains",
+      strategies: ["Clear Adjacents", "Naked Singles", "Hidden Singles", "Intersection Removal", "Hidden Pairs", "Hidden Quads", "Simple Color Chains"],
+      datas: ["100400006046091080005020000000500109090000050402009000000010900080930560500008004",
+              "000906000600008007100370009006000750004030100095000800200065008900800005000103000",
+              "400800003006010409000005000010060092000301000640050080000600000907080100800009004",
+              "090200350012003000300008000000017000630000089000930000000700002000300190078009030",
+              "000000070000090810500203004800020000045000720000000003400308006072010000030000000",
+              "062900000004308000709000400600801000003000200000207003001000904000709300000004120",],
+      url: "https://www.sudokuwiki.org/Singles_Chains",
     }
   ];
 
@@ -1804,6 +1814,279 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
   }
   
 
+/*
+     CCCCC  LL      RRRRRR   SSSSS      CCCCC  HH   HH   AAA   IIIII NN   NN  SSSSS
+    CC    C LL      RR   RR SS         CC    C HH   HH  AAAAA   III  NNN  NN SS
+    CC      LL      RRRRRR   SSSSS     CC      HHHHHHH AA   AA  III  NN N NN  SSSSS
+    CC    C LL      RR  RR       SS    CC    C HH   HH AAAAAAA  III  NN  NNN      SS
+     CCCCC  LLLLLLL RR   RR  SSSSS      CCCCC  HH   HH AA   AA IIIII NN   NN  SSSSS
+*/
+
+  function getOnlyTwoCells(group, v) {
+    var out = [];
+    for (var c=0; c<9; c++) {
+      if (group[c][v]) {
+        out.push(group[c]);
+      }
+    }
+    if (out.length === 2)
+      return out;
+    return false;
+  }
+
+
+  function placeLink(graph, from, to) {
+      if (graph[from] === undefined) {
+        graph[from] = [to];
+      } else if(graph[from].indexOf(to)===-1) {
+        graph[from].push(to);
+      }
+  }
+
+  function otherClr(clr) {
+    if (clr==='red')   return 'green';
+    if (clr==='green') return 'red';
+    return 'whatthefuck';
+  }
+
+  function fillStarting(links, colors, start, color) {
+    // this point has already been touched. do nothing.
+    if (colors[start]) return;
+
+    // set the color of this node.
+    colors[start] = color;
+    
+    // color from each of the adjacent nodes.
+    // start with the 'other' color.
+    var adjs = links[start];
+    var nextColor = otherClr(color);
+    for (var i=0; i<adjs.length; i++) {
+      fillStarting(links, colors, adjs[i], nextColor);
+    }
+  }
+
+  function getRedsGreens(links, colors, start) {
+    var grns = [];
+    var reds = [];
+
+    function step(node) {
+      // disregard nodes we have already looked at
+      if (grns.indexOf(node)>=0) return;
+      if (reds.indexOf(node)>=0) return;
+
+      // put this noe in the right box
+      if (colors[node]==='red') {
+        reds.push(node);
+      } else if (colors[node]==='green') {
+        grns.push(node);
+      }
+
+      // look at all adjacent nodes
+      for (var i=0; i<links[node].length; i++) {
+        step(links[node][i]);
+      }
+    }
+
+    // step through this graph
+    step(start);
+
+    return [reds,grns];
+  }
+
+  function colorOccursTwiceInOneGroup(labels) {
+    var rows = []; var cols = []; var boxes = [];
+    for (var i=0; i<labels.length; i++) {
+      var cell = sudokuCellsByPos[labels[i]];
+      if (rows[cell.row] || cols[cell.col] || boxes[cell.box]) {
+        if (rows[cell.row]) {
+          return [sudoku[cell.row], rows[cell.row], cell];
+        } else if (cols[cell.col]) {
+          return [sudokuCols[cell.col], cols[cell.col], cell];
+        } else if (boxes[cell.box]) {
+          return [sudokuBoxes[cell.box], boxes[cell.box], cell];
+        }
+      }
+      rows[cell.row] = cols[cell.col] = boxes[cell.box] = cell;
+    }
+    return [false];
+  }
+
+  function confirmColor(labels, v) {
+    for (var i=0; i<labels.length; i++)
+      confirmCell(sudokuCellsByPos[labels[i]], v);
+  }
+
+  function simpleColorsVal(v) {
+    var links  = [];
+    var colors = [];
+
+    // get all the strong links for this value
+    var strongLinks = everyGroupPush(g => getOnlyTwoCells(g, v));
+
+    // there needs to be at least three links to solve anything
+    if (strongLinks.length < 3) return false;
+
+    // build a set of links between nodes (this represents the graph)
+    for (var i=0; i<strongLinks.length; i++) {
+      placeLink(links, strongLinks[i][0].pos, strongLinks[i][1].pos);
+      placeLink(links, strongLinks[i][1].pos, strongLinks[i][0].pos);
+    }
+
+    // get a list of separated graphs, and colour these graphs
+    var graphStarts = [];
+    for (var i=0; i<strongLinks.length; i++) {
+      var node = strongLinks[i][0].pos;
+      if (colors[node] === undefined) {
+        graphStarts.push(node); // this node is uncolored. it is the start of a new graph.
+        fillStarting(links, colors, node, 'red');
+      }
+    }
+
+    // take a look at each graph
+    for (var i=0; i<graphStarts.length; i++) {
+      var [reds,grns] = getRedsGreens(links, colors, graphStarts[i]);
+      // need at least four points to be a useful graph
+      if (reds.length + grns.length > 3) {
+        // check if any color occurs twice in a group (Rule 2)
+        var [group, cell1, cell2] = colorOccursTwiceInOneGroup(reds);
+        var colorWithConflict = 'red';
+        if (!group) {
+          [group, cell1, cell2] = colorOccursTwiceInOneGroup(grns);
+          colorWithConflict = 'green';
+        }
+        if (group) {
+          // there is a conflict! the conflicted color is "colorWithConflict"
+          if (colorWithConflict === 'red')   confirmColor(grns, v);
+          if (colorWithConflict === 'green') confirmColor(reds, v);
+          // report the logic that was followed.
+          var path = getPathBetweenCells(links,cell1.pos,cell2.pos).join("->");
+          consolelog("Found simple colors chain on value "+(v+1)+". "+path+" starts and ends with odds in "+group.groupName+". Confirming evens.");
+          return true;
+        } else {
+          // there are no "two reds in one group" style conflicts.
+          // look for co-visible nodes. (Rule 4)
+          var numChanged = findCovisibleToColors(v,reds,grns);
+          if (numChanged>0) {
+            consolelog("Simple colors chain found on value "+(v+1)+", removing candidates from "+numChanged+" cells. Red: "+reds.join(",")+". Green: "+grns.join(",")+".");
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  function coVisibleCells(cellA, cellB) {
+    var cells = [];
+
+    function maybeCell(cell) {
+      if (!isSolved(cell) && cell!==cellA && cell!==cellB)
+        cells.push(cell);
+    }
+
+    if (cellA.box===cellB.box) {
+      // cells are in the same box
+      var box = sudokuBoxes[cellA.box];
+      for (var c=0; c<9; c++) {
+        maybeCell(box[c]);
+      }
+    }
+
+    if (cellA.row===cellB.row) {
+      // cells are in the same row
+      var row = sudoku[cellA.row];
+      for (var c=0; c<9; c++) {
+        maybeCell(row[c]);
+      }
+    } else if(boxRow(cellA.box)===boxRow(cellB.box) && cellA.box!==cellB.box) {
+      // cells are in the same 'box row' but not in the same box
+      var boxA = sudokuBoxes[cellA.box];
+      var boxB = sudokuBoxes[cellB.box];
+      for (var c=0; c<9; c++) {
+        var cellA2 = boxA[c];
+        var cellB2 = boxB[c];
+        if (cellA2.row===cellB.row)
+          maybeCell(cellA2);
+        if (cellB2.row===cellA.row)
+          maybeCell(cellB2);
+      }
+    }
+
+    if (cellA.col===cellB.col) {
+      // cells are in the same column
+      var col = sudokuCols[cellA.col];
+      for (var c=0; c<9; c++) {
+        maybeCell(col[c]);
+      }
+    } else if(boxCol(cellA.box)===boxCol(cellB.box) && cellA.box!==cellB.box) {
+      // cells are in the same 'box col' but not in the same box
+      var boxA = sudokuBoxes[cellA.box];
+      var boxB = sudokuBoxes[cellB.box];
+      for (var c=0; c<9; c++) {
+        var cellA2 = boxA[c];
+        var cellB2 = boxB[c];
+        if (cellA2.col===cellB.col)
+          maybeCell(cellA2);
+        if (cellB2.col===cellA.col)
+          maybeCell(cellB2);
+      }
+    }
+
+    // get the opposite corner cells
+    maybeCell(sudoku[cellA.row][cellB.col]);
+    maybeCell(sudoku[cellB.row][cellA.col]);
+
+    return cells;
+  }
+
+  function findCovisibleToColors(v,reds,grns) {
+    var changes = 0;
+    for (var r=0; r<reds.length; r++) {
+      for (var g=0; g<grns.length; g++) {
+        var red = sudokuCellsByPos[reds[r]];
+        var grn = sudokuCellsByPos[grns[g]];
+        var covis = coVisibleCells(red,grn);
+        for (var c=0; c<covis.length; c++) {
+          var cell = covis[c];
+          if (cell[v]) {
+            changes = changes + 1;
+            cell[v] = false;
+          }
+        }
+      }
+    }
+    return changes;
+  }
+
+  function getPathBetweenCells(links, start, end, ignore=[]) {
+    var adjs = links[start];
+    if (adjs.indexOf(end)>=0) {
+      return [start, end];
+    } else {
+      for (var i=0; i<adjs.length; i++) {
+        var next = adjs[i];
+        if (ignore.indexOf(next)===-1) {
+          var path = getPathBetweenCells(links,next,end,ignore.concat([start]));
+          if (path) {
+            return [start].concat(path);
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  function partialApply2nd(fn, arg2) {
+    return (function(arg1) {
+      return fn(arg1, arg2);
+    });
+  }
+
+  function simpleColors() {
+    for (var v=0; v<9; v++)
+      if (simpleColorsVal(v)) return true;
+  }
+
 
 
 
@@ -2849,278 +3132,6 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
 
 
 
-/*
-     CCCCC  LL      RRRRRR   SSSSS      CCCCC  HH   HH   AAA   IIIII NN   NN  SSSSS
-    CC    C LL      RR   RR SS         CC    C HH   HH  AAAAA   III  NNN  NN SS
-    CC      LL      RRRRRR   SSSSS     CC      HHHHHHH AA   AA  III  NN N NN  SSSSS
-    CC    C LL      RR  RR       SS    CC    C HH   HH AAAAAAA  III  NN  NNN      SS
-     CCCCC  LLLLLLL RR   RR  SSSSS      CCCCC  HH   HH AA   AA IIIII NN   NN  SSSSS
-*/
-
-  function getOnlyTwoCells(group, v) {
-    var out = [];
-    for (var c=0; c<9; c++) {
-      if (group[c][v]) {
-        out.push(group[c]);
-      }
-    }
-    if (out.length === 2)
-      return out;
-    return false;
-  }
-
-
-  function placeLink(graph, from, to) {
-      if (graph[from] === undefined) {
-        graph[from] = [to];
-      } else if(graph[from].indexOf(to)===-1) {
-        graph[from].push(to);
-      }
-  }
-
-  function otherClr(clr) {
-    if (clr==='red')   return 'green';
-    if (clr==='green') return 'red';
-    return 'whatthefuck';
-  }
-
-  function fillStarting(links, colors, start, color) {
-    // this point has already been touched. do nothing.
-    if (colors[start]) return;
-
-    // set the color of this node.
-    colors[start] = color;
-    
-    // color from each of the adjacent nodes.
-    // start with the 'other' color.
-    var adjs = links[start];
-    var nextColor = otherClr(color);
-    for (var i=0; i<adjs.length; i++) {
-      fillStarting(links, colors, adjs[i], nextColor);
-    }
-  }
-
-  function getRedsGreens(links, colors, start) {
-    var grns = [];
-    var reds = [];
-
-    function step(node) {
-      // disregard nodes we have already looked at
-      if (grns.indexOf(node)>=0) return;
-      if (reds.indexOf(node)>=0) return;
-
-      // put this noe in the right box
-      if (colors[node]==='red') {
-        reds.push(node);
-      } else if (colors[node]==='green') {
-        grns.push(node);
-      }
-
-      // look at all adjacent nodes
-      for (var i=0; i<links[node].length; i++) {
-        step(links[node][i]);
-      }
-    }
-
-    // step through this graph
-    step(start);
-
-    return [reds,grns];
-  }
-
-  function colorOccursTwiceInOneGroup(labels) {
-    var rows = []; var cols = []; var boxes = [];
-    for (var i=0; i<labels.length; i++) {
-      var cell = sudokuCellsByPos[labels[i]];
-      if (rows[cell.row] || cols[cell.col] || boxes[cell.box]) {
-        if (rows[cell.row]) {
-          return [sudoku[cell.row], rows[cell.row], cell];
-        } else if (cols[cell.col]) {
-          return [sudokuCols[cell.col], cols[cell.col], cell];
-        } else if (boxes[cell.box]) {
-          return [sudokuBoxes[cell.box], boxes[cell.box], cell];
-        }
-      }
-      rows[cell.row] = cols[cell.col] = boxes[cell.box] = cell;
-    }
-    return [false];
-  }
-
-  function confirmColor(labels, v) {
-    for (var i=0; i<labels.length; i++)
-      confirmCell(sudokuCellsByPos[labels[i]], v);
-  }
-
-  function simpleColorsVal(v) {
-    var links  = [];
-    var colors = [];
-
-    // get all the strong links for this value
-    var strongLinks = everyGroupPush(g => getOnlyTwoCells(g, v));
-
-    // there needs to be at least three links to solve anything
-    if (strongLinks.length < 3) return false;
-
-    // build a set of links between nodes (this represents the graph)
-    for (var i=0; i<strongLinks.length; i++) {
-      placeLink(links, strongLinks[i][0].pos, strongLinks[i][1].pos);
-      placeLink(links, strongLinks[i][1].pos, strongLinks[i][0].pos);
-    }
-
-    // get a list of separated graphs, and colour these graphs
-    var graphStarts = [];
-    for (var i=0; i<strongLinks.length; i++) {
-      var node = strongLinks[i][0].pos;
-      if (colors[node] === undefined) {
-        graphStarts.push(node); // this node is uncolored. it is the start of a new graph.
-        fillStarting(links, colors, node, 'red');
-      }
-    }
-
-    // take a look at each graph
-    for (var i=0; i<graphStarts.length; i++) {
-      var [reds,grns] = getRedsGreens(links, colors, graphStarts[i]);
-      // need at least four points to be a useful graph
-      if (reds.length + grns.length > 3) {
-        // check if any color occurs twice in a group (Rule 2)
-        var [group, cell1, cell2] = colorOccursTwiceInOneGroup(reds);
-        var colorWithConflict = 'red';
-        if (!group) {
-          [group, cell1, cell2] = colorOccursTwiceInOneGroup(grns);
-          colorWithConflict = 'green';
-        }
-        if (group) {
-          // there is a conflict! the conflicted color is "colorWithConflict"
-          if (colorWithConflict === 'red')   confirmColor(grns, v);
-          if (colorWithConflict === 'green') confirmColor(reds, v);
-          // report the logic that was followed.
-          var path = getPathBetweenCells(links,cell1.pos,cell2.pos).join("->");
-          consolelog("Found simple colors chain on value "+(v+1)+". "+path+" starts and ends with odds in "+group.groupName+". Confirming evens.");
-          return true;
-        } else {
-          // there are no "two reds in one group" style conflicts.
-          // look for co-visible nodes. (Rule 4)
-          var numChanged = findCovisibleToColors(v,reds,grns);
-          if (numChanged>0) {
-            consolelog("Simple colors chain found on value "+(v+1)+", removing candidates from "+numChanged+" cells. Red: "+reds.join(",")+". Green: "+grns.join(",")+".");
-            return true;
-          }
-        }
-      }
-    }
-    return false;
-  }
-
-  function coVisibleCells(cellA, cellB) {
-    var cells = [];
-
-    function maybeCell(cell) {
-      if (!isSolved(cell) && cell!==cellA && cell!==cellB)
-        cells.push(cell);
-    }
-
-    if (cellA.box===cellB.box) {
-      // cells are in the same box
-      var box = sudokuBoxes[cellA.box];
-      for (var c=0; c<9; c++) {
-        maybeCell(box[c]);
-      }
-    }
-
-    if (cellA.row===cellB.row) {
-      // cells are in the same row
-      var row = sudoku[cellA.row];
-      for (var c=0; c<9; c++) {
-        maybeCell(row[c]);
-      }
-    } else if(boxRow(cellA.box)===boxRow(cellB.box) && cellA.box!==cellB.box) {
-      // cells are in the same 'box row' but not in the same box
-      var boxA = sudokuBoxes[cellA.box];
-      var boxB = sudokuBoxes[cellB.box];
-      for (var c=0; c<9; c++) {
-        var cellA2 = boxA[c];
-        var cellB2 = boxB[c];
-        if (cellA2.row===cellB.row)
-          maybeCell(cellA2);
-        if (cellB2.row===cellA.row)
-          maybeCell(cellB2);
-      }
-    }
-
-    if (cellA.col===cellB.col) {
-      // cells are in the same column
-      var col = sudokuCols[cellA.col];
-      for (var c=0; c<9; c++) {
-        maybeCell(col[c]);
-      }
-    } else if(boxCol(cellA.box)===boxCol(cellB.box) && cellA.box!==cellB.box) {
-      // cells are in the same 'box col' but not in the same box
-      var boxA = sudokuBoxes[cellA.box];
-      var boxB = sudokuBoxes[cellB.box];
-      for (var c=0; c<9; c++) {
-        var cellA2 = boxA[c];
-        var cellB2 = boxB[c];
-        if (cellA2.col===cellB.col)
-          maybeCell(cellA2);
-        if (cellB2.col===cellA.col)
-          maybeCell(cellB2);
-      }
-    }
-
-    // get the opposite corner cells
-    maybeCell(sudoku[cellA.row][cellB.col]);
-    maybeCell(sudoku[cellB.row][cellA.col]);
-
-    return cells;
-  }
-
-  function findCovisibleToColors(v,reds,grns) {
-    var changes = 0;
-    for (var r=0; r<reds.length; r++) {
-      for (var g=0; g<grns.length; g++) {
-        var red = sudokuCellsByPos[reds[r]];
-        var grn = sudokuCellsByPos[grns[g]];
-        var covis = coVisibleCells(red,grn);
-        for (var c=0; c<covis.length; c++) {
-          var cell = covis[c];
-          if (cell[v]) {
-            changes = changes + 1;
-            cell[v] = false;
-          }
-        }
-      }
-    }
-    return changes;
-  }
-
-  function getPathBetweenCells(links, start, end, ignore=[]) {
-    var adjs = links[start];
-    if (adjs.indexOf(end)>=0) {
-      return [start, end];
-    } else {
-      for (var i=0; i<adjs.length; i++) {
-        var next = adjs[i];
-        if (ignore.indexOf(next)===-1) {
-          var path = getPathBetweenCells(links,next,end,ignore.concat([start]));
-          if (path) {
-            return [start].concat(path);
-          }
-        }
-      }
-    }
-    return false;
-  }
-
-  function partialApply2nd(fn, arg2) {
-    return (function(arg1) {
-      return fn(arg1, arg2);
-    });
-  }
-
-  function simpleColors() {
-    for (var v=0; v<9; v++)
-      if (simpleColorsVal(v)) return true;
-  }
 
 /*
      ######  ##     ## ########  ######  ##    ## #### ##    ##  ######
