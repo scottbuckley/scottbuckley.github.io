@@ -111,7 +111,7 @@
     { name:  "Z-Wings",
       sname: "ZWings",
       func:  ZWings,
-      enabled: false,
+      enabled: true,
       category: "Tough"
     },
     { name:  "Swordfish",
@@ -253,20 +253,39 @@
       datas: ["007000400060070030090203000005047609000000000908130200000705080070020090001000500",
               "600000002208000400000520896030080057000060000720090080574012000002000701800000009",
               "000000001004060208070320400900018000005000600000540009008037040609080300100000000",
-              "091700050700801000008469000073000000000396000000000280000684500000902001020007940"]
+              "091700050700801000008469000073000000000396000000000280000684500000902001020007940"],
+      url: "https://www.sudokuwiki.org/Y_Wing_Strategy",
     }, {
       name: "X-Wings",
       strategies: ["Clear Adjacents", "Naked Singles", "Hidden Singles", "Intersection Removal", "Naked Pairs", "Hidden Pairs", "Hidden Triples", "X-Wings"],
       datas: ["000400602006000100090500080050300000301206405000007020030002060004000900507009000",
               "005000400020940000900700008003000290100203007079000300400008001000014060006000700",
               "003910700000003400100040006060700000002109600000002010700080003008200000005071900",
-              "010037000000000010600008029070049600100000003009350070390200008040000000000790060"]
+              "010037000000000010600008029070049600100000003009350070390200008040000000000790060"],
+      url: "https://www.sudokuwiki.org/X_Wing_Strategy",
+    }, {
+      name: "Z-Wings",
+      strategies: ["Clear Adjacents", "Naked Singles", "Hidden Singles", "Intersection Removal", "Naked Triples", "Z-Wings"],
+      datas: ["072000680000700000500016000000028100200371006004560000000130004000007000015000890",
+              "000100000000000980705062310109007403000000000807200105091740802053000000000001000",
+              "008207090000000420400010056000980000006000100000023000760090004082000000040801200",
+              "900850000050201000600030008005070012080000070730010500100020003000109020000043006"],
+      url: "https://www.sudokuwiki.org/XYZ_Wing",
     }
   ];
 
   function runAllTests() {
     for (var t=0; t<regressionTests.length; t++)
       runRegressionTest(regressionTests[t]);
+  }
+
+  function loadTestStrats(name) {
+    for (var i=0; i<regressionTests.length; i++) {
+      if (regressionTests[i].name === name) {
+        setStrats(regressionTests[i].strategies);
+        updateAllCheckboxes();
+      }
+    }
   }
 
   function runRegressionTest(test) {
@@ -277,12 +296,12 @@
     for (var d=0; d<test.datas.length; d++) {
       var data = test.datas[d];
       console.log(`running test ${d+1} of ${test.datas.length}...`);
-      console.log(`importing ${data}...`);
+      console.log(`solving: ${data}`);
       var result = completeSilently(data);
       if (result === "INCOMPLETE" || result === "ERROR") {
-        console.error(`Test "${test.name}" failed with data "${data}".`);
+        console.error(`Test "${test.name}" failed with data "${data}"`);
       }        
-      console.log(`result: ${result}.`);
+      console.log(`result: ${result}`);
     }
     return true;    
   }
@@ -376,10 +395,10 @@
     else                return group                  .filter(hasNCandidates(2));
   }
 
-  // get the cells that have three candidates
-  function getThreesOrLess(group) {
-    return getUnsolvedCells(group)
-      .filter(hasLessThanNCandidates(4))
+  // the cells that have three candidates
+  function getThrees(group) {
+    if (group.canCache) return getUnsolvedCells(group).filter(hasNCandidates(3));
+    else                return group                  .filter(hasNCandidates(3));
   }
 
 
@@ -501,13 +520,22 @@
     var groupings = [sudoku, sudokuCols];
     for (var g=0; g<2; g++) {
       var grouping = groupings[g];
-      for (var i=0; i<9; i++) {
+      for (var i=0; i<9; i++)
         if (groupFunc(grouping[i])) {
           if (!multiple) return true;
           changed = true;
         }
-      }
     }
+    return changed;
+  }
+
+  function everyBox(groupFunc, multiple=true) {
+    var changed = false;
+    for (var b=0; b<9; b++)
+      if (groupFunc(sudokuBoxes[b])) {
+        if (!multiple) return true;
+        changed = true;
+      }
     return changed;
   }
 
@@ -1490,25 +1518,18 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
      ZZ           WW WWW WW  III  NN  NNN GG   GG      SS
     ZZZZZ          WW   WW  IIIII NN   NN  GGGGGG  SSSSS
 */
-  // 901500046425090081860010020502000000019000460600000002196040253200060817000001694
-  // breaks this
-  function clearZWing(rowcol, z, box, pivot) {
-    var changed = false;
-    for (var c=0; c<9; c++) {
-      var cell = rowcol[c];
-      if (cell.box === box && !sameCell(cell, pivot)) {
-        changed = changed || cell[z];
-        cell[z] = false;
-      }
-    }
-    return changed;
+
+  // also known as XYZ-wings
+  function ZWings() {
+    return everyBox(ZWingsBox);
   }
 
   function ZWingsBox(box) {
     // get the cells in this box with two and three candidates
     var twos   = getTwos(box);
-    var threes = getThreesOrLess(box);
+    var threes = getThrees(box);
 
+    // needs to be at least one of each
     if (twos.length   === 0) return false;
     if (threes.length === 0) return false;
     
@@ -1519,40 +1540,26 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
           var cellXYZ = threes[i3];
           var cellXZ  = twos[i2];
 
-          // look for the YZ cell in the pivot's column
-          if (cellXZ.col !== cellXYZ.col) for (var c=0; c<9; c++) {
-            var cellYZ = sudokuCols[cellXYZ.col][c];
-            if (cellYZ.box !== cellXYZ.box
-              && candidateCount(cellYZ) === 2
-              && combinedCandidateCount(cellYZ, cellXYZ) === 3
-              && !sameCandidates(cellYZ, cellXZ)) {
-              // we have a XYZ-wing
-              var Z = commonCandidate(cellXZ, cellYZ);
-              if (clearZWing(sudokuCols[cellXYZ.col], Z, cellXYZ.box, cellXYZ)) {
-                var cands = getCandidates(cellXYZ);
-                consolelog("XYZ-Wing "+vstr(...cands)+" pivoted on "+cellXYZ.pos+" with wings at "+cellXZ.pos+" and "+cellYZ.pos+".");
-                return true;
-              } else {
-                break; // there can't be another YZ - that would be a naked pair/triple
-              }
-            }
-          }
+          
+          var groupsToCheck = [];
+          if (cellXZ.col !== cellXYZ.col) groupsToCheck.push(sudokuCols);
+          if (cellXZ.row !== cellXYZ.row) groupsToCheck.push(sudoku);
 
-          // look for the YZ cell in the pivot's row
-          if (cellXZ.row !== cellXYZ.row) for (var c=0; c<9; c++) {
-            var cellYZ = sudoku[cellXYZ.row][c];
-            if (cellYZ.box !== cellXYZ.box
-              && candidateCount(cellYZ) === 2
-              && combinedCandidateCount(cellYZ, cellXYZ) === 3
-              && !sameCandidates(cellYZ, cellXZ)) {
-              // we have a XYZ-wing
-              var Z = commonCandidate(cellXZ, cellYZ);
-              if (clearZWing(sudoku[cellXYZ.row], Z, cellXYZ.box, cellXYZ)) {
-                var cands = getCandidates(cellXYZ);
-                consolelog("XYZ-Wing "+vstr(...cands)+" pivoted on "+cellXYZ.pos+" with wings at "+cellXZ.pos+" and "+cellYZ.pos+".");
-                return true;
-              } else {
-                break; // there can't be another YZ - that would be a naked pair/triple
+          for (var g=0; g<groupsToCheck.length; g++) {
+            var grouping = groupsToCheck[g];
+            var group = grouping[cellXYZ[grouping[0].groupType]];
+            // 'group' is the pivot's row or col
+            for (var c=0; c<9; c++) {
+              var cellYZ = group[c];
+              if (cellYZ.box === cellXYZ.box) continue;
+              if (candidateCount(cellYZ) === 2 && combinedCandidateCount(cellYZ, cellXYZ) === 3 && !sameCandidates(cellYZ, cellXZ)) {
+                // we have an XYZ-wing
+                var Z = commonCandidate(cellXZ, cellYZ); // can only be one
+                if (clearZWing(group, Z, cellXYZ.box, cellXYZ)) {
+                  var cands = getCandidates(cellXYZ);
+                  consolelog(`Z-Wing ${vstr(...cands)} pivoted on ${cellXYZ.pos} with wings at ${cellXZ.pos} and ${cellYZ.pos}.`);
+                  return true;
+                } else break; // there can't be another YZ - that would be a naked pair/triple
               }
             }
           }
@@ -1562,13 +1569,18 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     return false;
   }
 
-  function ZWings() {
-    for (var b=0; b<9; b++)
-      if (ZWingsBox(sudokuBoxes[b])) return true;
-    return false;
+  function clearZWing(group, z, box, pivot) {
+    var changed = false;
+    for (var c=0; c<9; c++) {
+      var cell = group[c];
+      if (cell.box === box && !sameCell(cell, pivot))
+        if (cell[z]) {
+          cell[z] = false;
+          changed = true;
+        }
+    }
+    return changed;
   }
-
-
 
 
 
@@ -2433,6 +2445,8 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     FF       III  NN  NNN NN  NNN EE      DD   DD     XX  XX
     FF      IIIII NN   NN NN   NN EEEEEEE DDDDDD     XX    XX
 */
+
+// does not catch this one 901500046425090081860010020502000000019000460600000002196040253200060817000001694
 
   function clearFinnedXWing(v, y1, y2, x, groupType) {
     var group = sudoku[x];
