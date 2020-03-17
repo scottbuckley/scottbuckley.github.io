@@ -21,7 +21,7 @@
       sname: "Clr Adjs",
       func:  clearAdjacents,
       enabled: true,
-      category: "Simple"
+      category: "Simple",
     },
     { name:  "Naked Singles",
       sname: "Nkd 1s",
@@ -45,13 +45,15 @@
       sname: "AK Elims",
       func:  antiknightElims,
       enabled:false,
-      category: "Anti-Knight"
+      category: "Anti-Knight",
+      specialty: true,
     },
     { name:  "X Sudoku Eliminations",
       sname: "X Elims",
       func:  xsudokuElims,
       enabled:false,
-      category: "X Sudoku"
+      category: "X Sudoku",
+      specialty: true,
     },
     { name:  "Naked Pairs",
       sname: "Nkd 2s",
@@ -69,7 +71,8 @@
       sname: "Sand Elim",
       func:  sandwichElims,
       enabled: false,
-      category: "Sandwich"
+      category: "Sandwich",
+      specialty: true,
     },
     { name:  "Naked Triples",
       sname: "Nkd 3s",
@@ -1601,17 +1604,8 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
      SSSSS    WW   WW   OOOO0  RR   RR DDDDDD  FF      IIIII  SSSSS  HH   HH
 */
 
-  function clearSwordfish(groups, v, g1, g2, g3, y1, y2, y3) {
-    var changed = false;
-    for (var g=0; g<9; g++) {
-      if (g!==g1 && g!==g2 && g!==g3) {
-        changed = changed || groups[g][y1][v] || groups[g][y2][v] || groups[g][y3][v];
-        groups[g][y1][v] = false;
-        groups[g][y2][v] = false;
-        groups[g][y3][v] = false;
-      }
-    }
-    return changed;
+  function swordfish() {
+    return swordfishAux(sudoku, "rows") || swordfishAux(sudokuCols, "cols");
   }
 
   function swordfishAux(groups, groupType) {
@@ -1658,7 +1652,6 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     return false;
   }
 
-
   String.prototype.nthIndexOf = function(pattern, n) {
     var i = -1;
     while (n-- && i++ < this.length) {
@@ -1668,10 +1661,18 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     return i;
   }
 
-  function swordfish() {
-    return swordfishAux(sudoku, "rows") || swordfishAux(sudokuCols, "cols");
+  function clearSwordfish(groups, v, g1, g2, g3, y1, y2, y3) {
+    var changed = false;
+    for (var g=0; g<9; g++) {
+      if (g!==g1 && g!==g2 && g!==g3) {
+        changed = changed || groups[g][y1][v] || groups[g][y2][v] || groups[g][y3][v];
+        groups[g][y1][v] = false;
+        groups[g][y2][v] = false;
+        groups[g][y3][v] = false;
+      }
+    }
+    return changed;
   }
-
 
 
 

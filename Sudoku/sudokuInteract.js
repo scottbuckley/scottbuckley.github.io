@@ -76,6 +76,7 @@
   var dragState  = undefined; // undefined = nothing. -1 = clear. 0-8 = set swatch. -2 = select
   var inputNum   = undefined;
 
+  var ls = window.localStorage;
   
 
 /*
@@ -116,6 +117,7 @@
 
     if (edge) initEdges(edge);
 
+    buildUI && loadSavedEnabledStrats();
     if (sandwich) enableStrats("Sandwich");
     if (antiknight) enableStrats("Anti-Knight");
     if (xsudoku) enableStrats("X Sudoku")
@@ -135,6 +137,16 @@
 
     // make the board square (also happens on resize)
     makeSq();
+  }
+
+  function loadSavedEnabledStrats() {
+    for (var i=0; i<strats.length; i++) {
+      var strat = strats[i];
+      if (strat.specialty) continue;
+      var storedState = ls.getItem(strat.name);
+      if (storedState === "true") strat.enabled = true;
+      else if (storedState === "false") strat.enabled = false;
+    }
   }
 
   function getFlagString() {
@@ -343,14 +355,26 @@ function setDblClick(element, cell) {
     prevSelectedControl = this;
   }
   
+  function enableStrat(strat) {
+    strat.enabled = true;
+    if (strat.specialty) return;
+    ls.setItem(strat.name, true);
+  }
+
+  function disableStrat(strat) {
+    strat.enabled = false;
+    if (strat.specialty) return;
+    ls.setItem(strat.name, false);
+  }
+
   // the checkbox for a particular strategy has been updated
   function stratCheckboxUpdated(strat) {
     // return the function to define that checkbox's behaviour
     return function() {
       if ($(this).prop('checked'))
-        strat.enabled = true;
+        enableStrat(strat);
       else
-        strat.enabled = false;
+        disableStrat(strat);
     }
   }
 
