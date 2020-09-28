@@ -10,10 +10,11 @@
   const strat_categories = [
     "Simple",
     "Tough",
+    "Diabolical",
     "Extreme",
     "X Sudoku",
     "Anti-Knight",
-    "Sandwich"
+    "Sandwich",
   ];
 
   const strats = [
@@ -136,6 +137,13 @@
       enabled: false,
       category: "Extreme"
     },
+    {
+      name:  "X-Cycles",
+      sname: "X-Cycles",
+      func: xCycles,
+      enabled: false,
+      category: "Diabolical"
+    }
   ];
 
   //  ######   #######  ##    ## ######## ####  ######
@@ -251,21 +259,21 @@
 */
 
   var regressionTests = [
-    { name: "Y-Wings",
-      strategies: ["Clear Adjacents", "Naked Singles", "Hidden Singles", "Intersection Removal", "Naked Pairs", "Y-Wings"],
-      datas: ["007000400060070030090203000005047609000000000908130200000705080070020090001000500",
-              "600000002208000400000520896030080057000060000720090080574012000002000701800000009",
-              "000000001004060208070320400900018000005000600000540009008037040609080300100000000",
-              "091700050700801000008469000073000000000396000000000280000684500000902001020007940"],
-      url: "https://www.sudokuwiki.org/Y_Wing_Strategy",
-    }, {
-      name: "X-Wings",
+    { name: "X-Wings",
       strategies: ["Clear Adjacents", "Naked Singles", "Hidden Singles", "Intersection Removal", "Naked Pairs", "Hidden Pairs", "Hidden Triples", "X-Wings"],
       datas: ["000400602006000100090500080050300000301206405000007020030002060004000900507009000",
               "005000400020940000900700008003000290100203007079000300400008001000014060006000700",
               "003910700000003400100040006060700000002109600000002010700080003008200000005071900",
               "010037000000000010600008029070049600100000003009350070390200008040000000000790060"],
       url: "https://www.sudokuwiki.org/X_Wing_Strategy",
+    }, {
+      name: "Y-Wings",
+      strategies: ["Clear Adjacents", "Naked Singles", "Hidden Singles", "Intersection Removal", "Naked Pairs", "Y-Wings"],
+      datas: ["007000400060070030090203000005047609000000000908130200000705080070020090001000500",
+              "600000002208000400000520896030080057000060000720090080574012000002000701800000009",
+              "000000001004060208070320400900018000005000600000540009008037040609080300100000000",
+              "091700050700801000008469000073000000000396000000000280000684500000902001020007940"],
+      url: "https://www.sudokuwiki.org/Y_Wing_Strategy",
     }, {
       name: "Z-Wings",
       strategies: ["Clear Adjacents", "Naked Singles", "Hidden Singles", "Intersection Removal", "Naked Triples", "Z-Wings"],
@@ -298,6 +306,24 @@
               "000000070000090810500203004800020000045000720000000003400308006072010000030000000",
               "062900000004308000709000400600801000003000200000207003001000904000709300000004120",],
       url: "https://www.sudokuwiki.org/Singles_Chains",
+    }, {
+      name: "X-Cycles",
+      strategies: ["Clear Adjacents", "Naked Singles", "Hidden Singles", "Hidden Pairs", "Intersection Removal", "X-Cycles"],
+      datas: ["024100670060070410700964020246591387135487296879623154400009760350716940697040031", // rule 1
+              "804537000023614085605982034000105870500708306080203450200859003050371208008426507", // rule 2
+              "000010960000680450056942307000008009380094625900200004673029540508476203240050006", // rule 2
+              "000078000003000590090200010004006000000134000000700680020009070008000300000320000", // rule 3
+              "000050000001203900050007000900020008060708020400060001000500080007304500000010000", // rule 3
+            ],
+      extraFunc: [
+        function() {
+          if (sudoku[2][2][7]) return false;
+          if (sudoku[6][2][7]) return false;
+          if (sudoku[6][8][7]) return false;
+          return true;
+        }
+      ],
+      url: "https://www.sudokuwiki.org/X_Cycles",
     }
   ];
 
@@ -307,6 +333,7 @@
       failure = !runRegressionTest(regressionTests[t]) || failure;
     if (failure) console.error("NOT ALL TESTS PASSED");
     else console.log("ALL TESTS PASSED");
+    return !failure;
   }
 
   function loadTestStrats(name) {
@@ -326,13 +353,23 @@
     var allPassed = true;
     for (var d=0; d<test.datas.length; d++) {
       var data = test.datas[d];
+      var extraFunc;
+      if (test.extraFunc) extraFunc = test.extraFunc[d];
       console.log(`running test ${d+1} of ${test.datas.length}...`);
       console.log(`solving: ${data}`);
       var result = completeSilently(data);
-      if (result === "INCOMPLETE" || result === "ERROR") {
-        console.error(`Test "${test.name}" failed with data "${data}"`);
+      if (result === "ERROR" || (result === "INCOMPLETE" && extraFunc===undefined)) {
+        console.warn(`Test "${test.name}" failed with data "${data}"`);
         allPassed = false;
-      }        
+      } else if (result === "INCOMPLETE") {
+        if (extraFunc()) {
+          console.log(`Test "${test.name}" #${d} passed with alternative success function`, extraFunc);
+          result = "PASSED ALT TEST";
+        } else {
+          console.error(`Test "${test.name}" failed with data "${data}"`);
+          allPassed = false;
+        }
+      }
       console.log(`result: ${result}`);
     }
     return allPassed;    
@@ -531,6 +568,25 @@
       for (var c=0; c<9; c++)
         if (func(sudoku[r][c]))
           changed = true;
+    return changed;
+  }
+
+  function everyCellFilter(filter) {
+    var result = [];
+    for (var r=0; r<9; r++)
+      for (var c=0; c<9; c++)
+        if (filter(sudoku[r][c]))
+          result.push(sudoku[r][c]);
+    return result;
+  }
+
+  function everyVal(func, multiple=true) {
+    var changed = false;
+    for (var v=0; v<9; v++)
+      if (func(v)) {
+        changed = true;
+        if (!multiple) return true;
+      }
     return changed;
   }
 
@@ -1425,7 +1481,6 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
   }
 
   function YWingAux(group) {
-
     var unsolved = getUnsolvedCells(group);
     if (unsolved.length < 3) return false;
     
@@ -1814,8 +1869,7 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
   const GREEN = 2;
 
   function simpleColors() {
-    for (var v=0; v<9; v++)
-      if (simpleColorsVal(v)) return true;
+    return everyVal(simpleColorsVal, false);
   }
 
   function simpleColorsVal(v) {
@@ -2080,7 +2134,251 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
 
 
 
+/*
+    XX    XX         CCCCC  HH   HH   AAA   IIIII NN   NN  SSSSS
+     XX  XX         CC    C HH   HH  AAAAA   III  NNN  NN SS
+      XXXX   _____  CC      HHHHHHH AA   AA  III  NN N NN  SSSSS
+     XX  XX         CC    C HH   HH AAAAAAA  III  NN  NNN      SS
+    XX    XX         CCCCC  HH   HH AA   AA IIIII NN   NN  SSSSS
+*/
 
+  function xCycles() {
+    return everyVal(xCyclesVal, false);
+  }
+
+  function xCyclesVal(v, showGraph=false) {
+
+    // get a list of all strong links
+    var stLinks = everyGroupPush(g => getOnlyTwoPossibleCells(g, v), true)
+        .map(([a, b]) => [a.pos, b.pos]);
+
+    // make a list of all nodes with a strong link
+    var nodeLabels = [];
+    for (var i=0; i<stLinks.length; i++) {
+      var [start, end] = stLinks[i];
+      if (nodeLabels.indexOf(start)===-1) nodeLabels.push(start);
+      if (nodeLabels.indexOf(end)  ===-1) nodeLabels.push(end);
+    }
+
+    // add all strong links to a graph ('nodes')
+    var nodes = [];
+    nodes["labels"] = nodeLabels;
+    for (var i=0; i<stLinks.length; i++) {
+      writeStrongLink(nodes, stLinks[i][0], stLinks[i][1]);
+      writeStrongLink(nodes, stLinks[i][1], stLinks[i][0]);
+    }
+
+    // get a list of all groups (prepping for calculating weak links)
+    var groupings = getAllGroupings(true);
+    var groupingInhabitants = [];
+    for (var g=0; g<groupings.length; g++) {
+      var grouping = groupings[g];
+      var groupingType = grouping.groupingType;
+      groupingInhabitants[groupingType] = [];
+      for (var i=0; i<grouping.length; i++)
+        groupingInhabitants[groupingType].push([]);
+    }
+
+    // add weak links to the graph
+    for (var i=0; i<nodeLabels.length; i++) {
+      var pos  = nodeLabels[i];
+      var cell = nodes[pos].cell;
+      for (var g=0; g<groupings.length; g++) {
+        var grouping = groupings[g];
+        var groupingType = grouping.groupingType;
+
+        // cells we've seen so far that share a group with this one
+        var adjs = groupingInhabitants[groupingType][cell[groupingType]];
+        // the group they share
+        var group = grouping[cell[groupingType]];
+        // record these weak links (noting the shared group)
+        for (var a=0; a<adjs.length; a++) {
+          var adjPos = adjs[a];
+          writeWeakLink(nodes, pos, adjPos, group);
+          writeWeakLink(nodes, adjPos, pos, group);
+        }
+        // record this one for future cells
+        adjs.push(pos);
+      }
+    }
+
+    
+    var findCycles = function(home, here, tag, strong, pathTaken=[]) {
+      if (here.visited===tag) return [];
+      here.visited = tag;
+      var result = [];
+
+      // if we're only looking for strong links, or including weak links as well
+      var adjs = strong ? here.strong : here.weak.concat(here.strong);
+
+      // try each applicable neighbour
+      for (var a=0; a<adjs.length; a++) {
+        var adj = adjs[a];
+        if (adj === home) {
+          // if we have reached the home node, a loop was found.
+          if (pathTaken.length%2===0)
+            // return immediately if it's an odd-length total path (will make major changes)
+            return [pathTaken.concat(here.pos)];
+          else
+            // otherwise include this in the cycles we have found.
+            result = result.concat([pathTaken.concat(here.pos)]);
+        } else if (adj.visited !== tag) {
+          // otherwise, if this is an unvisited neighbour, recurse to that neighbour
+          var cycles = findCycles(home, nodes[adj], tag, !strong, pathTaken.concat([here.pos]));
+
+          // include all cycles found, but if there is an odd one return that only
+          for (var c=0; c<cycles.length; c++) {
+            var cycle = cycles[c];
+            if (cycle.length%2===1)
+              return [cycle];
+            else
+            result.push(cycle);
+          }
+        }
+      }
+      return result;
+    }
+
+    // if the flag is given, draw the graph we have (so far).
+    // this should NOT happen during autosolving.
+    showGraph && drawGraph(nodes);
+
+
+    // starting with a node, check its cycles, try to make some
+    // changes to the grid
+    var tag = 1; // to differentiate between cycle-finding passes
+    var cyclesFromNodeYieldChange = function(pos) {
+      var changed = false;
+      var node = nodes[pos];
+      // get all cycles (starting with strong links)
+      var cycles = findCycles(pos, node, ++tag, true);
+      // if there are more than two weak links here, get all cycles that start with
+      // weak links. continue only if there is a single result (possible nice loops rule 3).
+      if (node.weak.length>=2) {
+        var weakCycles = findCycles(pos, node, ++tag, false);
+        if (weakCycles.length===1) {
+          weakCycles[0].isWeak = true;
+          cycles.push(weakCycles[0]);
+        }
+      }
+      for (var c=0; c<cycles.length; c++) {
+        var cycle = cycles[c];
+        if (cycle.length%2===1) {
+          var startCell = sudokuCellsByPos[cycle[0]];
+          if (cycle.isWeak===true) {
+            startCell[v] = false;
+            consolelog(`X-Cycle in value ${v+1} eliminates ${startCell.pos} (Nice Loops Rule 3). [unlikely]`);
+            console.warn("NOTE: UNLIKELY RULE 3 FOUND.");
+          } else {
+            confirmCell(startCell, v);
+            consolelog(`X-Cycle in value ${v+1} confirms ${startCell.pos} (Nice Loops Rule 2).`);
+          }
+          return true;
+        } else {
+          // nice loops (rule 1)
+          if (clearXCycleNiceLoop(nodes, cycle, v)) {
+            consolelog(`X-Cycle in value ${v+1} eliminates candidates from some cells (Nice Loops Rule 1).`);
+            changed = true;
+          }
+        }
+      }
+      return changed;
+    };
+
+    // check if any of the nodes *with strong links*
+    // create any changes
+    for (var i=0; i<nodeLabels.length; i++) {
+      var pos = nodeLabels[i];
+      nodes[pos].terminusConsidered = true;
+      if (cyclesFromNodeYieldChange(pos))  return true;
+    }
+
+    // the only option left is for rule 3 - we need to get
+    // the rest of the weak links (not just between strong link nodes)
+    var allCandCells = everyCellFilter(c => c[v]);
+    var rule3Changed = false;
+    for (var i=0; i<allCandCells.length; i++) {
+      var cell = allCandCells[i];
+      // ignore cells that have a strong link
+      if (nodes[cell.pos]!==undefined) continue;
+
+      // get cells with strong links that are neighbours
+      var strongAdjs = [];
+      for (var g=0; g<groupings.length; g++) {
+        var groupingType = groupings[g].groupingType;
+        // cells we've seen so far that share a group with this one
+        var adjs = groupingInhabitants[groupingType][cell[groupingType]];
+        for (var a=0; a<adjs.length; a++)
+          if (strongAdjs.indexOf(adjs[a])===-1) strongAdjs.push(adjs[a]);
+      }
+
+      // we need at least two
+      if (strongAdjs.length<2) continue;
+
+      // try to get from one to the other, by hacking the cycle finder
+      for (var a1=1; a1<strongAdjs.length; a1++) {
+        var adj1 = strongAdjs[a1];
+        for (var a2=0; a2<a1; a2++) {
+          var adj2 = strongAdjs[a2];
+          // the two strong nodes we're looking at can't share a weak link
+          if (nodes[adj1].weak.indexOf(adj2)!==-1) continue;
+
+          // this cell is the possible point of a rule 3 loop, with
+          // the first and last strong nodes being adj1 and adj2.
+          // see if they connect to eachother using the cycle finder
+          var cycles = findCycles(adj1,nodes[adj2],++tag,true);
+          for (var c=0; c<cycles.length; c++) {
+            if (cycles[c].length%2===0) continue;
+            // rule 3 found
+            rule3Changed = true;
+            cell[v] = false;
+            consolelog(`X-Cycle in value ${v+1} eliminates ${cell.pos} (Nice Loops Rule 3).`);
+          }
+        }
+      }
+    }
+    return rule3Changed;
+  }
+
+  function getAllGroupings(allowNonStandardGroups=false) {
+    return [sudoku, sudokuCols, sudokuBoxes];
+  }
+
+  function clearXCycleNiceLoop(nodes, loop, v) {
+    var changed = false;
+    // here we assume that we're starting with a strong link.
+    var weakLinks = getWeakPairsFromNiceLoop(loop);
+    for (var w=0; w<weakLinks.length; w++) {
+      var [pos1, pos2] = weakLinks[w];
+      if (nodes[pos1].strong.indexOf(pos2)!==-1) continue; // actually a strong link
+      var group = nodes[pos1].linkGroups[pos2];
+      var notThese = (c) => c.pos!==pos1 && c.pos!==pos2;
+      if (clearCands(group.filter(notThese),[v]))
+        changed = true;
+    }
+    return changed;
+  }
+
+  function getWeakPairsFromNiceLoop(loop) {
+    var result = [];
+    for (var i=1; i<loop.length-1; i+=2)
+      result.push([loop[i], loop[i+1]]);
+    result.push([loop[loop.length-1], loop[0]]);
+    return result;
+  }
+
+  function writeStrongLink(nodes,start,end) {
+    if (nodes[start] === undefined) nodes[start] = {pos:start, cell:sudokuCellsByPos[start], strong: [end], weak: [], linkGroups:[]};
+    else if (nodes[start].strong.indexOf(end)===-1) nodes[start].strong.push(end);
+  }
+
+  // we know that all nodes exist in 'nodes' already, and that 'weak' is never undefined
+  function writeWeakLink(nodes, start, end, group) {
+    if (nodes[start].strong.indexOf(end)!==-1) return;
+    if (nodes[start].weak.indexOf(end)!==-1) return;
+    nodes[start].weak.push(end);
+    nodes[start].linkGroups[end] = group;
+  }
 
 
 
@@ -2268,6 +2566,7 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
   //       SS AAAAAAA NN  NNN DD   DD  WW WWW WW  III  CC    C HH   HH
   //   SSSSS  AA   AA NN   NN DDDDDD    WW   WW  IIIII  CCCCC  HH   HH
 
+  // this breaks it ?sandwich=true&edge=0,2,,0,2,,,20,20,22,,11,,33,,,,22&data=0,0,0,0,0,0,0,0,0,0,0,0,0A,0A,0A,0,0,0,0,0,0A,0,0,0,0A,0,0,0,0,0A,0,0,!4,0A,0,0,0,0,0,0,0,!6,0A,0,0,0,0,0,0A,0A,!9A,0,0,0,0,0,0A,0,0,0,0,0,0,0,0,0A,0A,0A,0A,0A,0,0,0,0,0,0,0,0,0,0,!8
 
   var sandwichStaticFinished = false;
   function sandwichElims() {

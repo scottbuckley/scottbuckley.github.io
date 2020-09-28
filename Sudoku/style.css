@@ -280,3 +280,19 @@
               user-select: none; /* Non-prefixed version, currently
                                     supported by Chrome, Opera and Firefox */
   }
+
+  /* for overlay lines */
+  .svgline {
+    position:absolute;
+    width:10px;
+    background-color:#0003;
+    border-radius:5px;
+  }
+
+  .svgline.strong {
+    background-color:#0F03;
+  }
+
+  .svgline.weak {
+    background-color:#F003;
+  }

@@ -1,4 +1,11 @@
 
+  $(document).ready(function(){
+    $(window).off("resize").on("resize", function(){
+      makeSq();
+    });
+    onReady();
+  });
+
 /*
     ######## ##     ##    ###    ##     ## ########  ##       ########  ######
     ##        ##   ##    ## ##   ###   ### ##     ## ##       ##       ##    ##
@@ -952,9 +959,94 @@ function setDblClick(element, cell) {
   }
 
 
-  $(document).ready(function(){
-    $(window).off("resize").on("resize", function(){
-      makeSq();
-    });
-    onReady();
-  });
+/*
+     #######  ##     ## ######## ########  ##          ###    ##    ##
+    ##     ## ##     ## ##       ##     ## ##         ## ##    ##  ##
+    ##     ## ##     ## ##       ##     ## ##        ##   ##    ####
+    ##     ## ##     ## ######   ########  ##       ##     ##    ##
+    ##     ##  ##   ##  ##       ##   ##   ##       #########    ##
+    ##     ##   ## ##   ##       ##    ##  ##       ##     ##    ##
+     #######     ###    ######## ##     ## ######## ##     ##    ##
+*/
+
+
+  function drawGraph(nodes) {
+    clearLines();
+    var alreadyDrawn = [];
+    var labels = nodes.labels;
+
+    var maybeDraw = function(from, to, lineClass) {
+      if (alreadyDrawn[from+to] || alreadyDrawn[to+from]) return;
+      makeLine(from, to, lineClass);
+    };
+
+    for (var i=0; i<labels.length; i++) {
+      var pos = labels[i];
+      var node = nodes[pos];
+      for (var s=0; s<node.strong.length; s++)
+        maybeDraw(pos, node.strong[s], "strong");
+      for (var w=0; w<node.weak.length; w++)
+        maybeDraw(pos, node.weak[w], "weak");
+      
+    }
+  }
+
+  var nameInd = 1;
+  function newName() {
+    return `unique_${nameInd++}`;
+  }
+
+  function clearLines() {
+    $("#tbl").nextAll().remove();
+  }
+
+  function makeLine(from, to, lineClass) {
+    var cont = $("#gridcont");
+    var newID = newName();
+    var newDOM = document.createElement('div');
+    newDOM.setAttribute("id", newID);
+    newDOM.setAttribute("class", "svgline "+lineClass);
+    cont.append(newDOM);
+
+    var fromDOM = document.getElementById(from);
+    var toDOM   = document.getElementById(to);
+
+    adjustLine(fromDOM, toDOM, newDOM);
+  }
+
+  function adjustLine(from, to, line){
+    var fT = from.offsetTop  + from.offsetHeight/2;
+    var tT = to.offsetTop    + to.offsetHeight/2;
+    var fL = from.offsetLeft + from.offsetWidth/2;
+    var tL = to.offsetLeft   + to.offsetWidth/2;
+    
+    var CA   = Math.abs(tT - fT);
+    var CO   = Math.abs(tL - fL);
+    var H    = Math.sqrt(CA*CA + CO*CO);
+    var ANG  = 180 / Math.PI * Math.acos( CA/H );
+  
+    if(tT > fT){
+        var top  = (tT-fT)/2 + fT;
+    }else{
+        var top  = (fT-tT)/2 + tT;
+    }
+    if(tL > fL){
+        var left = (tL-fL)/2 + fL;
+    }else{
+        var left = (fL-tL)/2 + tL;
+    }
+  
+    if(( fT < tT && fL < tL) || ( tT < fT && tL < fL) || (fT > tT && fL > tL) || (tT > fT && tL > fL)){
+      ANG *= -1;
+    }
+    top-= H/2;
+  
+    line.style["-webkit-transform"] = 'rotate('+ ANG +'deg)';
+    line.style["-moz-transform"] = 'rotate('+ ANG +'deg)';
+    line.style["-ms-transform"] = 'rotate('+ ANG +'deg)';
+    line.style["-o-transform"] = 'rotate('+ ANG +'deg)';
+    line.style["-transform"] = 'rotate('+ ANG +'deg)';
+    line.style.top    = top+'px';
+    line.style.left   = left+'px';
+    line.style.height = H + 'px';
+  }
