@@ -189,15 +189,15 @@
     /* line-height:0 and translate is a sweet hack for vertical centering */
   }
 
-  v1 { top:0;left:0; }
-  v2 { top:0;left:0;right:0;}
-  v3 { top:0;right:0; }
-  v4 { top:0;left:0;bottom:0;}
-  v5 { top:0;bottom:0;left:0;right:0;}
-  v6 { top:0;bottom:0;right:0; }
-  v7 { bottom:0;left:0; }
-  v8 { left:0;right:0;bottom:0; }
-  v9 { bottom:0;right:0; }
+  v1 { top:1;left:1; }
+  v2 { top:1;left:1;right:1;}
+  v3 { top:1;right:1; }
+  v4 { top:1;left:1;bottom:1;}
+  v5 { top:1;bottom:1;left:1;right:1;}
+  v6 { top:1;bottom:1;right:1; }
+  v7 { bottom:1;left:1; }
+  v8 { left:1;right:1;bottom:1; }
+  v9 { bottom:1;right:1; }
 
 
   tr td[swatch="0"], #tbl tr.row td.cell[swatch="0"] { background-color:#b4daff44; }
@@ -209,6 +209,56 @@
   tr td[swatch="6"], #tbl tr.row td.cell[swatch="6"] { background-color:#b4feff44; }
   tr td[swatch="7"], #tbl tr.row td.cell[swatch="7"] { background-color:#d9ffb444; }
   tr td[swatch="8"], #tbl tr.row td.cell[swatch="8"] { background-color:#ffb4ff44; }
+
+  /* #tbl tr.row td.cell[region="yes"] { background-color:#ff000033; } */
+  #tbl tr.row td.cell[region="yes"]:before {
+    content: " ";
+    position: absolute;
+    z-index: -1;
+    top: 1px;
+    left: 1px;
+    right: 1px;
+    bottom: 1px;
+    border: 2px none #333;
+    z-index:-2;
+  }
+  #tbl tr.row td.cell[region="yes"][rgnup="no"]:before {
+    border-top-style: dashed;
+  }
+  #tbl tr.row td.cell[region="yes"][rgndown="no"]:before {
+    border-bottom-style: dashed;
+  }
+  #tbl tr.row td.cell[region="yes"][rgnleft="no"]:before {
+    border-left-style: dashed;
+  }
+  #tbl tr.row td.cell[region="yes"][rgnright="no"]:before {
+    border-right-style: dashed;
+  }
+
+  #tbl tr.row td.cell[region="yes"][TL="yes"] div.caption {
+    color:#000;
+    background-color:#fffe;
+    border:0.5px dotted #0004;
+    margin:auto;
+    top:-4px;
+    left:-4px;
+    padding-left:1px;
+    position:absolute;
+    text-align:center;
+    font-size:1.5vh;
+  }
+  #tbl tr.row td.cell[region="yes"][TL="yes"] div.caption:empty {
+    display:none;
+  }
+
+  
+  #tbl tr.row td.cell[region="yes"][TL="yes"] v1,
+  #tbl tr.row td.cell[region="yes"][TL="yes"] v2,
+  #tbl tr.row td.cell[region="yes"][TL="yes"] v3 {
+    text-shadow: 0px 0px 3px white, 0px 0px 3px white, 0px 0px 3px white;
+    z-index:1000;
+  }
+  
 
 
   

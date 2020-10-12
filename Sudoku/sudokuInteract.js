@@ -289,7 +289,9 @@ function resetButton() {
 }
 
 function setDblClick(element, cell) {
-  element.dblclick(function(){changeCell(cell)});
+  element.dblclick(function(e){
+      if (!e.shiftKey) changeCell(cell)
+    });
 }
 
   // a solver button has been clicked
@@ -396,6 +398,7 @@ function setDblClick(element, cell) {
   function processKeys(e) {
     var shift = e.shiftKey;
     var code  = e.code;
+    var modKey = e.shiftKey || e.metaKey || e.ctrlKey || e.altKey;
 
     if (code.startsWith("Digit")) {
       // deal with digits
@@ -416,6 +419,8 @@ function setDblClick(element, cell) {
       // undo. flash the button and perform an undo
       flashButton($("#undobutton"));
       undo();
+    } else if (code==="KeyR" && !modKey) {
+      regionsButton();
     }
     return true;
   }
@@ -662,6 +667,111 @@ function setDblClick(element, cell) {
   }
 
 /*
+    ########  ########  ######   ####  #######  ##    ##  ######
+    ##     ## ##       ##    ##   ##  ##     ## ###   ## ##    ##
+    ##     ## ##       ##         ##  ##     ## ####  ## ##
+    ########  ######   ##   ####  ##  ##     ## ## ## ##  ######
+    ##   ##   ##       ##    ##   ##  ##     ## ##  ####       ##
+    ##    ##  ##       ##    ##   ##  ##     ## ##   ### ##    ##
+    ##     ## ########  ######   ####  #######  ##    ##  ######
+*/
+var newRegionInd = 1;
+var regionLabels = [];
+function regionsButton() {
+  var thisRegion = newRegionInd;
+  newRegionInd++;
+
+  var cells = getSelectedCells();
+  cells.map(function(cell){
+    cell.region = thisRegion;
+  });
+
+  var input = "" + prompt("Enter a label for this region.");
+  if (input!=="null")
+    regionLabels[thisRegion] = input;
+
+  refreshRegionLabels();
+  clearSelected();
+  refresh();
+}
+
+function getSelectedCells() {
+  var cells = [];
+  for (var r=0;r<sudoku.length; r++) {
+    var row = sudoku[r];
+    for (var c=0; c<row.length; c++) {
+      var cell = row[c];
+      if (cell.td.hasClass("selected"))
+        cells.push(cell);
+    }
+  }
+  return cells;
+}
+
+function setRegionAttrs(cell) {
+  if (cell.region === undefined) return;
+  var td = cell.td;
+  var region = cell.region;
+  var dirs = [
+    ['rgnup', cellAbove],
+    ['rgndown', cellBelow],
+    ['rgnleft', cellLeft],
+    ['rgnright', cellRight]
+  ];
+  for (var i=0; i<4; i++) {
+    var [dirLabel, dirFn] = dirs[i];
+    var adjCell = dirFn(cell);
+    if (adjCell && adjCell.region === region)
+      td.attr(dirLabel, 'yes');
+    else
+      td.attr(dirLabel, 'no');
+  }
+  if (cell.isTL) {
+    td.attr('TL', 'yes');
+    td.find('div.caption').html(regionLabels[cell.region]);
+  } else {
+    td.attr('TL', 'no');
+  }
+}
+
+function cellAbove(cell) {
+  if (cell.row===0) return undefined;
+  return sudoku[cell.row-1][cell.col];
+}
+
+function cellBelow(cell) {
+  if (cell.row===8) return undefined;
+  return sudoku[cell.row+1][cell.col];
+}
+
+function cellLeft(cell) {
+  if (cell.col===0) return undefined;
+  return sudoku[cell.row][cell.col-1];
+}
+
+function cellRight(cell) {
+  if (cell.col===8) return undefined;
+  return sudoku[cell.row][cell.col+1];
+}
+
+function refreshRegionLabels() {
+  // clear region label tags errywhere, pick the 'topleft' cell
+  // for region labeling, and maybe set that label up.
+  var labeledRegions = [];
+  for (var d=0; d<sudokuCellsTL.length; d++) {
+    var diag = sudokuCellsTL[d];
+    for (var i=diag.length-1; i>=0; i--) {
+      var cell = diag[i];
+      cell.isTL = false;
+      if (cell.region !== undefined && labeledRegions.indexOf(cell.region) === -1) {
+        cell.isTL = true;
+        labeledRegions.push(cell.region);
+      }
+    }
+  }
+}
+
+/*
      ######   ########  #### ########     ##     ##  ######   ##     ## ########
     ##    ##  ##     ##  ##  ##     ##    ###   ### ##    ##  ###   ###    ##
     ##        ##     ##  ##  ##     ##    #### #### ##        #### ####    ##
@@ -696,6 +806,14 @@ function setDblClick(element, cell) {
           cell.td.attr('swatch', '');
         else
           cell.td.attr('swatch', cell.swatch);
+
+        // set the region borders as appropriate
+        if (cell.region===undefined)
+          cell.td.attr('region','no');
+        else {
+          cell.td.attr('region', 'yes');
+          setRegionAttrs(cell);
+        }
       }
     }
   }
@@ -713,16 +831,17 @@ function setDblClick(element, cell) {
 
   var cHTML = ["<c1>1</c1>", "<c2>2</c2>", "<c3>3</c3>", "<c4>4</c4>", "<c5>5</c5>", "<c6>6</c6>", "<c7>7</c7>", "<c8>8</c8>", "<c9>9</c9>",];
   var vHTML = ["<v1>1</v1>", "<v2>2</v2>", "<v3>3</v3>", "<v4>4</v4>", "<v5>5</v5>", "<v6>6</v6>", "<v7>7</v7>", "<v8>8</v8>", "<v9>9</v9>"];
+  var postHTML = '<div class="caption">';
   function refreshTableCell(cell) {
     var td = cell.td;
     if(isSolved(cell)) {
-      td.html(cHTML[cell.solved]);
+      td.html(cHTML[cell.solved]+postHTML);
     } else {
       var html = "";
       for (var v=0; v<9; v++)
         if (cell[v])
           html += vHTML[v];
-      td.html(html);
+      td.html(html+postHTML);
     }
   }
 
@@ -735,7 +854,7 @@ function setDblClick(element, cell) {
     // }
   }
 
-  // rebuild the table
+  // build the table
   function buildTable() {
     var table = $("#tbl");
     table.empty();
@@ -778,6 +897,7 @@ function setDblClick(element, cell) {
               td.append($("<v"+(i+1)+">"));
           }
         }
+        td.append($(`<div class="caption">`));
         tr.append(td);
       }
       var td = $("<td>")
@@ -936,7 +1056,7 @@ function setDblClick(element, cell) {
       else if (inputState===SETNOTHING) {
         if (!e.shiftKey) clearSelected();
         dragState = -2;
-        td.addClass("selected");
+        td.toggleClass("selected");
       }
 
     });

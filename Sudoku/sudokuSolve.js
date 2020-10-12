@@ -171,6 +171,7 @@
   var sudokuCols = [];
   var sudokuBoxes = [];
   var sudokuCellsByPos = [];      
+  var sudokuCellsTL = []; // grouping by the sum of row and col
   var sudokuEdges = [[],[],[],[]];
 
   var undoStack = [];
@@ -454,6 +455,7 @@
     return (getUnsolvedCells(group).length > n);
   }
 
+  function moreThanTwoLeft(group)   { return moreThanLeft(group, 2) };
   function moreThanThreeLeft(group) { return moreThanLeft(group, 3) };
   function moreThanFourLeft(group)  { return moreThanLeft(group, 4) };
 
@@ -1122,7 +1124,7 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
 
   function nakedPairsGroup(group, preText="") {
     var changed = false;
-    if (moreThanLeft(group)){
+    if (moreThanTwoLeft(group)){
       var twos = getTwos(group);
       for (var t1=0; t1<twos.length; t1++) {
         for (var t2=0; t2<t1; t2++) {
@@ -3600,6 +3602,7 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     sudokuCols = [];
     sudokuBoxes = [];
     sudokuCellsByPos = [];
+    sudokuCellsTL = [];
 
     // for special strategies
     sudokuDiags = undefined;
@@ -3630,6 +3633,12 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     sudokuCols.groupingType="col";
     sudokuBoxes.groupingType="box";
 
+    for (var i=0; i<17; i++) {
+      sudokuCellsTL.push([]);
+      sudokuCellsTL[i].groupName = "TLSum " + (i+2);
+      sudokuCellsTL[i].index = i;
+    }
+
     // make all cells
     for (var c=0; c<9; c++) {
       for(var r=0; r<9; r++) {
@@ -3651,6 +3660,7 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
         sudokuCols[c][r] = cell;
         sudokuBoxes[b].push(cell);
         sudokuCellsByPos[cell.pos] = cell;
+        sudokuCellsTL[r+c].push(cell);
       }
     }
   }
