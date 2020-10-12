@@ -441,7 +441,7 @@ function setDblClick(element, cell) {
       $(`v${i}`).show();
   }
 
-  const statefulRegexp = /^!?[0-9]*[A-I]?(,!?[0-9]*[A-I]?)+$/
+  // const statefulRegexp = /^!?[0-9]*(c[A-I])?(,!?[0-9]*(c[A-I])?)+$/
   const regularRegexp  = /^[0-9]+$/
   function importSudokuData(data) {
     if (typeof data !== "string") return;
@@ -456,7 +456,7 @@ function setDblClick(element, cell) {
         else
           blankCell(sudoku[r][c]);
       }
-    } else if (data.match(statefulRegexp)) {
+    } else {
       data = data.split(',');
       for (var i=0; i<data.length; i++) {
         var r = Math.floor(i/9);
@@ -466,8 +466,49 @@ function setDblClick(element, cell) {
     }
   }
 
-  const candsAndSwatch = /^!?[0-9]*[A-I]$/
+  const reData = /^(!?[0-9]*)(c([A-Z]))?(r([0-9]+))?$/;
   function setCellFromState(cell, data) {
+    cell.solved = undefined;
+    cell.isSolved = undefined;
+    cell.adjCleared = undefined;
+
+    res = data.match(reData);
+    console.log(res);
+
+    var cands = res[1];
+    var swatch = res[3];
+    var region = res[5];
+
+    console.log(cands);
+    console.log(swatch);
+    console.log(region);
+
+    // candidates
+    if (cands.length>1 && cands[0]==='!') {
+      var v = parseInt(cands[1]);
+      confirmCell(cell,v-1)
+    } else if (cands==="0") {
+      blankCell(cell);
+    } else {
+      for (var i=0; i<9; i++) cell[i]=false;
+      for (var i=0; i<cands.length; i++) {
+        var v = parseInt(cands[i])-1;
+        cell[v] = true;
+      }
+    }
+
+    // swatch
+    cell.swatch = swatchFromChar(swatch);
+
+    // region
+    if (region !== undefined)
+      cell.region = parseInt(region);
+
+  }
+
+
+  const candsAndSwatch = /^!?[0-9]*[A-I]$/
+  function setCellFromState2(cell, data) {
     cell.solved = undefined;
     cell.isSolved = undefined;
     cell.adjCleared = undefined;
@@ -538,15 +579,21 @@ function setDblClick(element, cell) {
     else return output;
   }
 
-  function charFromSwatch(val) {
-    if (val===undefined) return '';
-    return String.fromCharCode(65+val);
+  function exportSwatch(cell) {
+    if (cell.swatch === undefined) return '';
+    return 'c'+String.fromCharCode(65+cell.swatch);
+  }
+
+  function exportRegion(cell) {
+    if (cell.region === undefined) return '';
+    return 'r'+cell.region;
   }
 
   function swatchFromChar(char) {
+    if (char===undefined) return undefined;
     if (char==='') return undefined;
     if (char < 'A') return undefined;
-    if (char > 'I') return undefined;
+    if (char > 'Z') return undefined;
     return char.charCodeAt(0)-65;
   }
 
@@ -567,7 +614,7 @@ function setDblClick(element, cell) {
           if (cellstring==="123456789")
             cellstring = "0";
         }
-        cellstring = cellstring + charFromSwatch(cell.swatch);
+        cellstring = cellstring + exportSwatch(cell) + exportRegion(cell);
         output.push(cellstring);
       }
     }
