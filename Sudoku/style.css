@@ -99,6 +99,10 @@
       #0000 3px
     );
   }
+
+  button.selected {
+    background-color:red;
+  }
   
 
   /* STYLE */
@@ -337,12 +341,27 @@
     width:10px;
     background-color:#0003;
     border-radius:5px;
+    z-index:-1;
   }
 
   .svgline.strong {
     background-color:#0F03;
   }
 
+  .svgline.thermo {
+    background-color:#DDD;
+    width:2vh;
+    border-radius:1vh;
+  }
+
+  .svgline.thermoBulb {
+    background-color:#DDD;
+    width:6vh;
+    border-radius:3vh;
+  }
+
   .svgline.weak {
     background-color:#F003;
   }
+
+  

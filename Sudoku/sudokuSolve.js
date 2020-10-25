@@ -13,8 +13,10 @@
     "Diabolical",
     "Extreme",
     "X Sudoku",
-    "Anti-Knight",
+    "Regions",
+    "Thermos",
     "Sandwich",
+    "Anti-Knight",
   ];
 
   const strats = [
@@ -55,6 +57,20 @@
       enabled:false,
       category: "X Sudoku",
       specialty: true,
+    },
+    { name:  "No Repeats",
+      sname: "Region Uniq",
+      func:  regionUniques,
+      enabled: false,
+      category: "Regions",
+      specialty: false
+    },
+    { name:  "Thermo Basic",
+      sname: "Thermo Basic",
+      func:  thermoBasic,
+      enabled: false,
+      category: "Thermos",
+      specialty: false
     },
     { name:  "Naked Pairs",
       sname: "Nkd 2s",
@@ -172,7 +188,9 @@
   var sudokuBoxes = [];
   var sudokuCellsByPos = [];      
   var sudokuCellsTL = []; // grouping by the sum of row and col
+  var sudokuRegions = [];
   var sudokuEdges = [[],[],[],[]];
+  var sudokuThermos = [];
 
   var undoStack = [];
 
@@ -404,19 +422,22 @@
   }
 
   /* CANDIDATE STATS */
+  var solvedCellsCache = [];
   function getSolvedUnsolvedCells(group) {
-    if (group.canCache!==true || group.solvedCellsCache === undefined || group.unsolvedCellsCache === undefined) {
-      group.solvedCellsCache = [];
-      group.unsolvedCellsCache = [];
+    var name = group.groupName;
+    if (solvedCellsCache[name] === undefined) {
+      var solved = [];
+      var unsolved = [];
+      solvedCellsCache[name] = [solved, unsolved];
       for (var c=0; c<group.length; c++) {
         var cell = group[c];
         if (isSolved(cell))
-          group.solvedCellsCache.push(cell);
+          solved.push(cell);
         else
-          group.unsolvedCellsCache.push(cell);
+          unsolved.push(cell);
       }
     }
-    return [group.solvedCellsCache, group.unsolvedCellsCache];
+    return solvedCellsCache[name];
   }
 
   function getSolvedCells(  group) { return fst(getSolvedUnsolvedCells(group)); };
@@ -854,6 +875,7 @@
     sandwichStaticFinished = false;
     everyRowCol(g => g.sandwichFullySet = false);
     everyCell(c => c.adjCleared = false);
+    clearSolvedCache();
   }
 
 /*
@@ -872,17 +894,12 @@ function confirmCell(cell, v) {
   cell[v] = true;
   cell.isSolved = true;
   cell.solved = v;
-  clearSolvedLists(cell);
+  clearSolvedCache();
   return changed;
 }
 
-function clearSolvedLists(cell) {
-  var row = sudoku[cell.row];
-  var col = sudokuCols[cell.col];
-  var box = sudokuBoxes[cell.box];
-  row.solvedCellsCache = row.unsolvedCellsCache = undefined;
-  col.solvedCellsCache = col.unsolvedCellsCache = undefined;
-  box.solvedCellsCache = box.unsolvedCellsCache = undefined;
+function clearSolvedCache() {
+  solvedCellsCache = [];
 }
 
 /*
@@ -1143,7 +1160,7 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
 
   function clearNakedPair(group, val1, val2, cell1, cell2) {
     var changed = false;
-    for (var c=0; c<9; c++) {
+    for (var c=0; c<group.length; c++) {
       var cell = group[c];
       if (!sameCell(cell, cell1) && !sameCell(cell, cell2)) {
         changed = changed || cell[val1] || cell[val2];
@@ -1246,6 +1263,7 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
           var notThese = (c) => c.pos!==cell1.pos && c.pos!==cell2.pos && c.pos!==cell3.pos;
           if (clearCands(group.filter(notThese), cands)) {
             consolelog(preText+`Naked Triple ${vstr(...cands)} found in ${group.groupName}.`);
+            return true;
           }
         }
       }
@@ -2384,14 +2402,107 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
 
 
 
+/*
+    ########  ########  ######   ####  #######  ##    ##  ######
+    ##     ## ##       ##    ##   ##  ##     ## ###   ## ##    ##
+    ##     ## ##       ##         ##  ##     ## ####  ## ##
+    ########  ######   ##   ####  ##  ##     ## ## ## ##  ######
+    ##   ##   ##       ##    ##   ##  ##     ## ##  ####       ##
+    ##    ##  ##       ##    ##   ##  ##     ## ##   ### ##    ##
+    ##     ## ########  ######   ####  #######  ##    ##  ######
+*/
+
+  function regionUniques() {
+    var changed = false;
+    for (var i=0; i<sudokuRegions.length; i++) {
+      var region = sudokuRegions[i];
+      if (clearAdjGroup(region, "[regions] ")) changed = true;
+      if (nakedPairsGroup(region, "[regions] ")) changed = true;
+    }
+    return changed;
+  }
+
+  
 
 
 
 
 
 
+/*
+    ######## ##     ## ######## ########  ##     ##  #######   ######
+       ##    ##     ## ##       ##     ## ###   ### ##     ## ##    ##
+       ##    ##     ## ##       ##     ## #### #### ##     ## ##
+       ##    ######### ######   ########  ## ### ## ##     ##  ######
+       ##    ##     ## ##       ##   ##   ##     ## ##     ##       ##
+       ##    ##     ## ##       ##    ##  ##     ## ##     ## ##    ##
+       ##    ##     ## ######## ##     ## ##     ##  #######   ######
+*/
 
+  function thermoBasic() {
+    var changed = false;
+    sudokuThermos = sudokuThermos.filter((t) => (t.length>0));
+    for (var i=0; i<sudokuThermos.length; i++) 
+      if (thermoBasicSingle(sudokuThermos[i]))
+        changed = true;
+    return changed;
+  }
 
+  function cellMax(cell) {
+    if (isSolved(cell)) return cell.solved;
+    for (var v=9; v>=0; v--)
+      if (cell[v]) return v;
+    return -1;
+  }
+
+  function cellMin(cell) {
+    if (isSolved(cell)) return cell.solved;
+    for (var v=0; v<9; v++)
+      if (cell[v]) return v;
+    return -1;
+  }
+
+  function setCellMin(cell, min) {
+    if (isSolved(cell)) return false;
+    var changed = false;
+    for (var v=0; v<min; v++) {
+      changed = changed || cell[v];
+      cell[v] = false;
+    }
+    return changed;
+  }
+
+  function setCellMax(cell, max) {
+    if (isSolved(cell)) return false;
+    var changed = false;
+    for (var v=8; v>max; v--) {
+      changed = changed || cell[v];
+      cell[v] = false;
+    }
+    return changed;
+  }
+
+  function thermoBasicSingle(thermo) {
+    // bulb to tip
+    var changed = false;
+
+    var min = cellMin(thermo[0])+1;
+    for (var i=1; i<thermo.length; i++) {
+      var cell = thermo[i];
+      if (setCellMin(cell, min)) changed = true;
+      min = cellMin(cell)+1;
+    }
+
+    // tip to bulb
+    var max = cellMax(thermo[thermo.length-1])-1;
+    for (var i=thermo.length-2; i>=0; i--) {
+      var cell = thermo[i];
+      if (setCellMax(cell, max)) changed = true;
+      max = cellMax(cell)-1;
+    }
+
+    return changed;
+  }
 
 
 
@@ -3596,6 +3707,12 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     else initSudokuBlank();
   }
 
+  function makeBlankCell() {
+    var cell = [];
+    cell.isCell = true;
+    return cell;
+  }
+
   function initSudokuBlank() {
     // init lists to zero
     sudoku = [];
@@ -3615,19 +3732,21 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
       sudokuBoxes.push([]);
     }
 
+    //TODO: there is an issue with caching causing errors
+    var someCaching = false;
     for (var i=0; i<9; i++) {
       sudoku[i].groupName = "Row " + (i+1);
       sudoku[i].groupType = "row";
       sudoku[i].index = i;
-      sudoku[i].canCache = true;
+      sudoku[i].canCache = someCaching;
       sudokuCols[i].groupName = "Col " + (i+1);
       sudokuCols[i].groupType = "col";
       sudokuCols[i].index = i;
-      sudokuCols[i].canCache = true;
+      sudokuCols[i].canCache = someCaching;
       sudokuBoxes[i].groupName = "Box " + (i+1);
       sudokuBoxes[i].groupType = "box";
       sudokuBoxes[i].index = i;
-      sudokuBoxes[i].canCache = true;
+      sudokuBoxes[i].canCache = someCaching;
     }
     sudoku.groupingType="row";
     sudokuCols.groupingType="col";
@@ -3645,7 +3764,7 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
         var b = boxNum(r,c);
 
         // make the cell and fill it with 'true'
-        var cell = [];
+        var cell = makeBlankCell();
         for (var v=0; v<9; v++) {
           cell.push(true);
         }

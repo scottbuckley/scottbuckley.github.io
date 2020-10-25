@@ -77,6 +77,7 @@
   const SETFULL = 1;
   const SETCAND = 2;
   const SETCOLOR = 3;
+  const SETTHERMO = 4;
 
   // input state
   var inputState = SETNOTHING;
@@ -254,6 +255,8 @@ function changeCell(cell) {
   if (inputState !== SETNOTHING) return;
   var input = prompt("Enter the digits that are candidates for this cell. 0=all");
   if (input === null) return;
+  clearSolvedCache();
+  storeUndoState();
   if (input === "0") {
     cell.solved = undefined;
     cell.isSolved = undefined;
@@ -272,6 +275,7 @@ function changeCell(cell) {
       cell[v-1] = true;
     }
   }
+  saveStoredUndoState("Manually set "+cell.pos);
   refresh();
 }
 
@@ -290,7 +294,7 @@ function resetButton() {
 
 function setDblClick(element, cell) {
   element.dblclick(function(e){
-      if (!e.shiftKey) changeCell(cell)
+      if (!e.shiftKey) changeCell(cell);
     });
 }
 
@@ -394,6 +398,15 @@ function setDblClick(element, cell) {
     }
   }
 
+  function spaceClear() {
+    // space means clear. unclick whatever is selected.
+    $("#ctrl").find(".selected").click();
+    $("#bottombuttons").find(".selected").click();
+    inputState = SETNOTHING;
+    // also clear selected cells from the grid
+    clearSelected();
+  }
+
   // deal with key presses
   function processKeys(e) {
     var shift = e.shiftKey;
@@ -410,10 +423,7 @@ function setDblClick(element, cell) {
         $("table#confirm").find("td:contains('"+num+"')").click();
       return false;
     } else if (code==="Space") {
-      // space means clear. unclick whatever is selected.
-      $("#ctrl").find(".selected").click();
-      // also clear selected cells from the grid
-      clearSelected();
+      spaceClear();
       return false;
     } else if (code==="KeyU") {
       // undo. flash the button and perform an undo
@@ -464,6 +474,7 @@ function setDblClick(element, cell) {
         setCellFromState(sudoku[r][c], data[i]);
       }
     }
+    refreshRegionLabels();
   }
 
   const reData = /^(!?[0-9]*)(c([A-Z]))?(r([0-9]+))?$/;
@@ -473,15 +484,10 @@ function setDblClick(element, cell) {
     cell.adjCleared = undefined;
 
     res = data.match(reData);
-    console.log(res);
 
     var cands = res[1];
     var swatch = res[3];
     var region = res[5];
-
-    console.log(cands);
-    console.log(swatch);
-    console.log(region);
 
     // candidates
     if (cands.length>1 && cands[0]==='!') {
@@ -711,6 +717,7 @@ function setDblClick(element, cell) {
   function makeSq() {
     var tbl = $("#tbl");
     tbl.width(tbl.height());
+    refreshOverlay();
   }
 
 /*
@@ -805,16 +812,28 @@ function refreshRegionLabels() {
   // clear region label tags errywhere, pick the 'topleft' cell
   // for region labeling, and maybe set that label up.
   var labeledRegions = [];
+  var regionsAssoc = [];
   for (var d=0; d<sudokuCellsTL.length; d++) {
     var diag = sudokuCellsTL[d];
     for (var i=diag.length-1; i>=0; i--) {
       var cell = diag[i];
       cell.isTL = false;
       if (cell.region !== undefined && labeledRegions.indexOf(cell.region) === -1) {
+        newRegionInd = Math.max(newRegionInd, cell.region+1);
         cell.isTL = true;
         labeledRegions.push(cell.region);
+        regionsAssoc[cell.region] = [cell];
+      } else if (cell.region !== undefined) {
+        regionsAssoc[cell.region].push(cell);
       }
     }
+  }
+  sudokuRegions = [];
+  for (var i=0; i<labeledRegions.length; i++) {
+    var regionNum = labeledRegions[i];
+    sudokuRegions[i] = regionsAssoc[regionNum];
+    sudokuRegions[i].regionNum = regionNum;
+    sudokuRegions[i].groupName = "Region "+regionNum;
   }
 }
 
@@ -1019,7 +1038,7 @@ function refreshRegionLabels() {
     var [label, state] = undoStack.pop();
     console.log(`undoing "${label}"`);
     importSudokuData(state);
-    undoWipe();
+    clearSolvedCache();
     refresh();
     refreshUndoLog();
   }
@@ -1106,6 +1125,10 @@ function refreshRegionLabels() {
         td.toggleClass("selected");
       }
 
+      else if (inputState===SETTHERMO) {
+        addCellToCurrentThermo(cell);
+      }
+
     });
 
     td.off("mouseenter").on("mouseenter", function(e){
@@ -1136,6 +1159,35 @@ function refreshRegionLabels() {
      #######     ###    ######## ##     ## ######## ##     ##    ##
 */
 
+  function refreshOverlay() {
+    clearLines();
+    drawThermos();
+  }
+
+  function addThermo() {
+    controlClicked.call($("#thermoButton"), 0, SETTHERMO);
+    sudokuThermos.push([]);
+  }
+
+  function addCellToCurrentThermo(cell) {
+    sudokuThermos[sudokuThermos.length-1].push(cell);
+    refreshOverlay();
+  }
+
+  function drawThermos() {
+    for (var i=0; i<sudokuThermos.length; i++) {
+      drawThermo(sudokuThermos[i]);
+    }
+  }
+
+  function drawThermo(cells) {
+    if (cells.length < 1) return;
+    makeLine(cells[0].pos, cells[0].pos, "thermoBulb");
+    for (var i=0; i<cells.length-1; i++) {
+      makeLine(cells[i].pos, cells[i+1].pos, "thermo");
+    }
+    
+  }
 
   function drawGraph(nodes) {
     clearLines();
@@ -1181,17 +1233,22 @@ function refreshRegionLabels() {
     adjustLine(fromDOM, toDOM, newDOM);
   }
 
-  function adjustLine(from, to, line){
+  function adjustLine(from, to, line, overlapEnds=true){
+
+    var half = line.offsetWidth/2;
+
     var fT = from.offsetTop  + from.offsetHeight/2;
     var tT = to.offsetTop    + to.offsetHeight/2;
-    var fL = from.offsetLeft + from.offsetWidth/2;
-    var tL = to.offsetLeft   + to.offsetWidth/2;
+    var fL = from.offsetLeft + from.offsetWidth/2 - half;
+    var tL = to.offsetLeft   + to.offsetWidth/2 - half;
     
     var CA   = Math.abs(tT - fT);
     var CO   = Math.abs(tL - fL);
     var H    = Math.sqrt(CA*CA + CO*CO);
     var ANG  = 180 / Math.PI * Math.acos( CA/H );
-  
+
+    if (overlapEnds) H += half+half;
+
     if(tT > fT){
         var top  = (tT-fT)/2 + fT;
     }else{
