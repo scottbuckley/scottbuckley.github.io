@@ -191,6 +191,7 @@
   var sudokuRegions = [];
   var sudokuEdges = [[],[],[],[]];
   var sudokuThermos = [];
+  var sudokuLines = [];
 
   var undoStack = [];
 
@@ -3684,23 +3685,6 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
      ##  ##   ###  ##     ##     ##  ##     ## ##        ##  ##    ## ##
     #### ##    ## ####    ##    #### ##     ## ######## ####  ######  ########
 */
-
-  // const edgeRegexp = /^(.*(,.*)*)?$/
-  function initEdges(data){
-    sudokuEdges = [[],[],[],[]];
-    var data = data.split(",");
-    for (var i=0; i<data.length; i++) {
-      var edge = Math.floor(i/9);
-      var ind  = i%9;
-      if (edge>3) break;
-      var edgeVal = data[i];
-      var edgeValInt = parseInt(edgeVal);
-      if (isNaN(edgeValInt)) {
-        sudokuEdges[edge][ind] = edgeVal;
-      } else
-        sudokuEdges[edge][ind] = edgeValInt;
-    }
-  }
 
   function initSudoku(data) {
     if (data) initSudokuData(data);

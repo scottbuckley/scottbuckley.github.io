@@ -11,26 +11,11 @@
       <div id="gamewrapper">
         <div id="solvers">
           <button onclick="javascript:autoButton();">SOLVE</button>
-          <!-- <button id="caButton" onclick="javascript:caButton();">Clear Adjacents</button>
-          <button id="nsButton" onclick="javascript:nsButton();">Naked Singles</button>
-          <button id="hsButton" onclick="javascript:hsButton();">Hidden Singles</button>
-          <button id="npButton" onclick="javascript:npButton();">Naked Pairs</button>
-          <button id="hpButton" onclick="javascript:hpButton();">Hidden Pairs</button>
-          <button id="ntButton" onclick="javascript:ntButton();">Naked Triples</button>
-          <button id="htButton" onclick="javascript:htButton();">Hidden Triples</button>
-          <button id="htButton" onclick="javascript:nqButton();">Naked Quads</button>
-          <button id="irButton" onclick="javascript:irButton();">Intersection Removal</button>
-          <button id="xwButton" onclick="javascript:xwButton();">X-Wings</button>
-          <button id="ywButton" onclick="javascript:ywButton();">Y-Wings</button>
-          <button id="zwButton" onclick="javascript:zwButton();">Z-Wings</button>
-          <button id="sfButton" onclick="javascript:sfButton();">Swordfish</button>
-          <button id="fxButton" onclick="javascript:fxButton();">Finned X-Wings</button>
-          <button id="scButton" onclick="javascript:scButton();">Simple Coloring</button> -->
         </div>
         <div id="history">History:</div>
         <div id="gridcont">
-          <table id="tbl" class="noselect"></table>
-          <div id="line"></div>
+          
+          <table id="tbl" class="noselect"><canvas id="cnv">meow</canvas></table>
         </div>
         <div id="ctrl">
           <div>
@@ -59,6 +44,7 @@
         <button onclick="javascript:edgesButton();">Set Edges</button>
         <button onclick="javascript:regionsButton();">Set Region</button>
         <button onclick="javascript:addThermo();" id="thermoButton">Add Thermo</button>
+        <button onclick="javascript:addLine();" id="lineButton">Add Line</button>
         <button onclick="javascript:exportButton();">Export</button>
         <button onclick="javascript:statefulExportButton();">Full Export</button>
         <a id="exportLink" href="">Export Link</a>

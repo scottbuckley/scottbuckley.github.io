@@ -78,6 +78,7 @@
   const SETCAND = 2;
   const SETCOLOR = 3;
   const SETTHERMO = 4;
+  const SETLINE = 5;
 
   // input state
   var inputState = SETNOTHING;
@@ -112,7 +113,7 @@
   function onReady(buildUI=true) {
     // prepare the board with the appropriate givens.
     var data = getQueryVariable("data");
-    var edge = getQueryVariable("edge");
+    var edge = getQueryVariable("edge", false);
     var sandwich = queryBool(getQueryVariable("sandwich"));
     var antiknight = queryBool(getQueryVariable("antiknight"));
     var xsudoku = queryBool(getQueryVariable("xsudoku"));
@@ -124,6 +125,15 @@
     }
 
     if (edge) initEdges(edge);
+
+    // get region labels from the URL
+    parseRegionLabels();
+
+    // get thermos
+    parseThermos();
+
+    // get thermos
+    parseLines();
 
     buildUI && loadSavedEnabledStrats();
     if (sandwich) enableStrats("Sandwich");
@@ -321,14 +331,14 @@ function setDblClick(element, cell) {
   function setEdgeBehaviour(td, edgeind, ind) {
     td.dblclick(function(){
       var input = prompt("Enter an edge/corner value");
-      if (!isNaN(parseInt(input)))
-        input = parseInt(input);
       if (input === undefined) return;
+      var input = maybeIntify(input);
       sudokuEdges[edgeind][ind] = input;
       sandwichStaticFinished = false;
       refreshTable();
     });
     // why the fuck is this backwards lol
+    // edit a year later: still don't know.
     var isSet = false;
     if (edgeind===1 || edgeind===2)
       if (sudokuCols[ind].sandwichFullySet)
@@ -550,22 +560,121 @@ function setDblClick(element, cell) {
 
   function edgesButton() {
     var input = "" + prompt("Enter 36 values, comma separated. Top (LTR), Right (TTB), Bottom (LTR), Right(TTB).");
-    if (input!=="null") {
+    if (input!=="null" && input !== undefined) {
       initEdges(input);
       refresh();
     }
   }
 
-  function getEdgeString() {
+  const edgeReg = /^[0-9]+$/
+  function maybeIntify(str) {
+    if (str===undefined) return undefined;
+    if (str.match(edgeReg)) {
+      console.log('inty');
+      return parseInt(str);
+    }
+    return str;
+  }
+
+  function initEdges(data){
+    sudokuEdges = [[],[],[],[]];
+    var data = data.split(",");
+    for (var i=0; i<data.length; i++) {
+      // which edge i'm on (top left bottom right)
+      var edge = Math.floor(i/9);
+      // where on the edge this value is
+      var ind  = i%9;
+      if (edge>3) break; // if there's too much data here
+      var edgeVal = maybeIntify(decodeURIComponent(data[i]));
+      sudokuEdges[edge][ind] = edgeVal;
+    }
+  }
+
+  function getEdgeExportString() {
     var out = [];
     for (var i=0; i<sudokuEdges.length; i++) {
       for (var e=0; e<9; e++) {
-        out.push(sudokuEdges[i][e]);
+        var edge = sudokuEdges[i][e];
+        if (edge===undefined)edge="";
+        edge = encodeURIComponent(edge);
+        out.push(edge);
       }
     }
     return out.join(",").replace(/,+$/,'');
   }
 
+  function getUsedRegions() {
+    var rgns = [];
+    for (var r=0; r<9; r++) {
+      for (var c=0; c<9; c++) {
+        var rgn = sudoku[r][c].region;
+        if (rgn===undefined) continue;
+        if (rgns.indexOf(rgn)===-1)
+          rgns.push(rgn);
+      }
+    }
+    return rgns;
+  }
+
+  function getRegionLabelExportString() {
+    var out = [];
+    var regions = getUsedRegions();
+    for (var i=0; i<regions.length; i++) {
+      var region = regions[i];
+      var label = regionLabels[region];
+      out.push(`rgn${region}=${encodeURIComponent(label)}`);
+    }
+    return out.join("&");
+  }
+
+  function parseRegionLabels() {
+    var regions = getUsedRegions();
+    for (var i=0; i<regions.length; i++) {
+      var region = regions[i];
+      var label = getQueryVariable(`rgn${region}`);
+      regionLabels[region] = label;
+    }
+  }
+
+  function getCellListExportString(cellLists) {
+    var out = [];
+    for (var i=0; i<cellLists.length; i++) {
+      var poses = cellLists[i].map((c)=>c.pos);
+      out.push(poses.join(""));
+    }
+    return out.join(",");
+  }
+
+  function parseCellLists(cellListString) {
+    var out = [];
+    if (cellListString===undefined) return [];
+    var lists = cellListString.split(",");
+    for (var i=0; i<lists.length; i++) {
+      var poses = lists[i].match(/.{4}/g);
+      var list = [];
+      for (var t=0; t<poses.length; t++) {
+        list.push(sudokuCellsByPos[poses[t]]);
+      }
+      out.push(list);
+    }
+    return out;
+  }
+
+  function getThermosExportString() {
+    return getCellListExportString(sudokuThermos);
+  }
+
+  function getLinesExportString() {
+    return getCellListExportString(sudokuLines);
+  }
+
+  function parseThermos() {
+    sudokuThermos = parseCellLists(getQueryVariable('thermos'));
+  }
+
+  function parseLines() {
+    sudokuLines = parseCellLists(getQueryVariable('lines'));
+  }
 
   function getSolvedString() {
     var output = "";
@@ -654,9 +763,18 @@ function setDblClick(element, cell) {
     if (flags)
       URLentries.push(flags);
 
-    var edge = getEdgeString();
+    var edge = getEdgeExportString();
     if (edge)
       URLentries.push(`edge=${edge}`);
+
+    var labels = getRegionLabelExportString();
+    if (labels) URLentries.push(labels);
+
+    var thermos = getThermosExportString();
+    if (thermos) URLentries.push(`thermos=${thermos}`);
+
+    var lines = getLinesExportString();
+    if (lines) URLentries.push(`lines=${lines}`);
 
     if (data)
       URLentries.push(`data=${data}`);
@@ -667,16 +785,17 @@ function setDblClick(element, cell) {
     $("#exportLink").attr("href", URL);
   }
 
-  function getQueryVariable(variable) {
+  function getQueryVariable(variable, decode=true) {
     var query = window.location.search.substring(1);
     var vars = query.split("&");
     for (var i=0;i<vars.length;i++) {
       var pair = vars[i].split("=");
       if(pair[0] == variable) {
-        return decodeURIComponent(pair[1]);
+        if (decode) return decodeURIComponent(pair[1]);
+        return pair[1];
       }
     }
-    return false;
+    return undefined;
   }
 
   // if a test file is loaded, parse all sudokus in it and attempt to complete them.
@@ -717,6 +836,12 @@ function setDblClick(element, cell) {
   function makeSq() {
     var tbl = $("#tbl");
     tbl.width(tbl.height());
+
+    canvas = $("#cnv")[0];
+    ctx = canvas.getContext("2d");
+    cnv.width = tbl.width();
+    cnv.height = tbl.height();
+
     refreshOverlay();
   }
 
@@ -1129,6 +1254,10 @@ function refreshRegionLabels() {
         addCellToCurrentThermo(cell);
       }
 
+      else if (inputState===SETLINE) {
+        addCellToCurrentLine(cell);
+      }
+
     });
 
     td.off("mouseenter").on("mouseenter", function(e){
@@ -1160,13 +1289,35 @@ function refreshRegionLabels() {
 */
 
   function refreshOverlay() {
-    clearLines();
+    initCanvas();
     drawThermos();
+    drawLines();
   }
+
+  var canvas;
+  var ctx;
+  function initCanvas() {
+    canvas = $("#cnv")[0];
+    ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // ctx.beginPath();
+    // ctx.rect(2, 2, canvas.width-4, canvas.height-4);
+    // ctx.stroke();
+  }
+
+/*
+    ######## ##     ## ######## ########  ##     ##  #######
+       ##    ##     ## ##       ##     ## ###   ### ##     ##
+       ##    ##     ## ##       ##     ## #### #### ##     ##
+       ##    ######### ######   ########  ## ### ## ##     ##
+       ##    ##     ## ##       ##   ##   ##     ## ##     ##
+       ##    ##     ## ##       ##    ##  ##     ## ##     ##
+       ##    ##     ## ######## ##     ## ##     ##  #######
+*/
 
   function addThermo() {
     controlClicked.call($("#thermoButton"), 0, SETTHERMO);
-    sudokuThermos.push([]);
+    if (inputState===SETTHERMO) sudokuThermos.push([]);
   }
 
   function addCellToCurrentThermo(cell) {
@@ -1182,95 +1333,111 @@ function refreshRegionLabels() {
 
   function drawThermo(cells) {
     if (cells.length < 1) return;
-    makeLine(cells[0].pos, cells[0].pos, "thermoBulb");
-    for (var i=0; i<cells.length-1; i++) {
-      makeLine(cells[i].pos, cells[i+1].pos, "thermo");
+    canvCircle(cells[0], 0.3),
+    canvLine(cells);
+  }
+
+/*
+    ##       #### ##    ## ########  ######
+    ##        ##  ###   ## ##       ##    ##
+    ##        ##  ####  ## ##       ##
+    ##        ##  ## ## ## ######    ######
+    ##        ##  ##  #### ##             ##
+    ##        ##  ##   ### ##       ##    ##
+    ######## #### ##    ## ########  ######
+*/
+
+  function addLine() {
+    controlClicked.call($("#lineButton"), 0, SETLINE);
+    if (inputState===SETLINE) sudokuLines.push([]);
+  }
+
+  function addCellToCurrentLine(cell) {
+    sudokuLines[sudokuLines.length-1].push(cell);
+    refreshOverlay();
+  }
+
+  function drawLines() {
+    for (var i=0; i<sudokuLines.length; i++) {
+      drawLine(sudokuLines[i]);
     }
+  }
+
+  function drawLine(cells) {
+    if (cells.length < 1) return;
+    canvLine(cells);
+  }
+
+/*
+     ######     ###    ##    ## ##     ##    ###     ######
+    ##    ##   ## ##   ###   ## ##     ##   ## ##   ##    ##
+    ##        ##   ##  ####  ## ##     ##  ##   ##  ##
+    ##       ##     ## ## ## ## ##     ## ##     ##  ######
+    ##       ######### ##  ####  ##   ##  #########       ##
+    ##    ## ##     ## ##   ###   ## ##   ##     ## ##    ##
+     ######  ##     ## ##    ##    ###    ##     ##  ######
+*/
+  function getCellCenter(cell) {
+    var td = cell.td[0];
+    return [td.offsetLeft+td.offsetWidth/2
+          , td.offsetTop + td.offsetHeight/2];
+  }
+
+  function getCellWidth(cell) {
+    return cell.td[0].offsetWidth;
+  }
+
+  function canvLine(cells, width=0.2, style="#DDD", cap="round", join="round") {
+    var cellWidth = getCellWidth(cells[0]);
+    ctx.beginPath();
+    ctx.lineWidth = cellWidth * width;
+    ctx.strokeStyle = style;
+    ctx.lineCap = cap;
+    ctx.lineJoin = join;
+    ctx.moveTo(...getCellCenter(cells[0]));
+    for (var i=1; i<cells.length; i++) {
+      ctx.lineTo(...getCellCenter(cells[i]));
+    }
+    ctx.stroke();
+  }
+
+  function canvCircle(cell, rad=0.5, style="#DDD") {
+    var wid = getCellWidth(cell);
+    var [x, y] = getCellCenter(cell);
+    ctx.fillStyle = style;
+    ctx.beginPath();
+    ctx.arc(x, y, rad*wid, 0, 2 * Math.PI);
+    ctx.fill();
+  }
+
+/*
+     ######   ########     ###    ########  ##     ##
+    ##    ##  ##     ##   ## ##   ##     ## ##     ##
+    ##        ##     ##  ##   ##  ##     ## ##     ##
+    ##   #### ########  ##     ## ########  #########
+    ##    ##  ##   ##   ######### ##        ##     ##
+    ##    ##  ##    ##  ##     ## ##        ##     ##
+     ######   ##     ## ##     ## ##        ##     ##
+*/
+
+
+function drawGraph(nodes) {
+  clearLines();
+  var alreadyDrawn = [];
+  var labels = nodes.labels;
+
+  var maybeDraw = function(from, to, lineClass) {
+    if (alreadyDrawn[from+to] || alreadyDrawn[to+from]) return;
+    makeLine(from, to, lineClass);
+  };
+
+  for (var i=0; i<labels.length; i++) {
+    var pos = labels[i];
+    var node = nodes[pos];
+    for (var s=0; s<node.strong.length; s++)
+      maybeDraw(pos, node.strong[s], "strong");
+    for (var w=0; w<node.weak.length; w++)
+      maybeDraw(pos, node.weak[w], "weak");
     
   }
-
-  function drawGraph(nodes) {
-    clearLines();
-    var alreadyDrawn = [];
-    var labels = nodes.labels;
-
-    var maybeDraw = function(from, to, lineClass) {
-      if (alreadyDrawn[from+to] || alreadyDrawn[to+from]) return;
-      makeLine(from, to, lineClass);
-    };
-
-    for (var i=0; i<labels.length; i++) {
-      var pos = labels[i];
-      var node = nodes[pos];
-      for (var s=0; s<node.strong.length; s++)
-        maybeDraw(pos, node.strong[s], "strong");
-      for (var w=0; w<node.weak.length; w++)
-        maybeDraw(pos, node.weak[w], "weak");
-      
-    }
-  }
-
-  var nameInd = 1;
-  function newName() {
-    return `unique_${nameInd++}`;
-  }
-
-  function clearLines() {
-    $("#tbl").nextAll().remove();
-  }
-
-  function makeLine(from, to, lineClass) {
-    var cont = $("#gridcont");
-    var newID = newName();
-    var newDOM = document.createElement('div');
-    newDOM.setAttribute("id", newID);
-    newDOM.setAttribute("class", "svgline "+lineClass);
-    cont.append(newDOM);
-
-    var fromDOM = document.getElementById(from);
-    var toDOM   = document.getElementById(to);
-
-    adjustLine(fromDOM, toDOM, newDOM);
-  }
-
-  function adjustLine(from, to, line, overlapEnds=true){
-
-    var half = line.offsetWidth/2;
-
-    var fT = from.offsetTop  + from.offsetHeight/2;
-    var tT = to.offsetTop    + to.offsetHeight/2;
-    var fL = from.offsetLeft + from.offsetWidth/2 - half;
-    var tL = to.offsetLeft   + to.offsetWidth/2 - half;
-    
-    var CA   = Math.abs(tT - fT);
-    var CO   = Math.abs(tL - fL);
-    var H    = Math.sqrt(CA*CA + CO*CO);
-    var ANG  = 180 / Math.PI * Math.acos( CA/H );
-
-    if (overlapEnds) H += half+half;
-
-    if(tT > fT){
-        var top  = (tT-fT)/2 + fT;
-    }else{
-        var top  = (fT-tT)/2 + tT;
-    }
-    if(tL > fL){
-        var left = (tL-fL)/2 + fL;
-    }else{
-        var left = (fL-tL)/2 + tL;
-    }
-  
-    if(( fT < tT && fL < tL) || ( tT < fT && tL < fL) || (fT > tT && fL > tL) || (tT > fT && tL > fL)){
-      ANG *= -1;
-    }
-    top-= H/2;
-  
-    line.style["-webkit-transform"] = 'rotate('+ ANG +'deg)';
-    line.style["-moz-transform"] = 'rotate('+ ANG +'deg)';
-    line.style["-ms-transform"] = 'rotate('+ ANG +'deg)';
-    line.style["-o-transform"] = 'rotate('+ ANG +'deg)';
-    line.style["-transform"] = 'rotate('+ ANG +'deg)';
-    line.style.top    = top+'px';
-    line.style.left   = left+'px';
-    line.style.height = H + 'px';
-  }
+}
