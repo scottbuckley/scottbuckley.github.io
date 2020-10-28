@@ -576,7 +576,7 @@ function setDblClick(element, cell) {
   }
 
   function edgesButton() {
-    var input = "" + prompt("Enter 36 values, comma separated. Top (LTR), Right (TTB), Bottom (LTR), Right(TTB).");
+    var input = "" + prompt("Enter 36 values, comma separated. Top (LTR), Left (TTB), Right (LTR), Bottom(TTB).");
     if (input!=="null" && input !== undefined) {
       initEdges(input);
       refresh();
