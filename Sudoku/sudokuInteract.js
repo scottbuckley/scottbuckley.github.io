@@ -261,40 +261,52 @@ function autoButton() {
   autoSolve();
 }
 
-function changeCell(cell) {
-  if (inputState !== SETNOTHING) return;
-  var input = prompt("Enter the digits that are candidates for this cell. 0=all");
+function setCells() {
+  changeCells(getSelectedCells());
+}
+
+function changeCells(cells) {
+  if (cells.length===0) return;
+  var pText = "Enter the digits that are candidates for this cell. 0=all";
+  if (cells.length>1)
+      pText = "Enter the digits that are candidates for these cells. 0=all";
+  var input = prompt(pText);
   if (input === null) return;
   clearSolvedCache();
   storeUndoState();
-  if (input === "0") {
-    cell.solved = undefined;
-    cell.isSolved = undefined;
-    for (var v=0; v<9; v++)
-      cell[v] = true;
-  } else if (input.length === 1) {
-    var v = parseInt(input);
-    confirmCell(cell,v-1);
-  } else if (input.length > 1) {
-    cell.solved = undefined;
-    cell.isSolved = undefined;
-    for (var v=0; v<9; v++)
-      cell[v] = false;
-    for (var i=0; i<input.length; i++) {
-      var v=parseInt(input.charAt(i));
-      cell[v-1] = true;
+  for (var c=0; c<cells.length; c++) {
+    var cell = cells[c];
+    console.log(cell);
+    if (input === "0") {
+      cell.solved = undefined;
+      cell.isSolved = undefined;
+      for (var v=0; v<9; v++)
+        cell[v] = true;
+    } else if (input.length === 1) {
+      var v = parseInt(input);
+      confirmCell(cell,v-1);
+    } else if (input.length > 1) {
+      cell.solved = undefined;
+      cell.isSolved = undefined;
+      for (var v=0; v<9; v++)
+        cell[v] = false;
+      for (var i=0; i<input.length; i++) {
+        var v=parseInt(input.charAt(i));
+        cell[v-1] = true;
+      }
     }
   }
-  saveStoredUndoState("Manually set "+cell.pos);
+  saveStoredUndoState("Manually set "+cells.map((c)=>c.pos).join("+"));
   refresh();
 }
 
 
 function checkButton() {
-  if (checkErrors()) {
-    alert("some errors found :(");
+  var [err, report] = checkErrors();
+  if (err) {
+    alert(report);
   } else {
-    alert("no errors found :)")
+    alert(report)
   }
 }
 
@@ -304,7 +316,10 @@ function resetButton() {
 
 function setDblClick(element, cell) {
   element.dblclick(function(e){
-      if (!e.shiftKey) changeCell(cell);
+      if (!e.shiftKey) {
+        if (inputState !== SETNOTHING) return;
+        changeCells([cell]);
+      }
     });
 }
 
@@ -441,6 +456,8 @@ function setDblClick(element, cell) {
       undo();
     } else if (code==="KeyR" && !modKey) {
       regionsButton();
+    } else if (code==="KeyL" && !modKey) {
+      addLine();
     }
     return true;
   }
@@ -861,6 +878,7 @@ function regionsButton() {
   newRegionInd++;
 
   var cells = getSelectedCells();
+  if (cells.length===0) return;
   cells.map(function(cell){
     cell.region = thisRegion;
   });
@@ -1166,6 +1184,7 @@ function refreshRegionLabels() {
     clearSolvedCache();
     refresh();
     refreshUndoLog();
+    undoWipe();
   }
 
   function refreshUndoLog() {

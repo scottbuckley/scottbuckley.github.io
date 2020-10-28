@@ -17,6 +17,7 @@
     "Thermos",
     "Sandwich",
     "Anti-Knight",
+    "Non-Consecutive"
   ];
 
   const strats = [
@@ -102,6 +103,12 @@
       func:  hiddenTriples,
       enabled: true,
       category: "Simple"
+    },
+    {
+      name: "Non-Consecutive",
+      sname: "Non Con",
+      func: nonConsec,
+      category: "Non-Consecutive"
     },
     { name:  "Naked Quads",
       sname: "Nkd 4s",
@@ -203,7 +210,7 @@
     logging = false;
     initSudokuData(data);
     while(makeSomeChange(false));
-    if (checkErrors()) return "ERROR";
+    if (fst(checkErrors())) return "ERROR";
     if (getSolvedCount() < 81) return "INCOMPLETE";
     logging = true;
     return getSolvedString();
@@ -247,7 +254,7 @@
         } else {
           consolelog("Could not make any further progress.");
         }
-        if (checkErrors()) {
+        if (fst(checkErrors())) {
           consolelog("The current board has errors!");
         } else {
           consolelog("No errors were found in the current board.");
@@ -477,6 +484,14 @@
     return (getUnsolvedCells(group).length > n);
   }
 
+  // this is safe to cache, as a cell's neighbours will never change.
+  // (as in, it will always have the same cells neighbouring it)
+  function getCellNbrs(cell) {
+    if (cell.nbrs===undefined)
+      cell.nbrs = [cellLeft(cell), cellRight(cell), cellAbove(cell), cellBelow(cell)].filter((x)=>x!==undefined);
+    return cell.nbrs;
+  }
+
   function moreThanTwoLeft(group)   { return moreThanLeft(group, 2) };
   function moreThanThreeLeft(group) { return moreThanLeft(group, 3) };
   function moreThanFourLeft(group)  { return moreThanLeft(group, 4) };
@@ -585,6 +600,12 @@
     }
     return changes;
   }
+
+  /**
+   * Runs a function on every cell in the sudoku, and returns
+   * the OR of all these values.
+   * @param {fun} func - a boolean function to call on each cell
+   */
 
   function everyCell(func) {
     var changed = false;
@@ -729,6 +750,11 @@
     return candidates;
   }
 
+  /** 
+   * Clear every cell in a group of all given cands.
+   * @param {cell[]} group - a group of cells (any length).
+   * @param {int[]} cands - a list of candidate values. Safe to include outside 0-8.
+   */
   function clearCands(group, cands) {
     var changed = false;
     for (var c=0; c<group.length; c++) {
@@ -876,6 +902,7 @@
     sandwichStaticFinished = false;
     everyRowCol(g => g.sandwichFullySet = false);
     everyCell(c => c.adjCleared = false);
+    everyCell(c => c.nonConsCleared = false);
     clearSolvedCache();
   }
 
@@ -2423,13 +2450,6 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     return changed;
   }
 
-  
-
-
-
-
-
-
 /*
     ######## ##     ## ######## ########  ##     ##  #######   ######
        ##    ##     ## ##       ##     ## ###   ### ##     ## ##    ##
@@ -2505,13 +2525,120 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     return changed;
   }
 
+/*
+    ##    ##  #######  ##    ##  ######   #######  ##    ##  ######
+    ###   ## ##     ## ###   ## ##    ## ##     ## ###   ## ##    ##
+    ####  ## ##     ## ####  ## ##       ##     ## ####  ## ##
+    ## ## ## ##     ## ## ## ## ##       ##     ## ## ## ##  ######
+    ##  #### ##     ## ##  #### ##       ##     ## ##  ####       ##
+    ##   ### ##     ## ##   ### ##    ## ##     ## ##   ### ##    ##
+    ##    ##  #######  ##    ##  ######   #######  ##    ##  ######
+*/
+
+function nonConsec() {
+  if (nonConsNbrs()) return true;
+  if (nonConsRowColHiddens()) return true;
+  if (nonConsPairCells()) return true;
+  return false;
+}
+
+function nonConsNbrs() {
+  if (everyCell(cell => {
+    if (!isSolved(cell)) return false;
+    if (cell.nonConsCleared) return false;
+    cell.nonConsCleared = true;
+    return clearnonConsNbrs(cell);
+  })) {
+    consolelog('[non-consec] cleared consecutive candidates adjacent to confirmed cells.');
+    return true;
+  } return false;
+}
+
+function clearCons(cell, v) {
+  var changed = false;
+  if (cell[v-1]) {
+    changed = true;
+    cell[v-1] = false;
+  }
+  if (cell[v+1]) {
+    changed = true;
+    cell[v+1] = false;
+  }
+  return changed;
+}
+
+/** Clear a (confirmed) cell's neighbours of consecutive candidates. */ 
+function clearnonConsNbrs(cell) {
+  if (!isSolved(cell)) return false;
+  return clearCands(getCellNbrs(cell), [cell.solved-1, cell.solved+1]);
+}
 
 
+function nonConsRowColHiddens() {
+  return everyRowCol(function(group) {
+    // each value
+    var changed = false;
+    for (var v=0; v<9; v++) {
+      var mini = 9;
+      var maxi = -1;
+      var solved=false;
+      for (var i=0; i<9; i++) {
+        var cell = group[i];
+        if (cell[v]) {
+          if (i<mini) mini = i;
+          else if (i>maxi) {
+            maxi = i;
+            if (maxi-mini>3) continue;
+          }
+        } else if (cell.solved === v) {
+          solved = true;
+          continue;
+        }
+      }
+      if (solved) continue;
+      if (maxi-mini>3) continue;
+      if (nonConsClearRowColHidden(group, v, mini, maxi)) {
+        consolelog(`[non-consec] cleared candidates that would eliminate ${v+1} in ${group.groupName}.`);
+        changed = true;
+      }
+    }
+    return changed;
+  });
+}
 
+function nonConsClearRowColHidden(group, val, mini, maxi) {
+  var clearCells = [];
+  // if there are only two, we clear both. if there are three, we clear the middle one.
+  if      (maxi===mini+1) clearCells = [group[mini], group[maxi]];
+  else if (maxi===mini+2) clearCells = [group[mini+1]];
+  var changed = false;
+  for (var i=0; i<clearCells.length; i++) {
+    var cell = clearCells[i];
+    if (clearCons(cell, val)) changed = true;
+  }
+  return changed;
+}
 
-
-
-
+function nonConsPairCells() {
+  return (everyCell(cell => {
+    if (!hasNCandidates(2)(cell)) return false;
+    var [v1, v2] = getCandidates(cell);
+    if (v1+1===v2) {
+      // for example 5 and 6 means neither can be neighbouring
+      if (clearCands(getCellNbrs(cell), [v1, v2])) {
+        consolelog(`[non-consec] cleared ${v1} and ${v2} from ${cell.pos} neighbours.`);
+        return true;
+      } return false;
+    }
+    else if (v1+2===v2) {
+      // for example 2 and 4 means 3 cannot be neighbouring
+      if (clearCands(getCellNbrs(cell), [v1+1])) {
+        consolelog(`[non-consec] cleared ${v1+1} from ${cell.pos} neighbours.`);
+        return true;
+      } return false;
+    }
+  }));
+}
 
 
 
@@ -3573,7 +3700,7 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
     return error;
   }
 
-  function checkGroupForDuplicates(group, desc) {
+  function checkGroupForDuplicates(group) {
     var error = false;
     var solveds = [false,false,false,false,false,false,false,false,false];
     for (var c=0; c<9; c++) {
@@ -3581,7 +3708,7 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
       if (isSolved(cell)) {
         if (solveds[cell.solved-1]) {
           error = true;
-          consolelog("Found two confirmed " + (cell.solved+1) + "s in " + desc);
+          consolelog("Found two confirmed " + (cell.solved+1) + "s in " + group.groupName);
         }
         solveds[cell.solved-1] = true;
       }
@@ -3598,6 +3725,12 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
   function antiknightEnabled() {
     for (var i=0; i<strats.length; i++)
       if (strats[i].category==="Anti-Knight" && strats[i].enabled) return true;
+    return false;
+  }
+
+  function nonConEnabled() {
+    for (var i=0; i<strats.length; i++)
+      if (strats[i].category==="Non-Consecutive" && strats[i].enabled) return true;
     return false;
   }
 
@@ -3622,6 +3755,19 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
       }
     }
     return errors;
+  }
+
+  function checkNonConErrors() {
+    return everyCell((cell) => {
+      if (!isSolved(cell)) return false;
+      var nbrs = getCellNbrs(cell);
+      for (var i=0; i<nbrs.length; i++) {
+        var nbr = nbrs[i];
+        if (!isSolved(nbr)) continue;
+        if (Math.abs(cell.solved-nbr.solved)===1) return true;
+      }
+      return false;
+    });
   }
 
   function sandwichErrors(group, sw) {
@@ -3651,29 +3797,34 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
 
   function checkErrors() {
     var errors = false;
-    // errors = checkGroupForEmpties(sudoku[0], "row " + (0+1)) || errors;
-    for (var r=0; r<9; r++) {
-      errors = checkGroupForDuplicates(sudoku[r], "row " + (r+1)) || errors;
-      errors = checkGroupForEmpties(sudoku[r], "row " + (r+1)) || errors;
+
+    var report = "Checking basic sudoku rules... ";
+    for (var i=0; i<9; i++) {
+      errors = checkGroupForDuplicates(sudoku[i])      || errors;
+      errors = checkGroupForEmpties(sudoku[i])         || errors;
+      errors = checkGroupForDuplicates(sudokuCols[i])  || errors;
+      errors = checkGroupForEmpties(sudokuCols[i])     || errors;
+      errors = checkGroupForDuplicates(sudokuBoxes[i]) || errors;
+      errors = checkGroupForEmpties(sudokuBoxes[i])    || errors;
     }
+    if (errors) report += "ERRORS FOUND.\n";
+    else        report += "GOOD.\n";
 
-    for (var c=0; c<9; c++) {
-      errors = checkGroupForDuplicates(sudokuCols[c], "col " + (c+1)) || errors;
-      errors = checkGroupForEmpties(sudokuCols[c], "col " + (c+1)) || errors;
-    }
+    var checkSpecialErrors = function(desc, enabledBool, checkFunc) {
+      if (enabledBool) {
+        report += `Checking ${desc} rules... `;
+        if (checkFunc()) {
+          errors = true;
+          report += "ERRORS FOUND.\n";
+        } else report += "GOOD.\n";
+      }
+    };
 
-    for (var b=0; b<9; b++) {
-      errors = checkGroupForDuplicates(sudokuBoxes[b], "box " + (b+1)) || errors;
-      errors = checkGroupForEmpties(sudokuBoxes[b], "box " + (b+1)) || errors;
-    }
+    checkSpecialErrors("sandwich", sandwichEnabled(), function(){everyRowColSandwich(sandwichErrors, false);});
+    checkSpecialErrors("anti-knight", antiknightEnabled(), checkAntiknightErrors);
+    checkSpecialErrors("non-consecutive", nonConEnabled(), checkNonConErrors);
 
-    if (sandwichEnabled())
-      errors = everyRowColSandwich(sandwichErrors, false) || errors;
-    
-    if (antiknightEnabled())
-      errors = checkAntiknightErrors() || errors;
-
-    return errors;
+    return [errors, report];
   }
 
 /*
