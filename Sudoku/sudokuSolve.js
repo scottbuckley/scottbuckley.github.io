@@ -238,12 +238,19 @@
   
   // attempt to solve the whole sudoku, one step at a time.
   // includes a delay between solve steps.
-  function autoSolve() {
+  function autoSolve(firstError=false) {
     // consolelog("Attempting to solve...");
     // make a single step, then wait before doing it again.
     var makestep = function() {
       if (makeSomeChange()) {
         refresh();
+        if (firstError) {
+          var [flag, err] = checkErrors();
+          if (flag) {
+            alert(err);
+            return;
+          }
+        }
         if (stepDelay)
           setTimeout(makestep, stepDelay);
         else
@@ -3693,7 +3700,7 @@ function nonConsPairCells() {
     // check if any are zero
     for (var v=0; v<9; v++) {
       if (counts[v] === 0) {
-        consolelog("There can be no " + (v+1) + " in " + desc);
+        consolelog("There can be no " + (v+1) + " in " + group.groupName);
         error = true;
       }
     }

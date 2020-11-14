@@ -161,13 +161,27 @@
   }
 
   .highlit::after {
-    background: repeating-linear-gradient(
+    /* background: repeating-linear-gradient(
       45deg,
       #0006,
-      #0006 1px,
-      #0000 1px,
-      #0000 2px
+      #0006 2px,
+      #0000 4px,
+      #0000 6px
+    ); */
+
+    background: repeating-linear-gradient(
+      45deg,
+      #0000 0px,
+      #0000 2px,
+      #0004 2px,
+      #0004 4px
     );
+    left:0;
+    /* background: radial-gradient(
+      #0000,
+      #0001 50%,
+      #0004 100%
+    ); */
   }
 
   .cell:hover::before {

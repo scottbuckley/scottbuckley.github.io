@@ -256,9 +256,9 @@
 */
 
 
-function autoButton() {
+function autoButton(e) {
   saveUndoState("AUTOSOLVE");
-  autoSolve();
+  autoSolve(e.shiftKey);
 }
 
 function setCells() {
@@ -276,7 +276,6 @@ function changeCells(cells) {
   storeUndoState();
   for (var c=0; c<cells.length; c++) {
     var cell = cells[c];
-    console.log(cell);
     if (input === "0") {
       cell.solved = undefined;
       cell.isSolved = undefined;
@@ -427,6 +426,8 @@ function setDblClick(element, cell) {
     // space means clear. unclick whatever is selected.
     $("#ctrl").find(".selected").click();
     $("#bottombuttons").find(".selected").click();
+    // if (inputState===SETTHERMO) clearEmptyThermos();
+    // if (inputState===SETLINE)   clearEmptyLines();
     inputState = SETNOTHING;
     // also clear selected cells from the grid
     clearSelected();
@@ -458,6 +459,10 @@ function setDblClick(element, cell) {
       regionsButton();
     } else if (code==="KeyL" && !modKey) {
       addLine();
+    } else if (code==="KeyT" && !modKey) {
+      addThermo();
+    } else if (code==="KeyS" && !modKey) {
+      setCells();
     }
     return true;
   }
@@ -1309,8 +1314,8 @@ function refreshRegionLabels() {
 
   function refreshOverlay() {
     initCanvas();
-    drawThermos();
     drawLines();
+    drawThermos();
   }
 
   var canvas;
@@ -1337,6 +1342,7 @@ function refreshRegionLabels() {
   function addThermo() {
     controlClicked.call($("#thermoButton"), 0, SETTHERMO);
     if (inputState===SETTHERMO) sudokuThermos.push([]);
+    else clearEmptyThermos();
   }
 
   function addCellToCurrentThermo(cell) {
@@ -1352,8 +1358,22 @@ function refreshRegionLabels() {
 
   function drawThermo(cells) {
     if (cells.length < 1) return;
-    canvCircle(cells[0], 0.3),
-    canvLine(cells);
+    canvCircle(cells[0], 0.35, '#fff'),
+    canvLine(cells, 0.25, '#fff');
+    canvLine(cells, 0.2);
+    canvCircle(cells[0], 0.3);
+  }
+
+  function clearEmptyLists(lists) {
+    for (var i=lists.length-1; i>=0; i--) {
+      if (lists[i].length<1) {
+        lists.splice(i, 1);
+      }
+    }
+  }
+
+  function clearEmptyThermos() {
+    clearEmptyLists(sudokuThermos);
   }
 
 /*
@@ -1369,6 +1389,7 @@ function refreshRegionLabels() {
   function addLine() {
     controlClicked.call($("#lineButton"), 0, SETLINE);
     if (inputState===SETLINE) sudokuLines.push([]);
+    else clearEmptyLines();
   }
 
   function addCellToCurrentLine(cell) {
@@ -1384,7 +1405,12 @@ function refreshRegionLabels() {
 
   function drawLine(cells) {
     if (cells.length < 1) return;
-    canvLine(cells);
+    canvLine(cells, 0.35, '#fff');
+    canvLine(cells, 0.3);
+  }
+
+  function clearEmptyLines() {
+    clearEmptyLists(sudokuLines);
   }
 
 /*
