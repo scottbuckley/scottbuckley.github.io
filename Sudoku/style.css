@@ -28,11 +28,11 @@ div#endspacer {  }
   display:flex;
   justify-content:space-between;
   align-items:stretch;
-  overflow:scroll;
+  overflow:auto;
 }
 
 #history {
-  overflow-y:scroll;
+  overflow-y:auto;
   width:80px;
   font-size:8pt;
 }
@@ -380,12 +380,12 @@ button.highlight {
 }
 
 /* Hide scrollbar for Chrome, Safari and Opera */
-.example::-webkit-scrollbar {
+::-webkit-scrollbar {
   display: none;
 }
 
 /* Hide scrollbar for IE, Edge and Firefox */
-.example {
+{
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
 }
