@@ -93,10 +93,10 @@ div#endspacer {  }
 .cell.selected {
   background: repeating-linear-gradient(
     135deg,
-    #0003,
-    #0003 1px,
-    #0000 1px,
-    #0000 3px
+    #0000 0px,
+    #0000 2px,
+    #0006 3px,
+    #0000 4px
   );
 }
 
@@ -161,20 +161,12 @@ td.cell {
 }
 
 .highlit::after {
-  /* background: repeating-linear-gradient(
-    45deg,
-    #0006,
-    #0006 2px,
-    #0000 4px,
-    #0000 6px
-  ); */
-
   background: repeating-linear-gradient(
     45deg,
     #0000 0px,
     #0000 2px,
-    #0004 2px,
-    #0004 4px
+    #000B 3px,
+    #0000 4px
   );
   left:0;
   /* background: radial-gradient(
