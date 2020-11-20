@@ -261,15 +261,19 @@ function autoButton(e) {
   autoSolve(e.shiftKey);
 }
 
-function setCells() {
-  changeCells(getSelectedCells());
+function setCellsOnly() {
+  setCellsOnlyPropmt(getSelectedCells());
 }
 
-function changeCells(cells) {
+function setCellsNot() {
+  setCellsNotPropmt(getSelectedCells());
+}
+
+function setCellsOnlyPropmt(cells) {
   if (cells.length===0) return;
-  var pText = "Enter the digits that are candidates for this cell. 0=all";
+  var pText = "Enter the digits to intersect as candidates for this cell. 0=force all";
   if (cells.length>1)
-      pText = "Enter the digits that are candidates for these cells. 0=all";
+      pText = "Enter the digits to intersect as candidates for these cells. 0=force all";
   var input = prompt(pText);
   if (input === null) return;
   clearSolvedCache();
@@ -287,15 +291,45 @@ function changeCells(cells) {
     } else if (input.length > 1) {
       cell.solved = undefined;
       cell.isSolved = undefined;
-      for (var v=0; v<9; v++)
-        cell[v] = false;
-      for (var i=0; i<input.length; i++) {
-        var v=parseInt(input.charAt(i));
-        cell[v-1] = true;
+      var cands = [];
+      for (var i=0; i<input.length; i++)
+        cands.push(parseInt(input.charAt(i))-1);
+      for (var v=0; v<9; v++) {
+        if (cell[v] && cands.indexOf(v)===-1)
+          cell[v] = false;
       }
     }
   }
-  saveStoredUndoState("Manually set "+cells.map((c)=>c.pos).join("+"));
+  saveStoredUndoState("Set "+cells.map((c)=>c.pos).join("+")+" to "+input);
+  refresh();
+}
+
+function setCellsNotPropmt(cells) {
+  if (cells.length===0) return;
+  var pText = "Enter the digits to remove as candidates for this cell. 0=no change";
+  if (cells.length>1)
+      pText = "Enter the digits to remove as candidates for these cells. 0=no change";
+  var input = prompt(pText);
+  if (input === null) return;
+  clearSolvedCache();
+  storeUndoState();
+  for (var c=0; c<cells.length; c++) {
+    var cell = cells[c];
+    if (input === "0") {
+      cell.solved = undefined;
+      cell.isSolved = undefined;
+      for (var v=0; v<9; v++)
+        cell[v] = true;
+    } else {
+      cell.solved = undefined;
+      cell.isSolved = undefined;
+      for (var i=0; i<input.length; i++) {
+        var v=parseInt(input.charAt(i));
+        cell[v-1] = false;
+      }
+    }
+  }
+  saveStoredUndoState("Removed "+input+" from "+cells.map((c)=>c.pos).join("+"));
   refresh();
 }
 
@@ -462,7 +496,9 @@ function setDblClick(element, cell) {
     } else if (code==="KeyT" && !modKey) {
       addThermo();
     } else if (code==="KeyS" && !modKey) {
-      setCells();
+      setCellsOnly();
+    } else if (code==="KeyN" && !modKey) {
+      setCellsNot();
     }
     return true;
   }
