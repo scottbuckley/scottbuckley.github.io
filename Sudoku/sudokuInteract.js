@@ -351,7 +351,7 @@ function setDblClick(element, cell) {
   element.dblclick(function(e){
       if (!e.shiftKey) {
         if (inputState !== SETNOTHING) return;
-        changeCells([cell]);
+        setCellsOnlyPropmt([cell]);
       }
     });
 }
@@ -628,7 +628,6 @@ function setDblClick(element, cell) {
   function maybeIntify(str) {
     if (str===undefined) return undefined;
     if (str.match(edgeReg)) {
-      console.log('inty');
       return parseInt(str);
     }
     return str;
