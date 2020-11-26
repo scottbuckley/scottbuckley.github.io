@@ -937,15 +937,26 @@ function regionsButton() {
   var thisRegion = newRegionInd;
   newRegionInd++;
 
+  var oldLabel = "";
+
   var cells = getSelectedCells();
   if (cells.length===0) return;
+
+  cells.map(function(cell){
+    if (cell.region!==undefined) {
+      if (regionLabels[cell.region] !== undefined)
+        oldLabel = regionLabels[cell.region];
+    }
+  });
+
+  var input = "" + prompt("Enter a label for this region.", oldLabel);
+  if (input==="null") return;
+  
+  regionLabels[thisRegion] = input;
+
   cells.map(function(cell){
     cell.region = thisRegion;
   });
-
-  var input = "" + prompt("Enter a label for this region.");
-  if (input!=="null")
-    regionLabels[thisRegion] = input;
 
   refreshRegionLabels();
   clearSelected();
