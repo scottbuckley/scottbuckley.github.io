@@ -240,6 +240,7 @@
 
   function initKeyboardMouse() {
     $(document).off("keydown").keydown(processKeys);
+    $(document).off("keyup").keyup(processKeysUp);
     $(document).off("mouseup").on("mouseup", function(){
       dragState = undefined;
     });
@@ -469,6 +470,13 @@ function setDblClick(element, cell) {
     clearSelected();
   }
 
+  // remember when a shift key is released (hack for numpad keys)
+  var shiftUpTime = Date.now();
+  function processKeysUp(e) {
+    if (e.code.startsWith("Shift"))
+      shiftUpTime = Data.now();
+  }
+
   // deal with key presses
   function processKeys(e) {
     var shift = e.shiftKey;
@@ -479,8 +487,16 @@ function setDblClick(element, cell) {
       // deal with digits
       if (code === "Digit0" || code === "Numpad0") return true;
       var num = code.substring(5); // digit
-      if (code.startsWith("Numpad")) num = code.substring(6);
-      
+      if (code.startsWith("Numpad"))  {
+        num = code.substring(6);
+        if (!shift && (Data.now() - shiftUpTime)<50) {
+          // if the shift key ONLY JUST went up, pretend it's still down
+          // this is to account for windows removing the shift key when
+          // numpad keys are pressed.
+          shift = true;
+        }
+      }
+
       if (shift)
         $("table#candidate").find("td:contains('"+num+"')").click();
       else
