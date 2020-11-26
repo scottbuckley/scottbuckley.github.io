@@ -280,6 +280,7 @@ function setCellsOnlyPropmt(cells) {
   storeUndoState();
   for (var c=0; c<cells.length; c++) {
     var cell = cells[c];
+    if (isSolved(cell)) continue;
     if (input === "0") {
       cell.solved = undefined;
       cell.isSolved = undefined;
@@ -315,6 +316,7 @@ function setCellsNotPropmt(cells) {
   storeUndoState();
   for (var c=0; c<cells.length; c++) {
     var cell = cells[c];
+    if (isSolved(cell)) continue;
     if (input === "0") {
       cell.solved = undefined;
       cell.isSolved = undefined;
@@ -473,10 +475,12 @@ function setDblClick(element, cell) {
     var code  = e.code;
     var modKey = e.shiftKey || e.metaKey || e.ctrlKey || e.altKey;
 
-    if (code.startsWith("Digit")) {
+    if (code.startsWith("Digit") || code.startsWith("Numpad")) {
       // deal with digits
-      if (code === "Digit0") return true;
-      var num = code.substring(5);
+      if (code === "Digit0" || code === "Numpad0") return true;
+      var num = code.substring(5); // digit
+      if (code.startsWith("Numpad")) num = code.substring(6);
+      
       if (shift)
         $("table#candidate").find("td:contains('"+num+"')").click();
       else
