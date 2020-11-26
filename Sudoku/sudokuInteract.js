@@ -474,7 +474,7 @@ function setDblClick(element, cell) {
   var shiftUpTime = Date.now();
   function processKeysUp(e) {
     if (e.code.startsWith("Shift"))
-      shiftUpTime = Data.now();
+      shiftUpTime = Date.now();
   }
 
   // deal with key presses
@@ -489,7 +489,7 @@ function setDblClick(element, cell) {
       var num = code.substring(5); // digit
       if (code.startsWith("Numpad"))  {
         num = code.substring(6);
-        if (!shift && (Data.now() - shiftUpTime)<50) {
+        if (!shift && (Date.now() - shiftUpTime)<50) {
           // if the shift key ONLY JUST went up, pretend it's still down
           // this is to account for windows removing the shift key when
           // numpad keys are pressed.
