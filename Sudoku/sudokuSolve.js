@@ -2974,7 +2974,7 @@ function nonConsPairCells() {
     if (ind19s.length !==1) return false;
     var ind = ind19s[0];
 
-    var [close, far] = waysToSumRange(sw);
+    var [close, far] = waysToSumRange(sw, true);
 
     var changed = false;
     for (var c=0; c<9; c++) {
@@ -2998,7 +2998,7 @@ function nonConsPairCells() {
     if (!useRangeCheck) return true;
     if (ind2 <= ind1) return false; // should never happen
     var dist = ind2-ind1-1;
-    var cands = sumCandidates(sw, dist,dist);
+    var cands = SWsumCandidates(sw, dist, dist);
     var candList = candidatesToList(cands);
     for (var i=ind1+1; i<ind2; i++) {
       var cell = group[i];
@@ -3036,7 +3036,7 @@ function nonConsPairCells() {
 
   function sanwichIndividual19Eligibility(group, sw, groupLabel) {
     // i don't think this is useful for more than like 5 candidates, but unsure
-    var [close, far] = waysToSumRange(sw);
+    var [close, far] = waysToSumRange(sw, true);
     var changed = false;
     for (var c=0; c<9; c++) {
       var cell = group[c];
@@ -3078,7 +3078,7 @@ function nonConsPairCells() {
     // not sure if this applies for being closer together
     if (endInd-startInd < 2) return false;
 
-    var [minSpread, maxSpread] = waysToSumRange(sw);
+    var [minSpread, maxSpread] = waysToSumRange(sw, true);
     
     // disable 1/9 for any cells that are too close to both sides
     var changed = false;
@@ -3093,8 +3093,8 @@ function nonConsPairCells() {
     } return false;
   }
 
-  function oneWayToSum(sw) {
-    var ways = waysToSum(sw);
+  function oneWayToSum(sw, sandwich=false) {
+    var ways = waysToSum(sw, sandwich);
     if (ways.length === 1)
       return ways[0];
     return undefined;
@@ -3110,7 +3110,7 @@ function nonConsPairCells() {
 
     // if the sw complement can only be summed one way (usually only 1 digit but not always),
     // then its one way of summing can't be right on the edge.
-    var wayToSum = oneWayToSum(35-sw);
+    var wayToSum = oneWayToSum(35-sw, true);
     if (wayToSum === undefined) return false;
 
     // the cells that must be on the outside of the 1/9
@@ -3141,7 +3141,7 @@ function nonConsPairCells() {
     return false;
   }
 
-
+  //... i have no idea what this does
   function ensureIndices(arr) {
     if (arguments.length<3) return;
     if (arr[arguments[1]]===undefined)
@@ -3150,15 +3150,17 @@ function nonConsPairCells() {
     ensureIndices(arr[arguments[1]], ...(Array.from(arguments).slice(2)));
   }
 
-  var sumCandidatesCache = [];
-  function sumCandidates(sw, min=0, max=9) {
+  // the candidates for a sandwich sum with a minimum and maximum length.
+  // e.g. if we must sum to 21 in between 3 and 4 cells, what are the cands?
+  var SWsumCandidatesCache = [];
+  function SWsumCandidates(sw, min=0, max=9) {
     // use cache if it exists
-    ensureIndices(sumCandidatesCache,sw,min,max);
-    if (sumCandidatesCache[sw][min][max] !== undefined)
-      return sumCandidatesCache[sw][min][max];
+    ensureIndices(SWsumCandidatesCache,sw,min,max);
+    if (SWsumCandidatesCache[sw][min][max] !== undefined)
+      return SWsumCandidatesCache[sw][min][max];
 
     // figure out the candidates
-    var ways = waysToSum(sw);
+    var ways = waysToSum(sw, true);
     var cands = [];
     for (var w=0; w<ways.length; w++) {
       var way = ways[w];
@@ -3168,7 +3170,7 @@ function nonConsPairCells() {
     }
 
     // cache result
-    sumCandidatesCache[sw][min][max] = cands;
+    SWsumCandidatesCache[sw][min][max] = cands;
     return cands;
   }
 
@@ -3188,40 +3190,47 @@ function nonConsPairCells() {
     return out;
   }
 
-  var waysToSumRangeCache = [];
-  function waysToSumRange(total) {
-    if (waysToSumRangeCache[total])
-      return waysToSumRangeCache[total];
-
-    var ways = waysToSum(total)
-    if (ways.length>0) {
-      var minLength = 99;
-      var maxLength = -1;
-      for (var i=0; i<ways.length; i++) {
-        var len = ways[i].length;
-        if (len < minLength) minLength = len;
-        if (len > maxLength) maxLength = len;
-      }
-      var result = [minLength, maxLength];
-      waysToSumRangeCache[total] = result;
-      return result;
-    } else {
-      waysToSumRangeCache[total] = [0,0];
-      return [0,0];
+  function lenRange(list) {
+    if (list.length===0) return [0, 0];
+    var min = list[0].length;
+    var max = list[0].length;
+    for (var i=0; i<list.length; i++) {
+      if (list[i].length < min) min = list[i].length;
+      if (list[i].length > max) max = list[i].length;
     }
+    return [min, max];
   }
+
+  function waysToSumRange(total, sandwich=false) {
+    var ways = waysToSum(total, sandwich);
+    return [ways.minLength, ways.maxLength];
+  }
+
+
 
   var waysToSumCache = [];
-  function waysToSum(total) {
-    if (waysToSumCache[total] === undefined)
-      waysToSumCache[total] = waysToSumAux(total, [2,3,4,5,6,7,8]);
-    return waysToSumCache[total];
+  var waysToSumCacheSW = [];
+  function waysToSum(total, sandwich=false) {
+    var cache = sandwich ? waysToSumCacheSW : waysToSumCache;
+    if (cache[total] === undefined) {
+      var cands = sandwich ? [2,3,4,5,6,7,8] : [1,2,3,4,5,6,7,8,9];
+      cache[total] = decorateWaysList(waysToSumAux(total, cands, sandwich));
+    }
+    return cache[total];
   }
 
-  function waysToSumAux(total, vals) {
-    // can't sum to less than 2 or more than 35
-    if (total<2)  return [];
-    if (total>35) return [];
+  function waysToSumAux(total, vals=[1,2,3,4,5,6,7,8,9], sandwich=false) {
+    
+    if (sandwich) {
+      // can't sum to less than 2 or more than 35
+      if (total<2)  return [];
+      if (total>35) return [];
+    } else {
+      // can't sum to less than 1 or more than 45
+      if (total<1)  return [];
+      if (total>45) return [];
+    }
+    
 
     // base case
     if (vals.length===0) return [];
@@ -3242,7 +3251,7 @@ function nonConsPairCells() {
         ways.push([val]);
       } else {
         var smallerVals = vals.slice(0,i);
-        var subWays = waysToSumAux(total-val, smallerVals);
+        var subWays = waysToSumAux(total-val, smallerVals, sandwich);
         for (var w=0; w<subWays.length; w++) {
           subWays[w].push(val);
         }
@@ -3251,12 +3260,29 @@ function nonConsPairCells() {
     }
     return ways;
   }
+  
+  function decorateWaysList(ways) {
+    if (ways.length===0) {
+      ways.minLength = 0;
+      ways.maxLength = 0;
+      return ways;
+    }
+
+    ways.sort(function(a, b){
+      return a.length - b.length;
+    });
+  
+    ways.minLength = ways[0].length;
+    ways.maxLength = ways[ways.length-1].length;
+
+    return ways;
+  }
 
   // static
   function sandwichOneWayInside(group, sw, groupLabel) {
     // if the sw can only be summed one way (usually only 1 digit but not always),
     // then its one way of summing can't be right on the edge.
-    var wayToSum = oneWayToSum(sw);
+    var wayToSum = oneWayToSum(sw, true);
     if (wayToSum === undefined) return false;
 
     var changed = false;
@@ -3316,7 +3342,7 @@ function nonConsPairCells() {
     }
 
     // candidates for between the 19s
-    var inWays = waysToSum(sw);
+    var inWays = waysToSum(sw, true);
     var inAllowed = [];
     var inWaysConsidered = 0;
     for (var w=0; w<inWays.length; w++) {
@@ -3347,7 +3373,7 @@ function nonConsPairCells() {
 
 
     // candidates for outside the 19s
-    var outWays = waysToSum(35-sw);
+    var outWays = waysToSum(35-sw, true);
     var outAllowed = [];
     var outWaysConsidered = 0;
     for (var w=0; w<outWays.length; w++) {
@@ -3428,7 +3454,7 @@ function nonConsPairCells() {
     var minOutsideCells = 8-(endInd-startInd);
 
     // figure out which candidates could be part of an outside sum
-    var outsideCands = sumCandidates(35-sw, minOutsideCells);
+    var outsideCands = SWsumCandidates(35-sw, minOutsideCells);
     var outDisallowed = candidatesToNegativeList(outsideCands);
     
     // this is useless if the outside candidates cover all values
