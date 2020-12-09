@@ -134,6 +134,9 @@
     parseThermos();
 
     // get thermos
+    parseArrows();
+
+    // get thermos
     parseLines();
 
     buildUI && loadSavedEnabledStrats();
@@ -740,6 +743,24 @@ function setDblClick(element, cell) {
     return out;
   }
 
+  function parseArrowList(arrowListString) {
+    var out = [];
+    if (arrowListString===undefined) return [];
+    var arrows = arrowListString.split(",");
+    for (var i=0; i<arrows.length; i++) {
+      var [base, shoulder, shaft] = arrows[i].split("|");
+      var baseCells  = base.match(/.{4}/g);
+      var shaftCells = shaft.match(/.{4}/g);
+      var arrow = {base: [], shoulder: sudokuCellsByPos[shoulder], shaft: []};
+      for (var t=0; t<baseCells.length; t++)
+        arrow.base.push(sudokuCellsByPos[baseCells[t]]);
+      for (var t=0; t<shaftCells.length; t++)
+        arrow.shaft.push(sudokuCellsByPos[shaftCells[t]]);
+      out.push(arrow);
+    }
+    return out;
+  }
+
   function getThermosExportString() {
     return getCellListExportString(sudokuThermos);
   }
@@ -748,8 +769,24 @@ function setDblClick(element, cell) {
     return getCellListExportString(sudokuLines);
   }
 
+  function getArrowsExportString() {
+    var out = [];
+    for (var i=0; i<sudokuArrows.length; i++) {
+      var arrow = sudokuArrows[i];
+      var base = arrow.base.map((c)=>c.pos).join("");
+      var shoulder = arrow.shoulder.pos;
+      var shaft = arrow.shaft.map((c)=>c.pos).join("");
+      out.push([base, shoulder, shaft].join("|"));
+    }
+    return out.join(",");
+  }  
+
   function parseThermos() {
     sudokuThermos = parseCellLists(getQueryVariable('thermos'));
+  }
+
+  function parseArrows() {
+    sudokuArrows = parseArrowList(getQueryVariable('arrows'));
   }
 
   function parseLines() {
@@ -852,6 +889,9 @@ function setDblClick(element, cell) {
 
     var thermos = getThermosExportString();
     if (thermos) URLentries.push(`thermos=${thermos}`);
+
+    var arrows = getArrowsExportString();
+    if (arrows) URLentries.push(`arrows=${arrows}`);
 
     var lines = getLinesExportString();
     if (lines) URLentries.push(`lines=${lines}`);
@@ -1464,7 +1504,7 @@ function refreshRegionLabels() {
   function drawArrow(arrow) {
     // the 'shaft' of the arrow
     if (arrow.shaft.length>0) {
-      canvArrow([arrow.shoulder].concat(arrow.shaft), 0.2);
+      canvArrow([arrow.shoulder].concat(arrow.shaft), 0.15);
     }
 
     // the 'base' of the arrow
@@ -1613,8 +1653,8 @@ function refreshRegionLabels() {
     var from = getCellCenter(lastTwo[0]);
     var to   = getCellCenter(lastTwo[1]);
     var angle = Math.atan2(to[1] - from[1], to[0] - from[0]);
-    var rad = cellWidth*0.5;
-    var point_forward = cellWidth*0.2;
+    var rad = cellWidth*0.4;
+    var point_forward = cellWidth*0.1;
     var pitch = Math.PI*1.25;
 
     // this is 'to', but pushed a little further forward
