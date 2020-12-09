@@ -195,10 +195,12 @@
   var sudokuBoxes = [];
   var sudokuCellsByPos = [];      
   var sudokuCellsTL = []; // grouping by the sum of row and col
-  var sudokuRegions = [];
   var sudokuEdges = [[],[],[],[]];
+  
+  var sudokuRegions = [];
   var sudokuThermos = [];
   var sudokuLines = [];
+  var sudokuArrows = [];
 
   var undoStack = [];
 

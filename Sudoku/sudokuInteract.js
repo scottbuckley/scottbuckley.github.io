@@ -79,6 +79,7 @@
   const SETCOLOR = 3;
   const SETTHERMO = 4;
   const SETLINE = 5;
+  const SETARROW = 6;
 
   // input state
   var inputState = SETNOTHING;
@@ -515,6 +516,8 @@ function setDblClick(element, cell) {
       addLine();
     } else if (code==="KeyT" && !modKey) {
       addThermo();
+    } else if (code==="KeyA" && !modKey) {
+      addArrow();
     } else if (code==="KeyS" && !modKey) {
       setCellsOnly();
     } else if (code==="KeyN" && !modKey) {
@@ -1344,6 +1347,10 @@ function refreshRegionLabels() {
         addCellToCurrentThermo(cell);
       }
 
+      else if (inputState===SETARROW) {
+        addCellToCurrentArrow(cell);
+      }
+
       else if (inputState===SETLINE) {
         addCellToCurrentLine(cell);
       }
@@ -1382,6 +1389,7 @@ function refreshRegionLabels() {
     initCanvas();
     drawLines();
     drawThermos();
+    drawArrows();
   }
 
   var canvas;
@@ -1394,6 +1402,84 @@ function refreshRegionLabels() {
     // ctx.rect(2, 2, canvas.width-4, canvas.height-4);
     // ctx.stroke();
   }
+
+/*
+       ###    ########  ########   #######  ##      ##
+      ## ##   ##     ## ##     ## ##     ## ##  ##  ##
+     ##   ##  ##     ## ##     ## ##     ## ##  ##  ##
+    ##     ## ########  ########  ##     ## ##  ##  ##
+    ######### ##   ##   ##   ##   ##     ## ##  ##  ##
+    ##     ## ##    ##  ##    ##  ##     ## ##  ##  ##
+    ##     ## ##     ## ##     ##  #######   ###  ###
+*/
+  function addArrow() {
+    controlClicked.call($("#arrowButton"), 0, SETARROW);
+    if (inputState===SETARROW) {
+      // starting an arrow
+      var baseCells = getSelectedCells();
+      if (baseCells.length<1) {
+        alert("You need to first select a cell/cells to be the base of the arrow");
+        controlClicked.call($("#arrowButton"), 0, SETARROW);
+        return;
+      }
+      sudokuArrows.push({base: baseCells, shaft: [], shoulder: baseCells[0]});
+      clearSelected();
+      refreshOverlay();
+    } else {
+      // ending an arrow
+      // clearEmptyArrows();
+    }
+  }
+
+  function cellDistance(cell1, cell2) {
+    return (Math.abs(cell1.row-cell2.row)
+          + Math.abs(cell1.col-cell2.col));
+  }
+
+  function addCellToCurrentArrow(cell) {
+    var arrow = sudokuArrows[sudokuArrows.length-1];
+    if (arrow.shaft.length===0) {
+      // first shaft cell. need to decide which base cell
+      // connects to the shaft (the shoulder).
+      var base = arrow.base;
+      var closeCell = base[0];
+      var closeDist = cellDistance(cell, base[0]);
+      for (var i=1; i<base.length; i++)
+        if (cellDistance(cell, base[i]) < closeDist) {
+          closeCell = base[i];
+          closeDist = cellDistance(cell, base[i]);
+        }
+      arrow.shoulder = closeCell;
+    }
+    arrow.shaft.push(cell);
+    refreshOverlay();
+  }
+
+  function drawArrows() {
+    for (var i=0; i<sudokuArrows.length; i++) {
+      drawArrow(sudokuArrows[i]);
+    }
+  }
+
+  function drawArrow(arrow) {
+    // the 'shaft' of the arrow
+    if (arrow.shaft.length>0) {
+      canvArrow([arrow.shoulder].concat(arrow.shaft), 0.2);
+    }
+
+    // the 'base' of the arrow
+    canvLine(arrow.base, 0.85);
+    canvLine(arrow.base, 0.6, '#fff');
+  }
+
+  function clearEmptyArrows() {
+    for (var i=sudokuArrows.length-1; i>=0; i--) {
+      if (sudokuArrows[i].shaft.length<1) {
+        sudokuArrows.splice(i, 1);
+      }
+    }
+  }
+
 
 /*
     ######## ##     ## ######## ########  ##     ##  #######
@@ -1490,8 +1576,8 @@ function refreshRegionLabels() {
 */
   function getCellCenter(cell) {
     var td = cell.td[0];
-    return [td.offsetLeft+td.offsetWidth/2
-          , td.offsetTop + td.offsetHeight/2];
+    return [td.offsetLeft+td.offsetWidth/2,
+            td.offsetTop + td.offsetHeight/2];
   }
 
   function getCellWidth(cell) {
@@ -1509,6 +1595,47 @@ function refreshRegionLabels() {
     for (var i=1; i<cells.length; i++) {
       ctx.lineTo(...getCellCenter(cells[i]));
     }
+    if (cells.length===1) {
+      // only one cell. draw a line to itself to make sure something is drawn
+      ctx.lineTo(...getCellCenter(cells[0]));
+    }
+    ctx.stroke();
+  }
+
+  function canvArrow() {
+    canvLine(...arguments);
+    canvArrowHead(...arguments);
+  }
+
+  function canvArrowHead(cells, width=0.2, style="#DDD", cap="round", join="round") {
+    var lastTwo = cells.slice(-2);
+    var cellWidth = getCellWidth(lastTwo[1]);
+    var from = getCellCenter(lastTwo[0]);
+    var to   = getCellCenter(lastTwo[1]);
+    var angle = Math.atan2(to[1] - from[1], to[0] - from[0]);
+    var rad = cellWidth*0.5;
+    var point_forward = cellWidth*0.2;
+    var pitch = Math.PI*1.25;
+
+    // this is 'to', but pushed a little further forward
+    var middle = [to[0]+point_forward*Math.cos(angle),
+                  to[1]+point_forward*Math.sin(angle)]
+
+    // the left and right points of the arrow
+    var left  = [middle[0]+rad*Math.cos(angle+pitch),
+                 middle[1]+rad*Math.sin(angle+pitch)];
+    var right = [middle[0]+rad*Math.cos(angle-pitch),
+                 middle[1]+rad*Math.sin(angle-pitch)];
+    
+    ctx.beginPath();
+    ctx.lineWidth = cellWidth * width;
+    ctx.strokeStyle = style;
+    ctx.lineCap = cap;
+    ctx.lineJoin = join;
+
+    ctx.moveTo(...left);
+    ctx.lineTo(...middle);
+    ctx.lineTo(...right);
     ctx.stroke();
   }
 
