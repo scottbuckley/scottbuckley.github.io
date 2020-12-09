@@ -3219,8 +3219,18 @@ function nonConsPairCells() {
     return cache[total];
   }
 
+  // waysToSum, but enforce that each way of summing must include
+  // the digit that is its own length.
+  function waysToSumInclLength(total) {
+    return waysToSum(total).filter(includesLength);
+  }
+
+  // whether a list of numbers includes its own length as an element.
+  function includesLength(list) {
+    return (list.indexOf(list.length)!==-1);
+  }
+
   function waysToSumAux(total, vals=[1,2,3,4,5,6,7,8,9], sandwich=false) {
-    
     if (sandwich) {
       // can't sum to less than 2 or more than 35
       if (total<2)  return [];
