@@ -2460,6 +2460,16 @@ function clearExceptGroup(thisgroup, otherGroupType, otherGroupVal, v) {
   }
 
 /*
+       ###    ########  ########   #######  ##      ##  ######
+      ## ##   ##     ## ##     ## ##     ## ##  ##  ## ##    ##
+     ##   ##  ##     ## ##     ## ##     ## ##  ##  ## ##
+    ##     ## ########  ########  ##     ## ##  ##  ##  ######
+    ######### ##   ##   ##   ##   ##     ## ##  ##  ##       ##
+    ##     ## ##    ##  ##    ##  ##     ## ##  ##  ## ##    ##
+    ##     ## ##     ## ##     ##  #######   ###  ###   ######
+*/
+
+/*
     ######## ##     ## ######## ########  ##     ##  #######   ######
        ##    ##     ## ##       ##     ## ###   ### ##     ## ##    ##
        ##    ##     ## ##       ##     ## #### #### ##     ## ##
@@ -3208,7 +3218,21 @@ function nonConsPairCells() {
     return [ways.minLength, ways.maxLength];
   }
 
-
+  function sumCands(total, length=undefined) {
+    var ways = waysToSum(total);
+    var flags = [];
+    for (var i=0; i<ways.length; i++) {
+      var way = ways[i];
+      if (length===undefined || way.length===length)
+        for (var j=0; j<way.length; j++)
+          flags[way[j]] = true;
+    }
+    var cands = [];
+    for (var v=0; v<9; v++)
+      if (flags[v])
+        cands.push(v);
+    return cands;
+  }
 
   var waysToSumCache = [];
   var waysToSumCacheSW = [];
