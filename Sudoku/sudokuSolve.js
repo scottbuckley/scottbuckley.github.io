@@ -201,6 +201,7 @@
   var sudokuThermos = [];
   var sudokuLines = [];
   var sudokuArrows = [];
+  var sudokuKropkis = [];
 
   var undoStack = [];
 

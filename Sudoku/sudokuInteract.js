@@ -87,6 +87,9 @@
   var inputNum   = undefined;
 
   var ls = window.localStorage;
+
+  // kropki dot styles
+  const KROPDIAMOND = "D";
   
 
 /*
@@ -133,8 +136,11 @@
     // get thermos
     parseThermos();
 
-    // get thermos
+    // get arrows
     parseArrows();
+
+    // get kropkis
+    parseKropkis();
 
     // get thermos
     parseLines();
@@ -521,6 +527,8 @@ function setDblClick(element, cell) {
       addThermo();
     } else if (code==="KeyA" && !modKey) {
       addArrow();
+    } else if (code==="KeyK" && !modKey) {
+      addKropki();
     } else if (code==="KeyS" && !modKey) {
       setCellsOnly();
     } else if (code==="KeyN" && !modKey) {
@@ -779,7 +787,34 @@ function setDblClick(element, cell) {
       out.push([base, shoulder, shaft].join("|"));
     }
     return out.join(",");
-  }  
+  }
+
+  function getKropkisExportString() {
+    var out = [];
+    for (var i=0; i<sudokuKropkis.length; i++) {
+      var krop = sudokuKropkis[i];
+      out.push([krop.cell1.pos, krop.cell2.pos, krop.style].join("|"));
+    }
+    return out.join("||");
+  }
+
+  function parseKropkiList(kropkiListString) {
+    var out = [];
+    if (kropkiListString===undefined) return [];
+    var krops = kropkiListString.split("||");
+    for (var i=0; i<krops.length; i++) {
+      var [c1pos, c2pos, style] = krops[i].split("|");
+      var kropki = {cell1: sudokuCellsByPos[c1pos],
+                    cell2: sudokuCellsByPos[c2pos],
+                    style: style};
+      out.push(kropki);
+    }
+    return out;
+  }
+
+  function parseKropkis() {
+    sudokuKropkis = parseKropkiList(getQueryVariable('krops'));
+  }
 
   function parseThermos() {
     sudokuThermos = parseCellLists(getQueryVariable('thermos'));
@@ -892,6 +927,9 @@ function setDblClick(element, cell) {
 
     var arrows = getArrowsExportString();
     if (arrows) URLentries.push(`arrows=${arrows}`);
+
+    var krops = getKropkisExportString();
+    if (krops) URLentries.push(`krops=${krops}`);
 
     var lines = getLinesExportString();
     if (lines) URLentries.push(`lines=${lines}`);
@@ -1430,6 +1468,7 @@ function refreshRegionLabels() {
     drawLines();
     drawThermos();
     drawArrows();
+    drawKropkis();
   }
 
   var canvas;
@@ -1442,6 +1481,39 @@ function refreshRegionLabels() {
     // ctx.rect(2, 2, canvas.width-4, canvas.height-4);
     // ctx.stroke();
   }
+
+/*
+    ##    ## ########   #######  ########  ##    ## ####
+    ##   ##  ##     ## ##     ## ##     ## ##   ##   ##
+    ##  ##   ##     ## ##     ## ##     ## ##  ##    ##
+    #####    ########  ##     ## ########  #####     ##
+    ##  ##   ##   ##   ##     ## ##        ##  ##    ##
+    ##   ##  ##    ##  ##     ## ##        ##   ##   ##
+    ##    ## ##     ##  #######  ##        ##    ## ####
+*/
+  function addKropki() {
+    var kropkiStyle = KROPDIAMOND; // for later having a few types of dots
+    var kropkiCells = getSelectedCells();
+    if (kropkiCells.length!=2) {
+      alert("Select exactly two cells before pressing the Kropki button.");
+      return;
+    }
+    sudokuKropkis.push({cell1:kropkiCells[0], cell2:kropkiCells[1], style:kropkiStyle});
+    clearSelected();
+    refreshOverlay();
+  }
+
+  function drawKropkis() {
+    for (var i=0; i<sudokuKropkis.length; i++) {
+      drawKropki(sudokuKropkis[i]);
+    }
+  }
+
+  function drawKropki(kropki) {
+    var center = midpoint(getCellCenter(kropki.cell1), getCellCenter(kropki.cell2));
+    canvKropkiDot(center, kropki.style);
+  }
+
 
 /*
        ###    ########  ########   #######  ##      ##
@@ -1616,8 +1688,20 @@ function refreshRegionLabels() {
 */
   function getCellCenter(cell) {
     var td = cell.td[0];
-    return [td.offsetLeft+td.offsetWidth/2,
-            td.offsetTop + td.offsetHeight/2];
+    // seems to be slightly more accurate if i add 0.5 to x and y this way
+    return [td.offsetLeft+(td.offsetWidth+1)/2,
+            td.offsetTop + (td.offsetHeight+1)/2];
+  }
+
+  function midpoint(p1, p2) {
+    return [
+      (p1[0]+p2[0])/2,
+      (p1[1]+p2[1])/2
+    ];
+  }
+
+  function getSomeCellWidth() {
+    return getCellWidth(sudoku[0][0]);
   }
 
   function getCellWidth(cell) {
@@ -1640,6 +1724,32 @@ function refreshRegionLabels() {
       ctx.lineTo(...getCellCenter(cells[0]));
     }
     ctx.stroke();
+  }
+
+  function canvKropkiDot(center, style, size=getSomeCellWidth()*0.15) {
+    // the style here indicates which kropki dot will be drawn
+    ctx.fillStyle = "#DDD";
+    ctx.strokeStyle = "#BBB";
+
+    var [x, y] = center;
+
+    if (style===KROPDIAMOND) {
+      var d = size*0.9;
+      ctx.lineWidth = d*0.2;
+      console.log(x, y);
+      ctx.beginPath();
+      ctx.moveTo(x, y-d);
+      ctx.lineTo(x+d, y);
+      ctx.lineTo(x, y+d);
+      ctx.lineTo(x-d, y);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.fill();
+    } else {  
+      ctx.beginPath();
+      ctx.arc(center[0], center[1], size, 0, 2 * Math.PI);
+      ctx.fill();
+    }
   }
 
   function canvArrow() {
