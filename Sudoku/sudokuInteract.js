@@ -1315,15 +1315,15 @@ function refreshRegionLabels() {
   function zoneName(swatch) {
     if (swatch===undefined) return "none";
     switch (swatch) {
-      case 0: return "blue";
-      case 1: return "green 1";
-      case 2: return "red";
-      case 3: return "yellow";
-      case 4: return "purple";
-      case 5: return "orange";
-      case 6: return "cyan";
-      case 7: return "green 2";
-      case 8: return "pink";
+      case 0: return "darkgreen";
+      case 1: return "lightblue";
+      case 2: return "darkblue";
+      case 3: return "lightgreen";
+      case 4: return "pink";
+      case 5: return "purple";
+      case 6: return "yellow";
+      case 7: return "orange";
+      case 8: return "red";
     }
   }
 
