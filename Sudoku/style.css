@@ -210,6 +210,7 @@ v8 { left:1;right:1;bottom:1; }
 v9 { bottom:1;right:1; }
 
 
+tr td[swatch=""],  #tbl tr.row td.cell[swatch=""]  { background-color:#ffffff66; }
 tr td[swatch="0"], #tbl tr.row td.cell[swatch="0"] { background-color:#1bd56f66; }
 tr td[swatch="1"], #tbl tr.row td.cell[swatch="1"] { background-color:#77eee766; }
 tr td[swatch="2"], #tbl tr.row td.cell[swatch="2"] { background-color:#4aa3e866; }
@@ -349,13 +350,13 @@ button.highlight {
 }
 
 .svgline.thermo {
-  background-color:#DDD;
+  background-color:#AAA;
   width:2vh;
   border-radius:1vh;
 }
 
 .svgline.thermoBulb {
-  background-color:#DDD;
+  background-color:#AAA;
   width:6vh;
   border-radius:3vh;
 }

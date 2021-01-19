@@ -61,6 +61,8 @@
   const stepDelay = 0;
   const flashDelay = Math.max(10, stepDelay*0.9);
 
+  const NOTATION_BASE_CLR = "#BBB";
+
 
 /*
      ######  ########    ###    ######## ########
@@ -1708,7 +1710,7 @@ function refreshRegionLabels() {
     return cell.td[0].offsetWidth;
   }
 
-  function canvLine(cells, width=0.2, style="#DDD", cap="round", join="round") {
+  function canvLine(cells, width=0.2, style=NOTATION_BASE_CLR, cap="round", join="round") {
     var cellWidth = getCellWidth(cells[0]);
     ctx.beginPath();
     ctx.lineWidth = cellWidth * width;
@@ -1728,8 +1730,8 @@ function refreshRegionLabels() {
 
   function canvKropkiDot(center, style, size=getSomeCellWidth()*0.15) {
     // the style here indicates which kropki dot will be drawn
-    ctx.fillStyle = "#DDD";
-
+    ctx.fillStyle = NOTATION_BASE_CLR;
+    ctx.strokeStyle = "#FFF";
     var [x, y] = center;
 
     if (style===KROPDIAMOND) {
@@ -1742,6 +1744,7 @@ function refreshRegionLabels() {
       ctx.lineTo(x, y+d);
       ctx.lineTo(x-d, y);
       ctx.closePath();
+      ctx.stroke();
       ctx.fill();
     } else {  
       ctx.beginPath();
@@ -1755,7 +1758,7 @@ function refreshRegionLabels() {
     canvArrowHead(...arguments);
   }
 
-  function canvArrowHead(cells, width=0.2, style="#DDD", cap="round", join="round") {
+  function canvArrowHead(cells, width=0.2, style=NOTATION_BASE_CLR, cap="round", join="round") {
     var lastTwo = cells.slice(-2);
     var cellWidth = getCellWidth(lastTwo[1]);
     var from = getCellCenter(lastTwo[0]);
@@ -1787,7 +1790,7 @@ function refreshRegionLabels() {
     ctx.stroke();
   }
 
-  function canvCircle(cell, rad=0.5, style="#DDD") {
+  function canvCircle(cell, rad=0.5, style=NOTATION_BASE_CLR) {
     var wid = getCellWidth(cell);
     var [x, y] = getCellCenter(cell);
     ctx.fillStyle = style;
