@@ -1689,8 +1689,8 @@ function refreshRegionLabels() {
   function getCellCenter(cell) {
     var td = cell.td[0];
     // seems to be slightly more accurate if i add 0.5 to x and y this way
-    return [td.offsetLeft+(td.offsetWidth+1)/2,
-            td.offsetTop + (td.offsetHeight+1)/2];
+    return [td.offsetLeft+(td.offsetWidth)/2,
+            td.offsetTop + (td.offsetHeight)/2];
   }
 
   function midpoint(p1, p2) {
@@ -1729,13 +1729,12 @@ function refreshRegionLabels() {
   function canvKropkiDot(center, style, size=getSomeCellWidth()*0.15) {
     // the style here indicates which kropki dot will be drawn
     ctx.fillStyle = "#DDD";
-    ctx.strokeStyle = "#BBB";
 
     var [x, y] = center;
 
     if (style===KROPDIAMOND) {
-      var d = size*0.9;
-      ctx.lineWidth = d*0.2;
+      var d = size;
+      ctx.lineWidth = d*0.3;
       console.log(x, y);
       ctx.beginPath();
       ctx.moveTo(x, y-d);
@@ -1743,7 +1742,6 @@ function refreshRegionLabels() {
       ctx.lineTo(x, y+d);
       ctx.lineTo(x-d, y);
       ctx.closePath();
-      ctx.stroke();
       ctx.fill();
     } else {  
       ctx.beginPath();
