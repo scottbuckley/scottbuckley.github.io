@@ -669,9 +669,17 @@ function setDblClick(element, cell) {
     return str;
   }
 
+
   function initEdges(data){
+    // check if we are dividing by "," or "-"
+    var commaCount = (data.match(/,/g) || []).length;
+    var dashCount  = (data.match(/-/g) || []).length;
+    // console.log(`edge has ${commaCount} commas`);
+    // console.log(`edge has ${dashCount} dashes`);
+    var delim = (commaCount > dashCount) ? "," : "-";
+    
     sudokuEdges = [[],[],[],[]];
-    var data = data.split(",");
+    var data = data.split(delim);
     for (var i=0; i<data.length; i++) {
       // which edge i'm on (top left bottom right)
       var edge = Math.floor(i/9);
@@ -693,7 +701,7 @@ function setDblClick(element, cell) {
         out.push(edge);
       }
     }
-    return out.join(",").replace(/,+$/,'');
+    return out.join("-").replace(/-+$/,'');
   }
 
   function getUsedRegions() {
