@@ -3315,6 +3315,70 @@ function nonConsPairCells() {
     return ways;
   }
 
+  function zeroesList(length) {
+    var out = [];
+    for (var i=0; i<length; i++)
+      out.push(0);
+    return out;
+  }
+
+  function waysToSumGeneral() {
+    return decorateWaysList(waysToSumGeneralAux(...arguments));
+  }
+
+  // vals must be in strictly increasing order
+  function waysToSumGeneralAux(total, vals=[2,3,4,5,6,7,8], minLength=1, maxLength=9999, maxrepeat=1, used=zeroesList(vals.length)) {
+
+    // reached max length
+    if (maxLength===0) return [];
+    // can't sum to less than 1 obviously
+    if (total<1)  return [];
+
+    // base case
+    if (vals.length===0) return [];
+
+    
+    var ways = [];
+    for (var i=vals.length-1; i>=0; i--) {
+      var val = vals[i];
+
+      // we have already use this value too many times
+      if (used[i] >= maxrepeat) continue;
+
+      if (val > total) {
+        continue;
+      } else if (val === total) {
+          // only accept this as a way to finish the sum if we have already reached the minimum length
+          if (minLength<=1)
+            ways.push([val]);
+      } else if (val < total) {
+        // clone used, and mark this val as used once more
+        var subUsed = used.slice(0, i+1);
+        subUsed[i]++;
+
+        // only use this value and smaller from now on
+        var subVals = vals.slice(0,i+1);
+        
+        // get all the ways we can complete if after using this value
+        var subWays = waysToSumGeneralAux(total-val, subVals, minLength-1, maxLength-1, maxrepeat, subUsed);
+
+        // add this value to each of those ways
+        for (var w=0; w<subWays.length; w++) {
+          subWays[w].push(val);
+        }
+
+        // add all those ways to the final list
+        ways = ways.concat(subWays);
+      }
+    }
+  
+    return ways;
+  }
+
+
+
+
+
   // static
   function sandwichOneWayInside(group, sw, groupLabel) {
     // if the sw can only be summed one way (usually only 1 digit but not always),
