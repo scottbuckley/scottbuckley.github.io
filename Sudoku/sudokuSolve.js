@@ -3326,6 +3326,10 @@ function nonConsPairCells() {
     return decorateWaysList(waysToSumGeneralAux(...arguments));
   }
 
+  function waysToSumSWLen(total,len) {
+    return waysToSumGeneral(total, [2,3,4,5,6,7,8], len, len);
+  }
+
   // vals must be in strictly increasing order
   function waysToSumGeneralAux(total, vals=[2,3,4,5,6,7,8], minLength=1, maxLength=9999, maxrepeat=1, used=zeroesList(vals.length)) {
 
