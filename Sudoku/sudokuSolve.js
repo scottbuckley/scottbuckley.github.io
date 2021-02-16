@@ -3909,6 +3909,7 @@ function nonConsPairCells() {
   }
 
   function sandwichErrors(group, sw) {
+    console.log(group.groupName, sw);
     var outSum = 0;
     var inSum = 0;
     var allSolved = true;
@@ -3958,7 +3959,7 @@ function nonConsPairCells() {
       }
     };
 
-    checkSpecialErrors("sandwich", sandwichEnabled(), function(){everyRowColSandwich(sandwichErrors, false);});
+    checkSpecialErrors("sandwich", sandwichEnabled(), function(){return everyRowColSandwich(sandwichErrors, false);});
     checkSpecialErrors("anti-knight", antiknightEnabled(), checkAntiknightErrors);
     checkSpecialErrors("non-consecutive", nonConEnabled(), checkNonConErrors);
 
