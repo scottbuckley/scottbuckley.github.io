@@ -8,15 +8,26 @@
 <link rel="stylesheet" type="text/css" href="font/MyFontsWebfontsKit.css">
 <style>
 
-.node {
+.hex {
   stroke: #fff;
+  fill: black;
   stroke-width: 0.5px;
   opacity:0.6;
 }
 
+.built {
+  fill:green;
+}
+
 .nodeCover {
-  fill: red;
-  opacity:0;
+  fill: #ffffff00;
+  stroke: none;
+  stroke-width:2px;
+}
+
+.nodeCover.selected {
+  stroke:black;
+  opacity:50%;
 }
 
 .link {
@@ -50,16 +61,19 @@
 </style>
 </head>
 <body>
-<script src="d3.v4.min.js"></script>
-    <script src="cola.min.js"></script>
-<script>
+  <script src="d3.v4.min.js"></script>
+  <script src="cola.min.js"></script>
+  <script>
     var width = window.document.documentElement.clientWidth-50,
         height = window.document.documentElement.clientHeight;
 
     var nodeRadius = 30;
     var nodeSpacing = 90;
 
+    var store = window.localStorage;
+
     var color = d3.scaleOrdinal(d3.schemeCategory20);
+
 
     var d3cola = cola.d3adaptor(d3)
         .avoidOverlaps(true)
@@ -85,18 +99,23 @@
       });
     };
 
-    d3.json("chris2.json", function (error, graph) {
+    d3.json("hideout2.json", function (error, graph) {
         
         processNamedLinks(graph);
 
-        graph.nodes.forEach(function (v,i) { v.height = v.width = nodeRadius*2; index=i;});
+        //preprocess nodes
+        graph.nodes.forEach(function (n,i) {
+          n.height = n.width = nodeRadius*2.5;
+          n.index=i;
+          n.built = (store[`built_${n.id}`]==="true");
+        });
 
         d3cola
             .nodes(graph.nodes)
             .links(graph.links)
             .flowLayout("y", nodeRadius*2.5)
             .symmetricDiffLinkLengths(18)
-            .linkDistance(nodeSpacing)
+            // .linkDistance(nodeSpacing)
             .start(10,20,20);
 
         // define arrow markers for graph links
@@ -116,18 +135,22 @@
           .enter().append('svg:path')
             .attr('class', 'link');
 
-        var node = svg.selectAll(".node")
+        var normalHex = "-8.6 -5,0 -10,8.6 -5,8.6 5,0 10,-8.6 5";
+        var biggerHex = "-13 -7.5,0 -15,13 -7.5,13 7.5,0 15,-13 7.5";
+
+        var hex = svg.selectAll(".hex")
             .data(graph.nodes)
           .enter()
           .append("polygon")
-            .attr("class", "node")
+            .attr("class", "hex")
             .attr("id", (d)=>`hex${d.id}`)
-            .attr("points", "-8.6 -5,0 -10,8.6 -5,8.6 5,0 10,-8.6 5")
-            .attr("fill", (d, i) => d3.hsl(color(d.group)).darker(3))
+            .attr("points", normalHex)
+            .classed("built", (d)=>d.built)
+            // .attr("fill", (d, i) => d3.hsl(color(d.group)).darker(2))
             .call(d3cola.drag);
 
-        var getIcon = function(node) {
-          return `icons/${node.type}.png`;
+        var getIcon = function(n) {
+          return `icons/${n.type}.png`;
         };
 
         var prettyNodeName = function(n) {
@@ -149,19 +172,24 @@
             .attr("class", "level")
             .call(d3cola.drag);
 
+        // an invisible hexagon over the node, which handles all kinds of interaction.
         var nodeCover = svg.selectAll(".nodeCover")
           .data(graph.nodes)
           .enter()
           .append("polygon")
             .attr("class", "nodeCover")
-            .attr("points", "-8.6 -5,0 -10,8.6 -5,8.6 5,0 10,-8.6 5")
+            .attr("points", normalHex)
             .attr("graphIndex", (d, i) => i)
             .on("mouseover", mouseover)
             .on("mouseout", mouseout)
+            .on("click", nodeClick)
+            .on("dblclick", nodeDblClick)
             .call(d3cola.drag);
         
-        // give ever node a link to its nodeCover
-        node.each((n, i) => {
+        d3.select("body").on("click", outsideClick);
+        
+        // give every hex a link to its nodeCover
+        hex.each((n, i) => {
           var cover = d3.select(`polygon#hex${n.id}`);
           n.cover = cover;
         });
@@ -170,22 +198,56 @@
         nodeCover.append("title").text(prettyNodeName);
 
 
+
+        function updateNodeDisplays() {
+          hex.each(function(n) {
+            // console.log(this);
+            // console.log(n);
+          });
+        }
+
+        function nodeDblClick(n) {
+          n.built = !n.built;
+          store[`built_${n.id}`] = n.built;
+
+          var hex = d3.select(`polygon#hex${n.id}`);
+          hex.classed("built", n.built);
+        }
+
+        function nodeClick(n) {
+          // this click shouldn't also register on the background
+          d3.event.stopPropagation();
+
+          var cover = d3.select(this);
+          if (cover.classed("selected")) {
+            // already selected. unselect
+            cover.classed("selected", false);
+          } else {
+            // not selected. unselect everything else and select this.
+            nodeCover.classed("selected", false);
+            cover.classed("selected", true);
+          }
+          return true;
+        }
+
+        function outsideClick() {
+          nodeCover.classed("selected", false);
+        }
+
         function mouseover(n) {
-          // graph.nodes[n.index].width = nodeRadius*3;
-          // graph.nodes[n.index].height = nodeRadius*3;
           d3.select(`polygon#hex${n.id}`)
             .transition()
             .duration(250)
-            .style("fill", color(n.group));
+            .style("opacity", 0.3)
+            .attr("points", biggerHex);
         }
 
         function mouseout(n) {
-          // graph.nodes[n.index].width = nodeRadius*2;
-          // graph.nodes[n.index].height = nodeRadius*2;
           d3.select(`polygon#hex${n.id}`)
             .transition()
             .duration(250)
-            .style("fill", d3.hsl(color(n.group)).darker(4));
+            .style("opacity", 0.6)
+            .attr("points", normalHex);
         }
 
         function tick() {
@@ -207,7 +269,7 @@
             });
 
             var hexScale = nodeRadius/10;
-            node.attr("transform", function (d) {
+            hex.attr("transform", function (d) {
                 return `translate(${d.x}, ${d.y}) scale(${hexScale})`;
             });
 
