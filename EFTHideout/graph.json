@@ -1,0 +1,48 @@
+{
+    "nodes":
+    [
+     {
+       "name": "Ben"
+    },
+     {
+       "name": "May"
+    },
+     {
+       "name": "Jack"
+    },
+     {
+       "name": "Francis"
+    },
+     {
+       "name": "Owen"
+    },
+     {
+       "name": "Blake"
+    },
+     {
+       "name": "Julia"
+    },
+     {
+       "name": "Liam"
+    }
+    ],
+    "links":
+    [
+        {
+            "source":"Ben",
+            "target":"May"
+        },
+        {
+            "source":"Ben",
+            "target":"Blake"
+        },
+        {
+            "source":"Ben",
+            "target":"Owen"
+        },
+        {
+            "source":"Owen",
+            "target":"Julia"
+        }
+    ]
+    }
