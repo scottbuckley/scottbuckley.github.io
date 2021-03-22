@@ -30,12 +30,32 @@
   opacity:50%;
 }
 
-.link {
+.path {
   fill: none;
   stroke: #000;
   stroke-width: 2px;
   opacity: 0.5;
-  marker-end: url(#end-arrow);
+  marker-end:url(#end-arrow-normal);
+}
+
+.path.red {
+  stroke: red;
+  marker-end:url(#end-arrow-red);
+}
+
+.path.green {
+  stroke: green;
+  marker-end:url(#end-arrow-green);
+}
+
+marker#end-arrow-red {
+  fill:red;
+  stroke:red;
+}
+
+marker#end-arrow-green {
+  fill:green;
+  stroke:green;
 }
 
 .level {
@@ -110,6 +130,10 @@
           n.built = (store[`built_${n.id}`]==="true");
         });
 
+        graph.links.forEach(function(l,i) {
+          l.linkIndex = i;
+        });
+
         d3cola
             .nodes(graph.nodes)
             .links(graph.links)
@@ -118,27 +142,31 @@
             // .linkDistance(nodeSpacing)
             .start(10,20,20);
 
-        // define arrow markers for graph links
-        svg.append('svg:defs').append('svg:marker')
-            .attr('id', 'end-arrow')
+
+        //define a few markers
+        svg.append('svg:defs').selectAll('marker')
+           .data(['normal', 'red', 'green']).enter()
+           .append('svg:marker')
+           .attr('id', (t)=>`end-arrow-${t}`)
             .attr('viewBox', '0 -5 10 10')
             .attr('refX', 6)
             .attr('markerWidth', 3)
             .attr('markerHeight', 3)
             .attr('orient', 'auto')
           .append('svg:path')
-            .attr('d', 'M0,-5L10,0L0,5')
-            .attr('fill', '#000');
+            .attr('d', 'M0,-5L10,0L0,5');
 
-        var path = svg.selectAll(".link")
+
+
+        var paths = svg.selectAll(".path")
             .data(graph.links)
           .enter().append('svg:path')
-            .attr('class', 'link');
+            .attr('class', 'path');
 
         var normalHex = "-8.6 -5,0 -10,8.6 -5,8.6 5,0 10,-8.6 5";
         var biggerHex = "-13 -7.5,0 -15,13 -7.5,13 7.5,0 15,-13 7.5";
 
-        var hex = svg.selectAll(".hex")
+        var hexes = svg.selectAll(".hex")
             .data(graph.nodes)
           .enter()
           .append("polygon")
@@ -166,14 +194,14 @@
             .attr("height", 50)
             .attr("width", 50);
 
-        var level = svg.selectAll(".level")
+        var levels = svg.selectAll(".level")
             .data(graph.nodes)
             .enter().append("text").text((n) => "0"+n.level)
             .attr("class", "level")
             .call(d3cola.drag);
 
         // an invisible hexagon over the node, which handles all kinds of interaction.
-        var nodeCover = svg.selectAll(".nodeCover")
+        var covers = svg.selectAll(".nodeCover")
           .data(graph.nodes)
           .enter()
           .append("polygon")
@@ -186,53 +214,103 @@
             .on("dblclick", nodeDblClick)
             .call(d3cola.drag);
         
-        d3.select("body").on("click", outsideClick);
+        d3.select("body")
+            .on("click", outsideClick)
+            .on("keydown", keyDown);
         
         // give every hex a link to its nodeCover
-        hex.each((n, i) => {
-          var cover = d3.select(`polygon#hex${n.id}`);
-          n.cover = cover;
+        hexes.each((n, i) => {
+          var hex = d3.select(`polygon#hex${n.id}`);
+          n.hex = hex;
         });
 
         // hover titles for nodes, images, levels
-        nodeCover.append("title").text(prettyNodeName);
+        covers.append("title").text(prettyNodeName);
 
 
 
         function updateNodeDisplays() {
-          hex.each(function(n) {
+          
+          if (sel = getSelectedNode) {
+
+            paths.classed("red",   (l) => l.target.selected && !l.source.built);
+            paths.classed("green", (l) => l.target.selected &&  l.source.built);
+
+            // paths.each(function(l){
+            //   if (l.target.selected) {
+            //     console.log(l.source.id);
+            //     this.attr("stroke", "red");
+            //   }
+            // });
+          }
+
+          hexes.each(function(n) {
             // console.log(this);
             // console.log(n);
           });
         }
 
-        function nodeDblClick(n) {
-          n.built = !n.built;
-          store[`built_${n.id}`] = n.built;
+        function updateBuiltStatus() {
+          hexes.classed("built", (n) => n.built);
+        }
 
-          var hex = d3.select(`polygon#hex${n.id}`);
-          hex.classed("built", n.built);
+        function nodeDblClick(n) {
+        //   n.built = !n.built;
+        
+
+        //   var hex = d3.select(`polygon#hex${n.id}`);
+        //   hex.classed("built", n.built);
+        }
+
+        function setSelected(b) {
+          return function(n) {
+            n.selected = b; return b;
+          }
         }
 
         function nodeClick(n) {
           // this click shouldn't also register on the background
           d3.event.stopPropagation();
 
-          var cover = d3.select(this);
-          if (cover.classed("selected")) {
+          var thisCover = d3.select(this);
+          if (thisCover.classed("selected")) {
             // already selected. unselect
-            cover.classed("selected", false);
+            thisCover.classed("selected", setSelected(false));
           } else {
             // not selected. unselect everything else and select this.
-            nodeCover.classed("selected", false);
-            cover.classed("selected", true);
+            covers.classed("selected", setSelected(false));
+            thisCover.classed("selected", setSelected(true));
           }
-          return true;
+          updateNodeDisplays();
         }
 
         function outsideClick() {
-          nodeCover.classed("selected", false);
+          covers.classed("selected", setSelected(false));
+          updateNodeDisplays();
         }
+
+
+        function getSelectedNode() {
+          for (var i=0; i<graph.nodes.length; i++) {
+            if (graph.nodes[i].selected) return graph.nodes[i];
+          }
+        }
+
+
+        function toggleBuilt(n) {
+          n.built = !n.built;
+          store[`built_${n.id}`] = n.built;
+        }
+
+        function keyDown(e) {
+          if (event.keyCode="KeyB") {
+            if (n = getSelectedNode()) {
+              toggleBuilt(n);
+              updateBuiltStatus();
+            }
+          }
+        }
+        
 
         function mouseover(n) {
           d3.select(`polygon#hex${n.id}`)
@@ -253,7 +331,7 @@
         function tick() {
 
           // draw directed edges with proper padding from node centers
-          path.attr('d', function (d) {
+          paths.attr('d', function (d) {
                 var deltaX = d.target.x - d.source.x,
                     deltaY = d.target.y - d.source.y,
                     dist = Math.sqrt(deltaX * deltaX + deltaY * deltaY),
@@ -269,15 +347,15 @@
             });
 
             var hexScale = nodeRadius/10;
-            hex.attr("transform", function (d) {
+            hexes.attr("transform", function (d) {
                 return `translate(${d.x}, ${d.y}) scale(${hexScale})`;
             });
 
-            nodeCover.attr("transform", function (d) {
+            covers.attr("transform", function (d) {
                 return `translate(${d.x}, ${d.y}) scale(${hexScale})`;
             });
 
-            level.attr("transform", function (d) {
+            levels.attr("transform", function (d) {
                 return `translate(${d.x+nodeRadius*0.5}, ${d.y+nodeRadius*0.5}) scale(${hexScale/3})`;
             });
 
