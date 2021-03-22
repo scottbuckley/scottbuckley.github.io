@@ -5,7 +5,7 @@
     {"id": "Generator_3", "group": 1, "type":"Generator", "level":3},
     {"id": "Heater_1", "group": 2, "type":"Heater", "level":1},
     {"id": "Heater_2", "group": 2, "type":"Heater", "level":2},
-    {"id": "Heater_3", "group": 2, "type":"Heater", "level":3},
+    {"id": "Heater_3", "group": 2, "type":"Heater", "level":3, "hidden":true},
     {"id": "Illumination_1", "group": 3, "type":"Illumination", "level":1},
     {"id": "Illumination_2", "group": 3, "type":"Illumination", "level":2},
     {"id": "Illumination_3", "group": 3, "type":"Illumination", "level":3},

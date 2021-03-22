@@ -1,0 +1,69 @@
+.hex {
+    stroke: #fff;
+    fill: black;
+    stroke-width: 0.5px;
+    opacity:0.6;
+  }
+  
+  g.built polygon.hex {
+    fill:green;
+  }
+  
+  .nodeCover {
+    fill: #ff00ff00;
+    stroke: none;
+    stroke-width:2px;
+  }
+  
+  g.selected .nodeCover {
+    stroke:black;
+    opacity:50%;
+  }
+  
+  .path {
+    fill: none;
+    stroke: #000;
+    stroke-width: 2px;
+    opacity: 0.5;
+    marker-end:url(#end-arrow-normal);
+  }
+  
+  .path.red {
+    stroke: red;
+    marker-end:url(#end-arrow-red);
+  }
+  
+  .path.green {
+    stroke: green;
+    marker-end:url(#end-arrow-green);
+  }
+  
+  marker#end-arrow-red {
+    fill:red;
+    stroke:red;
+  }
+  
+  marker#end-arrow-green {
+    fill:green;
+    stroke:green;
+  }
+  
+  .level {
+      fill: black;
+      font-family: Bender-Black;
+      font-size: 20px;
+      fill:#FFF;
+      stroke:#000;
+      stroke-width:1px;
+      letter-spacing:-2.5px;
+      text-anchor: middle;
+      alignment-baseline: central;
+  }
+  
+  .image {
+      fill: black;
+      font-family: Verdana;
+      font-size: 5px;
+      text-anchor: middle;
+      cursor: move;
+  }
