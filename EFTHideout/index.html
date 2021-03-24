@@ -40,6 +40,7 @@
     var gnodes = svg.selectAll(".gnode");
     var paths = svg.selectAll(".path");
     var markers;
+    var deletedGraph = {nodes:[], links:[]};
 
     // helper to process JSON links (so we don't have to write stuff by index)
     d3.json("hideout2.json", function (error, graph_) {
@@ -75,7 +76,7 @@
             .attr('d', 'M0,-5L10,0L0,5');
 
       buildGraph(true);
-
+      
 
       d3.select("body")
             .on("click", outsideClick)
@@ -101,7 +102,7 @@
           // .symmetricDiffLinkLengths(18)
           // .linkDistance(nodeSpacing)
           ;
-      console.log(graph);
+
       // build (add and remove) paths
       svg.selectAll(".path")
          .data(graph.links, (l)=>l.id)
@@ -229,12 +230,16 @@
       }
     }
 
-    function filterInPlace(a, condition) {
+    function filterInPlace(a, condition, removed=function(){}) {
       let i = 0, j = 0;
 
       while (i < a.length) {
         const val = a[i];
-        if (condition(val, i, a)) a[j++] = val;
+        var keep = condition(val, i, a);
+        if (keep)
+          a[j++] = val;
+        else
+          removed(a[i]);
         i++;
       }
 
@@ -242,23 +247,69 @@
       return a;
     }
 
-    function filterInPlace2(a, condition) {
+    function restoreGraph() {
+      deletedGraph.nodes.forEach((n)=>graph.nodes.push(n));
+      deletedGraph.links.forEach((l)=>graph.links.push(l));
+      deletedGraph.nodes = [];
+      deletedGraph.links = [];
+      buildGraph();
+    }
+
+    function filterInPlace2(a, condition, removed=function(){}) {
       return filterInPlace(a, function(){
         return !condition(...arguments);
-      })
+      }, removed)
+    }
+
+    function deleteNodesCond(cond) {
+      filterInPlace2(graph.nodes, cond, (rn)=>deletedGraph.nodes.push(rn));
+      filterInPlace2(graph.links, (l)=>{
+        return (cond(l.source) || cond(l.target));
+      }, (rl)=>deletedGraph.links.push(rl));
     }
 
     function deleteNode(n) {
-      filterInPlace2(graph.nodes, (n2)=>n2===n);
-      filterInPlace2(graph.links, (l)=>{
-        return (l.source===n || l.target===n);
-      });
-      buildGraph();
-      // d3cola.start();
+      return deleteNodesCond((n2)=>n2===n);
+    }
+
+    function deleteNodes(ns) {
+      ns.forEach((n) => deleteNode(n));
     }
 
 
 
+    function getParents(n) {
+      var pars = [];
+      graph.links.forEach(function(l){
+        if (l.target===n)
+          pars.push(l.source);
+      });
+      return pars;
+    }
+
+    function getRemainingParents(n) {
+      var ps = getParents(n);
+      ps.forEach((p) => {
+        // console.log(`${p.id} is a parent of ${n.id}`);
+        if (!p.built)
+          ps = ps.concat(getRemainingParents(p));
+      });
+      return ps;
+    }
+
+    function getRemainingParents2(n) {
+      return [...new Set(getRemainingParents(n))];
+    }
+
+    function showNodeRequirements(n) {
+      // var p = getParents(n);
+      // console.log(p);
+      var pp = getRemainingParents(n);
+      console.log(pp);
+      pp.push(n);
+      deleteNodesCond((n)=>pp.indexOf(n)===-1);
+      buildGraph();
+    }
 
 
 
@@ -284,7 +335,14 @@
         if (n = getSelectedNode()) {
           console.log('deleting '+n.id);
           deleteNode(n);
+          buildGraph();
         }
+      } else if (event.code==="KeyS") {
+        if (n = getSelectedNode()) {
+          showNodeRequirements(n);
+        }
+      } else if (event.code==="Escape") {
+        restoreGraph();
       }
     }
     
