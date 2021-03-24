@@ -131,7 +131,8 @@
         .enter().append("g")
           .attr("id", (n)=>n.id)
           .attr("class", "gnode")
-          .classed("built", (n)=>n.built);
+          .classed("built", (n)=>n.built)
+          .call(d3cola.drag);
 
       gnodes.append("polygon")
             .attr("class", "hex")
@@ -162,12 +163,15 @@
           .on("mouseout", mouseout)
           .on("click", nodeClick)
           .on("dblclick", nodeDblClick)
-          .call(d3cola.drag)
           .append("title")
             .text(prettyNodeName);
 
       gnodes.exit().remove();
       gnodes = svg.selectAll(".gnode");
+
+      graph.nodes.forEach(function(n) {
+        n.g = d3.select(`g#${n.id}`).node();
+      });
 
       d3cola.start(10,20,20);
     };
@@ -283,19 +287,17 @@
     function mouseover(n) {
       console.log(n);
       d3.event.stopPropagation();
-      d3.select(`polygon#${n.id}`)
+      d3.select(n.g)
         .transition()
         .duration(250)
-        .style("opacity", 0.3)
         .attr("points", biggerHex);
     }
 
     function mouseout(n) {
       d3.event.stopPropagation();
-      d3.select(`polygon#${n.id}`)
+      d3.select(n.g)
         .transition()
         .duration(250)
-        .style("opacity", 0.6)
         .attr("points", normalHex);
     }
 
