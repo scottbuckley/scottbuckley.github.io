@@ -18,6 +18,7 @@
     var nodeRadius = 30;
     var nodeSpacing = 90;
     var hexScale = nodeRadius/10;
+    var mouseOverScale = 1.5;
     var store = window.localStorage;
 
     var normalHex = "-8.6 -5,0 -10,8.6 -5,8.6 5,0 10,-8.6 5";
@@ -56,6 +57,7 @@
         var newlink = {...l}; // clone the link
         newlink.source = graph.dict[l.source];
         newlink.target = graph.dict[l.target];
+        newlink.id = `${l.source}_to_${l.target}`;
         graph.links.push(newlink);
       });
 
@@ -72,7 +74,7 @@
           .append('svg:path')
             .attr('d', 'M0,-5L10,0L0,5');
 
-      buildGraph();
+      buildGraph(true);
 
 
       d3.select("body")
@@ -82,25 +84,6 @@
 
 
 
-    function deleteSome() {
-      // graph.nodes = graph.nodes.filter(function(n, i){
-      //   if (i%2===0) {
-      //     // n.hidden = true;
-      //     // return false;
-      //   }
-      //   return true;
-      // });
-
-      // graph.links = graph.links.filter(function(l,i) {
-      //   console.log(l);
-      //   // return false;
-      // });
-      graph.nodes.splice(1,1);
-
-      buildGraph();
-      d3cola.start(1,1,1);
-    }
-
     var getIcon = function(n) {
       return `icons/${n.type}.png`;
     };
@@ -109,7 +92,7 @@
       return `${n.type} Level ${n.level}`;
     }
 
-    function buildGraph() {
+    function buildGraph(first = false) {
 
       d3cola
           .nodes(graph.nodes)
@@ -118,17 +101,27 @@
           // .symmetricDiffLinkLengths(18)
           // .linkDistance(nodeSpacing)
           ;
-
+      console.log(graph);
       // build (add and remove) paths
-      paths.data(graph.links)
-        .enter().append('svg:path')
-          .attr('class', 'path')
-        .exit().remove();
+      svg.selectAll(".path")
+         .data(graph.links, (l)=>l.id)
+         .enter()
+        .append("svg:path")
+          .attr("class", "path")
+          .attr("id", (l)=>l.id);
+
+      svg.selectAll(".path")
+         .data(graph.links, (l)=>l.id)
+         .exit()
+           .remove();
+
       paths = svg.selectAll(".path")
 
 
-      gnodes = gnodes.data(graph.nodes)
-        .enter().append("g")
+      gnodes = svg.selectAll(".gnode")
+        .data(graph.nodes,  (n)=>n.id)
+        .enter()//.each(function(n){console.log("adding", n);})
+        .append("g")
           .attr("id", (n)=>n.id)
           .attr("class", "gnode")
           .classed("built", (n)=>n.built)
@@ -166,14 +159,25 @@
           .append("title")
             .text(prettyNodeName);
 
-      gnodes.exit().remove();
+      // exit (delete DOM elements for nodes that are gone)
+      svg.selectAll(".gnode")
+        .data(graph.nodes, (n)=>n.id)
+        .exit()
+          .each(function(n){console.log("removing", n)})
+          .remove();
+
       gnodes = svg.selectAll(".gnode");
 
-      graph.nodes.forEach(function(n) {
+      graph.nodes.forEach(function(n, i) {
         n.g = d3.select(`g#${n.id}`).node();
+        n.index = i;
       });
 
-      d3cola.start(10,20,20);
+      if (first) {
+        d3cola.start(10,20,20);
+      } else {
+        d3cola.start();
+      }
     };
 
     function tick() {
@@ -225,9 +229,32 @@
       }
     }
 
+    function filterInPlace(a, condition) {
+      let i = 0, j = 0;
+
+      while (i < a.length) {
+        const val = a[i];
+        if (condition(val, i, a)) a[j++] = val;
+        i++;
+      }
+
+      a.length = j;
+      return a;
+    }
+
+    function filterInPlace2(a, condition) {
+      return filterInPlace(a, function(){
+        return !condition(...arguments);
+      })
+    }
+
     function deleteNode(n) {
-      console.log(n);
-      deleteSome();
+      filterInPlace2(graph.nodes, (n2)=>n2===n);
+      filterInPlace2(graph.links, (l)=>{
+        return (l.source===n || l.target===n);
+      });
+      buildGraph();
+      // d3cola.start();
     }
 
 
@@ -262,10 +289,8 @@
     }
     
     function nodeClick(n) {
-      console.log(n);
       // this click shouldn't also register on the background
       d3.event.stopPropagation();
-      console.log(this.parentNode);
 
       var thisGNode = d3.select(this.parentNode);
       if (thisGNode.classed("selected")) {
@@ -285,20 +310,19 @@
     }
 
     function mouseover(n) {
-      console.log(n);
       d3.event.stopPropagation();
-      d3.select(n.g)
+      d3.select(n.g).select("polygon.hex")
         .transition()
         .duration(250)
-        .attr("points", biggerHex);
+        .attr("transform", `scale(${hexScale*mouseOverScale})`);
     }
 
     function mouseout(n) {
       d3.event.stopPropagation();
-      d3.select(n.g)
+      d3.select(n.g).select("polygon.hex")
         .transition()
         .duration(250)
-        .attr("points", normalHex);
+        .attr("transform", `scale(${hexScale})`);
     }
 
 </script>
