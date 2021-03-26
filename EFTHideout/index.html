@@ -22,7 +22,6 @@
     var store = window.localStorage;
 
     var normalHex = "-8.6 -5,0 -10,8.6 -5,8.6 5,0 10,-8.6 5";
-    var biggerHex = "-13 -7.5,0 -15,13 -7.5,13 7.5,0 15,-13 7.5";
 
     // SETUP LIBS
     var d3cola = cola.d3adaptor(d3)
@@ -42,12 +41,20 @@
     var markers;
     var deletedGraph = {nodes:[], links:[]};
 
+    function buildNodeId(n) {
+      if (n.level===undefined)
+        n.id = n.type;
+      else
+        n.id = `${n.type}_${n.level}`;
+    }
+
     // helper to process JSON links (so we don't have to write stuff by index)
     d3.json("hideout2.json", function (error, graph_) {
       graph = graph_;
       // process named links
       graph.dict = [];
       graph.nodes.forEach(function (n, i) {
+        buildNodeId(n); // give the node an id from its type and level
         graph.dict[n.id] = i;
         n.height = n.width = nodeRadius*2.5;
         n.built = (store[`built_${n.id}`]==="true");
@@ -109,7 +116,8 @@
          .enter()
         .append("svg:path")
           .attr("class", "path")
-          .attr("id", (l)=>l.id);
+          .attr("id", (l)=>l.id)
+          .lower();
 
       svg.selectAll(".path")
          .data(graph.links, (l)=>l.id)
@@ -118,7 +126,7 @@
 
       paths = svg.selectAll(".path")
 
-
+      // build (add and remove) nodes
       gnodes = svg.selectAll(".gnode")
         .data(graph.nodes,  (n)=>n.id)
         .enter()//.each(function(n){console.log("adding", n);})
@@ -142,7 +150,9 @@
             .attr("height", 50)
             .attr("width", 50);
       
-      gnodes.append("text")
+      // add level (text) to the nodes that have a level
+      gnodes.filter((n)=>n.level!==undefined)
+            .append("text")
             .attr("class", "level")
             .text((n) => "0"+n.level)
             .attr("x", nodeRadius/2)
@@ -290,7 +300,6 @@
     function getRemainingParents(n) {
       var ps = getParents(n);
       ps.forEach((p) => {
-        // console.log(`${p.id} is a parent of ${n.id}`);
         if (!p.built)
           ps = ps.concat(getRemainingParents(p));
       });
@@ -302,8 +311,6 @@
     }
 
     function showNodeRequirements(n) {
-      // var p = getParents(n);
-      // console.log(p);
       var pp = getRemainingParents(n);
       console.log(pp);
       pp.push(n);
