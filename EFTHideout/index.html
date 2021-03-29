@@ -403,7 +403,7 @@
     }
 
     function dragstarted(e, d) {
-      if (!e.active) simulation.alphaTarget(0.3).restart();
+      if (!e.active) simulation.alphaTarget(0.01).restart();
       d.fx = d.x;
       d.fy = d.y;
     }
@@ -414,7 +414,7 @@
     }
 
     function dragended(e, d) {
-      if (!e.active) simulation.alphaTarget(0);
+      if (!e.active) simulation.alphaTarget(0.01);
       d.fx = null;
       d.fy = null;
     }
