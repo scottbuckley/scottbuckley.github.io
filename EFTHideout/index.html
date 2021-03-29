@@ -25,8 +25,8 @@
 
     var simulation = d3.forceSimulation()
       .force("link", d3.forceLink().id((n)=>n.id))
-      // .force("charge", d3.forceManyBody())
-      // .force("center", d3.forceCenter().strength(1))
+      .force("charge", d3.forceManyBody())
+      .force("center", d3.forceCenter().strength(0.25))
       .force("collision", d3.forceCollide().radius(nodeRadius*1.25).strength(0.75))
       .on("tick", tick);
 
