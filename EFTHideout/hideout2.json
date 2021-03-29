@@ -50,7 +50,7 @@
     {"type":"ScavCase"},
     {"type":"Library"}
   ],
-  "namedlinks":[
+  "links":[
     {"target":"Generator_2",            "source":"Generator_1"},
     {"target":"Generator_2",            "source":"Security_2"},
     {"target":"Generator_2",            "source":"Vents_2"},

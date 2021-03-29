@@ -6,8 +6,8 @@
     <title>Hideout D3 Cola</title>
     <link rel="stylesheet" type="text/css" href="font/MyFontsWebfontsKit.css">
     <link rel="stylesheet" type="text/css" href="hideoutstyle.css">
-    <script src="d3.v4.min.js"></script>
-    <script src="cola.min.js"></script>
+    <script src="d3.v6.min.js"></script>
+    <!-- <script src="cola.min.js"></script> -->
   </head>
   <body>
   <script>
@@ -23,16 +23,20 @@
 
     var normalHex = "-8.6 -5,0 -10,8.6 -5,8.6 5,0 10,-8.6 5";
 
-    // SETUP LIBS
-    var d3cola = cola.d3adaptor(d3)
-        .avoidOverlaps(true)
-        .size([width, height]);
-    
-    d3cola.on("tick", tick);
+    var simulation = d3.forceSimulation()
+      .force("link", d3.forceLink().id((n)=>n.id))
+      // .force("charge", d3.forceManyBody())
+      // .force("center", d3.forceCenter().strength(1))
+      .force("collision", d3.forceCollide().radius(nodeRadius*1.25).strength(0.75))
+      .on("tick", tick);
+
+    console.log(simulation);
 
     var svg = d3.select("body").append("svg")
         .attr("width", width)
-        .attr("height", height);
+        .attr("height", height)
+        .attr("viewBox", `${-width/2} ${-height/2} ${width} ${height}`);
+    svg = d3.select("svg");
     
     // GLOBAL
     var graph;
@@ -41,33 +45,33 @@
     var markers;
     var deletedGraph = {nodes:[], links:[]};
 
-    function buildNodeId(n) {
+    function getNodeId(n) {
       if (n.level===undefined)
-        n.id = n.type;
+        return n.type;
       else
-        n.id = `${n.type}_${n.level}`;
+        return `${n.type}_${n.level}`;
     }
-
     // helper to process JSON links (so we don't have to write stuff by index)
-    d3.json("hideout2.json", function (error, graph_) {
+    d3.json("hideout2.json").then(function (graph_) {
+      console.log("meow");
       graph = graph_;
+      
       // process named links
-      graph.dict = [];
       graph.nodes.forEach(function (n, i) {
-        buildNodeId(n); // give the node an id from its type and level
-        graph.dict[n.id] = i;
+        n.id = getNodeId(n); // give the node an id from its type and level
         n.height = n.width = nodeRadius*2.5;
         n.built = (store[`built_${n.id}`]==="true");
+        n.prettyName = prettyNodeName(n);
       });
 
-      graph.links = [];
-      graph.namedlinks.forEach(function(l){
-        var newlink = {...l}; // clone the link
-        newlink.source = graph.dict[l.source];
-        newlink.target = graph.dict[l.target];
-        newlink.id = `${l.source}_to_${l.target}`;
-        graph.links.push(newlink);
-      });
+      // graph.links = [];
+      // graph.namedlinks.forEach(function(l){
+      //   var newlink = {...l}; // clone the link
+      //   newlink.source = graph.dict[l.source];
+      //   newlink.target = graph.dict[l.target];
+      //   newlink.id = `${l.source}_to_${l.target}`;
+      //   graph.links.push(newlink);
+      // });
 
       //define a few markers
       svg.append('svg:defs').selectAll('marker')
@@ -96,23 +100,28 @@
       return `icons/${n.type}.png`;
     };
 
-    var prettyNodeName = function(n) {
-      return `${n.type} Level ${n.level}`;
+    function prettyNodeType(type) {
+      if (type==="BoozeGenerator") return "Booze Generator";
+      if (type==="NutritionUnit")  return "Nutrition Unit";
+      if (type==="ScavCase")       return "Scav Case";
+      if (type==="ShootingRange")  return "Shooting Range";
+      if (type==="IntelligenceCenter") return "Intelligence Center";
+      if (type==="BitcoinFarm")    return "Bitcoin Farm";
+      if (type==="RestSpace")      return "Rest Space";
+      return type;
+    }
+
+    function prettyNodeName(n) {
+      if (n.level===undefined)
+        return prettyNodeType(n.type);
+      return `${prettyNodeType(n.type)} Level ${n.level}`;
     }
 
     function buildGraph(first = false) {
 
-      d3cola
-          .nodes(graph.nodes)
-          .links(graph.links)
-          // .flowLayout("y", nodeRadius*2.5)
-          // .symmetricDiffLinkLengths(18)
-          // .linkDistance(nodeSpacing)
-          ;
-
       // build (add and remove) paths
       svg.selectAll(".path")
-         .data(graph.links, (l)=>l.id)
+         .data(graph.links)
          .enter()
         .append("svg:path")
           .attr("class", "path")
@@ -120,7 +129,7 @@
           .lower();
 
       svg.selectAll(".path")
-         .data(graph.links, (l)=>l.id)
+         .data(graph.links)
          .exit()
            .remove();
 
@@ -128,13 +137,19 @@
 
       // build (add and remove) nodes
       gnodes = svg.selectAll(".gnode")
-        .data(graph.nodes,  (n)=>n.id)
+        .data(graph.nodes, (n)=>n.id)
         .enter()//.each(function(n){console.log("adding", n);})
         .append("g")
           .attr("id", (n)=>n.id)
           .attr("class", "gnode")
           .classed("built", (n)=>n.built)
-          .call(d3cola.drag);
+          .call(d3.drag()
+            .on("start", dragstarted)
+            .on("drag", dragged)
+            .on("end", dragended));
+
+      gnodes.append("title")
+        .text((n)=>n.prettyName);
 
       gnodes.append("polygon")
             .attr("class", "hex")
@@ -167,14 +182,12 @@
           .on("mouseout", mouseout)
           .on("click", nodeClick)
           .on("dblclick", nodeDblClick)
-          .append("title")
-            .text(prettyNodeName);
+          
 
       // exit (delete DOM elements for nodes that are gone)
       svg.selectAll(".gnode")
         .data(graph.nodes, (n)=>n.id)
         .exit()
-          .each(function(n){console.log("removing", n)})
           .remove();
 
       gnodes = svg.selectAll(".gnode");
@@ -184,11 +197,11 @@
         n.index = i;
       });
 
-      if (first) {
-        d3cola.start(10,20,20);
-      } else {
-        d3cola.start();
-      }
+
+      simulation.nodes(graph.nodes);
+      simulation.force("link").links(graph.links);
+
+      simulation.alpha(0.5).restart();
     };
 
     function tick() {
@@ -312,7 +325,6 @@
 
     function showNodeRequirements(n) {
       var pp = getRemainingParents(n);
-      console.log(pp);
       pp.push(n);
       deleteNodesCond((n)=>pp.indexOf(n)===-1);
       buildGraph();
@@ -353,9 +365,9 @@
       }
     }
     
-    function nodeClick(n) {
+    function nodeClick(e, n) {
       // this click shouldn't also register on the background
-      d3.event.stopPropagation();
+      e.stopPropagation();
 
       var thisGNode = d3.select(this.parentNode);
       if (thisGNode.classed("selected")) {
@@ -374,20 +386,37 @@
       updateNodeDisplays();
     }
 
-    function mouseover(n) {
-      d3.event.stopPropagation();
+    function mouseover(e, n) {
+      e.stopPropagation();
       d3.select(n.g).select("polygon.hex")
         .transition()
         .duration(250)
         .attr("transform", `scale(${hexScale*mouseOverScale})`);
     }
 
-    function mouseout(n) {
-      d3.event.stopPropagation();
+    function mouseout(e, n) {
+      e.stopPropagation();
       d3.select(n.g).select("polygon.hex")
         .transition()
         .duration(250)
         .attr("transform", `scale(${hexScale})`);
+    }
+
+    function dragstarted(e, d) {
+      if (!e.active) simulation.alphaTarget(0.3).restart();
+      d.fx = d.x;
+      d.fy = d.y;
+    }
+
+    function dragged(e, d) {
+      d.fx = e.x;
+      d.fy = e.y;
+    }
+
+    function dragended(e, d) {
+      if (!e.active) simulation.alphaTarget(0);
+      d.fx = null;
+      d.fy = null;
     }
 
 </script>
