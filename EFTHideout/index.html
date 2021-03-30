@@ -21,6 +21,7 @@
     var mouseOverScale = 1.5;
     var store = window.localStorage;
 
+    // points for a hex of radius 10 around the origin
     var normalHex = "-8.6 -5,0 -10,8.6 -5,8.6 5,0 10,-8.6 5";
 
     var simulation = d3.forceSimulation()
@@ -29,8 +30,6 @@
       .force("center", d3.forceCenter().strength(0.25))
       .force("collision", d3.forceCollide().radius(nodeRadius*1.25).strength(0.75))
       .on("tick", tick);
-
-    console.log(simulation);
 
     var svg = d3.select("body").append("svg")
         .attr("width", width)
@@ -51,9 +50,27 @@
       else
         return `${n.type}_${n.level}`;
     }
+    
+    // not currently used
+    function buildNeighbourMatrices() {
+      graph.parents = [];
+      graph.children = [];
+      graph.links.forEach((l) => {
+        // set empty lists if undefined
+        graph.parents[l.target.id] ||= [];
+        graph.children[l.source.id] ||= [];
+        // record links
+        graph.parents[l.target.id].push(l.source);
+        graph.children[l.source.id].push(l.target);
+      });
+      graph.nodes.forEach((n)=>{
+        n.getChildren = function(){ return graph.children[n.id] || [] };
+        n.getParents = function(){ return graph.parents[n.id] || []; };
+      });
+    }
+
     // helper to process JSON links (so we don't have to write stuff by index)
     d3.json("hideout2.json").then(function (graph_) {
-      console.log("meow");
       graph = graph_;
       
       // process named links
@@ -200,8 +217,8 @@
 
       simulation.nodes(graph.nodes);
       simulation.force("link").links(graph.links);
-
       simulation.alpha(0.5).restart();
+      if (first) buildNeighbourMatrices();
     };
 
     function tick() {
@@ -233,6 +250,14 @@
         paths.classed("red",   (l) => l.target.selected && !l.source.built);
         paths.classed("green", (l) => l.target.selected &&  l.source.built);
       }
+
+      gnodes.style("opacity", (n)=>n.focus);
+      paths.style("opacity", (l)=>{
+        if (l.target.focus>0)
+          return l.source.focus;
+        return 0;
+      });
+
     }
 
     function updateBuiltStatus() {
@@ -245,12 +270,6 @@
 
     //   var hex = d3.select(`polygon#hex${n.id}`);
     //   hex.classed("built", n.built);
-    }
-
-    function setSelected(b) {
-      return function(n) {
-        n.selected = b; return b;
-      }
     }
 
     function filterInPlace(a, condition, removed=function(){}) {
@@ -330,6 +349,26 @@
       buildGraph();
     }
 
+    function decreaseFocus(oldval) {
+      return oldval-0.2;
+    }
+    
+    function focusAux(n, val) {
+      n.focus = val;
+      val = decreaseFocus(val);
+      n.getParents().map((p)=>{
+        if (p.focus===0)
+          focusAux(p, val);
+      });
+    }
+
+    function focus(n) {
+      console.log(n);
+      // set all focus to zero
+      graph.nodes.forEach((n)=>n.focus=0);
+      focusAux(n, 1);
+      
+    }
 
 
     function getSelectedNode() {
@@ -365,24 +404,35 @@
       }
     }
     
+    function setSelected(n) {
+      var g = d3.select(n.g);
+      if (g.classed("selected")) {
+        // already selected. unselect
+        g.classed("selected", setNodeSelectedFn(false));
+      } else {
+        // not selected. unselect everything else and select this.
+        gnodes.classed("selected", setNodeSelectedFn(false));
+        g.classed("selected", setNodeSelectedFn(true));
+      }
+    }
+
+    function setNodeSelectedFn(b) {
+      return function(n) {
+        n.selected = b; return b;
+      }
+    }
+
     function nodeClick(e, n) {
       // this click shouldn't also register on the background
       e.stopPropagation();
-
-      var thisGNode = d3.select(this.parentNode);
-      if (thisGNode.classed("selected")) {
-        // already selected. unselect
-        thisGNode.classed("selected", setSelected(false));
-      } else {
-        // not selected. unselect everything else and select this.
-        gnodes.classed("selected", setSelected(false));
-        thisGNode.classed("selected", setSelected(true));
-      }
+      setSelected(n);
+      focus(n);
       updateNodeDisplays();
     }
 
     function outsideClick() {
-      gnodes.classed("selected", setSelected(false));
+      gnodes.classed("selected", setNodeSelectedFn(false));
+      graph.nodes.forEach((n)=>n.focus=1);
       updateNodeDisplays();
     }
 
