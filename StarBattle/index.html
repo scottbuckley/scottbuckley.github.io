@@ -1,0 +1,1348 @@
+<html>
+  <head>
+    <title>Star Battle</title>
+    <!-- <link rel="stylesheet" href="style.css" type="text/css"/> -->
+    <script src="jquery-3.4.1.min.js"></script>
+    <script type="text/javascript">
+
+
+
+  /*#####   ##        #######  ########     ###    ##        ######  
+  ##    ##  ##       ##     ## ##     ##   ## ##   ##       ##    ## 
+  ##        ##       ##     ## ##     ##  ##   ##  ##       ##       
+  ##   #### ##       ##     ## ########  ##     ## ##        ######  
+  ##    ##  ##       ##     ## ##     ## ######### ##             ## 
+  ##    ##  ##       ##     ## ##     ## ##     ## ##       ##    ## 
+   ######   ########  #######  ########  ##     ## ########  #####*/
+
+  const UNK    = 0;
+  const STAR   = 1;
+  const NOSTAR = 2;
+
+  const autosolve = true;
+  var autoSolveWait = 20;
+  const initialSolves = 0;
+
+  // INTERACTIVITY SETTINGS
+  var MODE_SETTING = false;
+
+  // CONSTANTS
+  // some example slitherlinks
+  const data_test1  = "111222222.133222222.333344445.333334445.633333345.663377744.666677794.866667794.888666794";
+  const data_test2  = "111122333.114122226.114452226.714152266.711158266.711888866.777888866.777788866.777999666";
+  const data_test3  = "";
+  const data_test4  = "";
+  const data_test5  = "";
+  const data_test6  = "";
+  const data_test7  = "";
+  const data_test8  = "";
+  const data_test9  = "";
+  const data_test10 = "";
+  const data_test11 = "";
+  const data_test12 = "";
+  const data_default = data_test2; // this one will be loaded automatically.
+
+  const allTests = [data_test1, data_test2, data_test3, data_test4, data_test5, data_test6, data_test7, data_test8, data_test9, data_test10];
+  var sideLength = 10;
+  var cellSize;
+
+  const colorProfile = randomColorProfile();
+  const bgColor      = colorFromProfile(colorProfile, 0, 0);
+  const starColor    = colorFromProfile(colorProfile, -40, -5);
+  const noStarColor  = colorFromProfile(colorProfile, +40);
+  const unkColor     = colorFromProfile(colorProfile, 0, 5);
+  const editColor    = colorFromProfile(colorProfile, +80);
+
+  const bgColorCompleted = "#04c80f";
+  const bgColorFailed    = "#fb453b";
+  const bgColorErrored   = "#fba53b";
+
+  var rows = [];
+  var cols = [];
+  var regions = [];
+  var allCells = [];
+  var allGroups = [];
+  var allRowCols = [];
+
+  var isIniFrame=false;
+  var puzzleComplete = false;
+  var puzzleFailed = false;
+  var puzzleErrored = false;
+
+  var canvas;
+  var ctx = undefined;
+  var gridOffset;
+
+
+
+  /*     ## ####  ######   ##     ##         ##       ######## ##     ## ######## ##       
+  ##     ##  ##  ##    ##  ##     ##         ##       ##       ##     ## ##       ##       
+  ##     ##  ##  ##        ##     ##         ##       ##       ##     ## ##       ##       
+  #########  ##  ##   #### ######### ####### ##       ######   ##     ## ######   ##       
+  ##     ##  ##  ##    ##  ##     ##         ##       ##        ##   ##  ##       ##       
+  ##     ##  ##  ##    ##  ##     ##         ##       ##         ## ##   ##       ##       
+  ##     ## ####  ######   ##     ##         ######## ########    ###    ######## #######*/
+
+  function onReady() {
+    // set up canvas
+    canvas = $("#canvas")[0];
+    ctx = canvas.getContext("2d");
+    
+    // figure out which puzzle to load
+    var data = getQueryVariable("data");
+    if (data===undefined) data=data_default;
+
+    // if we are given the URI vairable "iframe" change some things
+    if (getQueryVariable("iframe"))
+      configureiframe();
+
+    // load puzzle
+    buildField(data);
+    drawField();
+
+    // set up interaction stuff
+    initKeyboardMouse();
+
+    // perform starting solve actions
+    if (autosolve) {
+      doAutoSolve();
+    } else {
+      for (var i=0; i<initialSolves; i++)
+        makeProgress();
+      refresh();
+    }
+  }
+
+  function doAutoSolve() {
+    puzzleComplete = false;
+    puzzleFailed = false;
+    puzzleErrored = false;
+    function step() {
+      if (makeProgress()) {
+        setTimeout(step, autoSolveWait);
+      } else {
+        var result = checkErrors(false);
+        if (result===INCOMPLETE) {
+          consoleError("Could not complete the puzzle.");
+          puzzleFailed = true;
+        } else if (result===ERROR) {
+          consoleError("Made errors trying to complete the puzzle.");
+          puzzleErrored = true;
+        } else if (result===COMPLETE) {
+          consoleWarn("Puzzle successfully completed without errors.");
+          puzzleComplete = true;
+        } else {
+          console.error("weird error: ", result);
+        }
+      }
+      drawField();
+    }
+    step();
+  }
+
+  // disablable logging
+  var logging = true;
+  function consoleLog() { logging && console.log(...arguments); }
+  function consoleWarn() { logging && console.warn(...arguments); }
+  function consoleError() { logging && console.error(...arguments); }
+
+  // testing that all the tests in "allTests" can be solved
+  function regressionTest() {
+    logging = false;
+    var fails = 0;
+    for (var i=0; i<allTests.length; i++) {
+      testString = allTests[i];
+      buildField(testString);
+      while (makeProgress());
+      if (checkErrors(false)!==COMPLETE) {
+        console.error("Could not solve test number %i.", (i+1));
+        fails++;
+      }
+    }
+    logging = true;
+    if (fails===0) {
+      consoleWarn("Successfully solved all tests.");
+    } else {
+      consoleWarn("Some tests failed.");
+    }
+  }
+
+  var ignoredChars = [".", "\n"];
+  function getFieldKeys(data) {
+    var keys = [];
+    var indices = [];
+    var maxind = 0;
+    for (var i=0; i<data.length; i++) {
+      var key = data[i];
+      if (ignoredChars.indexOf(key)!==-1) continue;
+      if (keys.indexOf(key)==-1) {
+        keys.push(key);
+        indices[key] = maxind++;
+      }
+    }
+    return [keys, indices];
+  }
+
+  function buildField(data) {
+    // console.log(`building rows from ${data}`);
+    // empty lists
+    cols = [];
+    rows = [];
+    regions = [];
+    allCells = [];
+    allGroups = [];
+    allRowCols = [];
+
+    // get the input keys and the side length (side length = number of regions/keys)
+    [keys, keyIndices] = getFieldKeys(data);
+    sideLength = Math.floor(Math.sqrt(data.length));
+
+    // set up empty row/col lists
+    for (var i=0; i<sideLength; i++) {
+      rows[i] = new Row(i);
+      cols[i] = new Col(i);
+      allGroups.push(rows[i], cols[i]);
+      allRowCols.push(rows[i], cols[i]);
+    }
+    for (var i=0; i<keys.length; i++) {
+      regions[i] = new Region(i);
+      allGroups.push(regions[i]);
+    }
+
+    // create all the cells
+    var i = 0;
+    for (var r=0; r<sideLength; r++) {
+      for (var c=0; c<sideLength; c++) {
+        var cell = new cellProto();
+        rows[r][c] = cell;
+        cols[c][r] = cell;
+        
+        // skip any ignorable characters
+        while (ignoredChars.indexOf(data[i])!==-1) i++;
+        
+        // set the cell's ordinality
+        var regionKey = data[i++];
+        var regionIndex = keyIndices[regionKey];
+
+        // tell the cell where it is
+        cell.row = r;
+        cell.col = c;
+        
+        cell.region = regions[regionIndex];
+
+        regions[regionIndex].push(cell);
+        allCells.push(cell);
+      }
+    }
+  }
+
+  function meowButton() {
+    // randomQuad();
+    // randomCell();
+    // if (makeProgress()) {
+      // setTimeout(meowButton, 10);
+    // }
+    makeProgress(true);
+    drawField();
+  }
+
+  function refresh() {
+    drawField();
+  }
+
+  function drawField() {
+    // figure out canvas size
+    var canvasSize = Math.min(window.innerHeight, window.innerWidth)-20;
+    
+    if (canvas.height!==canvasSize || canvas.width!==canvasSize) {
+      canvas.height = canvasSize;
+      canvas.width  = canvasSize;
+      canvasMid = canvasSize/2;
+      cellSize = (canvasSize/(sideLength+4));
+    }
+    var center = canvas.width/2;
+    gridOffset = cellSize*2;
+
+    // draw background
+    ctx.fillStyle = bgColor;
+
+    // if in an iframe, potentially draw a different coloured border (if solving is finished)
+    if (isIniFrame) {
+      if (puzzleComplete) {
+        ctx.fillStyle = bgColorCompleted;
+      } else if (puzzleFailed) {
+        ctx.fillStyle = bgColorFailed;
+      } else if (puzzleErrored) {
+        ctx.fillStyle = bgColorErrored;
+      }
+    }
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (isIniFrame) {
+      var statusBorderWidth = cellSize/3;
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(statusBorderWidth, statusBorderWidth, canvas.width-statusBorderWidth*2, canvas.height-statusBorderWidth*2);
+    }
+
+    // draw "setting" label
+    if (MODE_SETTING) drawSettingLabel();
+
+    // draw the grid
+    for (var i=0; i<allCells.length; i++)
+      allCells[i].drawBG();
+    for (var i=0; i<allCells.length; i++)
+      allCells[i].drawMe();
+  }
+
+  function drawSettingLabel() {
+    ctx.font = (cellSize*0.57)+"px Arial"
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle"; 
+    ctx.fillStyle = '#0009';
+    ctx.fillText("SETTING GRID", canvasMid, cellSize);
+  }
+
+
+
+  function randomColorProfile() {
+    return [360 * Math.random()
+            ,(35 + 20 * Math.random())
+            ,(80 + 3 * Math.random())
+            ];
+  }
+
+  function colorFromProfile(profile, off=0, lightoff=0) {
+    var [h, s, l] = profile;
+    h = (h+off)%360;
+    l = l+lightoff;
+    return `hsl(${h},${s}%,${l}%)`;
+  }
+  
+
+/*                                                                   
+  # #    # ##### ###### #####    ##    ####  ##### #  ####  #    # 
+  # ##   #   #   #      #    #  #  #  #    #   #   # #    # ##   # 
+  # # #  #   #   #####  #    # #    # #        #   # #    # # #  # 
+  # #  # #   #   #      #####  ###### #        #   # #    # #  # # 
+  # #   ##   #   #      #   #  #    # #    #   #   # #    # #   ## 
+  # #    #   #   ###### #    # #    #  ####    #   #  ####  #    # 
+*/
+
+  var dragRegion = undefined;
+
+  function configureiframe() {
+    isIniFrame = true;
+    var anchor = $("a#selflink");
+    anchor.append(canvas);
+    anchor.attr("href", `?data=${getQueryVariable("data")}`);
+
+    // adjust the wait times to be a bit different from eachother
+    var waitVariance = autoSolveWait*0.3;
+    var delta = Math.random()*waitVariance*2 - waitVariance;
+    autoSolveWait += delta;
+  }
+
+  function initKeyboardMouse() {
+    $(document).off("keydown").keydown(processKeys);
+
+    $(canvas).off("mousedown").on("mousedown", mouseDown);
+
+    $(canvas).off("mousemove").on("mousemove", mouseDrag);
+
+    $(document).off("mouseup").on("mouseup", mouseUp);
+  }
+
+  function processKeys(e) {
+    if (e.code==="KeyS") {
+      toggleSetMode();
+    } else if (e.code==="KeyE") {
+      var str = getRegionExportString();
+      navigator.clipboard.writeText(str);
+      location.href = `index.html?data=${str}`;
+      console.log(str);
+    } else if (e.code==="KeyR") {
+      if (MODE_SETTING) {
+        emptyRegions();
+        resetField();
+      }
+    }
+    drawField();
+  }
+
+  function toggleSetMode() {
+    MODE_SETTING = !MODE_SETTING;
+    renewRegions();
+  }
+
+  function findCell(e) {
+    var x = e.offsetX;
+    var y = e.offsetY;
+
+    var r = Math.floor((y-gridOffset)/cellSize);
+    var c = Math.floor((x-gridOffset)/cellSize);
+
+    if (r<0 || r>=rows.length) return undefined;
+    if (c<0 || c>=cols.length) return undefined;
+
+    return rows[r][c];
+  }
+
+  function mouseDown(e) {
+    if (!MODE_SETTING) return;
+    initiateNewRegion(e);
+    drawField();
+  }
+
+  function mouseDrag(e) {
+    if (!MODE_SETTING || dragRegion===undefined) return;
+    extendRegion(e);
+    drawField();
+  }
+
+  function mouseUp(e) {
+    dragRegion = undefined;
+    renewRegions(true);
+  }
+
+  function moveCellToRegion(cell, region) {
+    // remove the cell from the old region
+    cell.region.removeCell(cell);
+
+    // add the cell to the new region
+    cell.region = region;
+    region.push(cell);
+  }
+
+  function initiateNewRegion(e) {
+    var cell = findCell(e);
+    if (cell===undefined) return;
+    dragRegion = new Region();
+    regions.push(dragRegion);
+    moveCellToRegion(cell, dragRegion);
+  }
+
+  function extendRegion(e) {
+    var cell = findCell(e);
+    if (cell===undefined) return;
+    if (cell.region===dragRegion) return;
+    moveCellToRegion(cell, dragRegion);
+  }
+
+  function renewRegions(ignoreSpecialIndex=false) {
+    // delete all empty regions
+    regions.filterInPlace((r)=>r.length>0);
+
+    // reset all region indices
+    regions.forEach((region, i)=>{
+      if (ignoreSpecialIndex && region.index===-1) return;
+      region.index = i;
+    });
+  }
+
+  function emptyRegions() {
+    var region = new Region(-1);
+    regions.push(region);
+    allCells.forEach((c)=>moveCellToRegion(c, region));
+    renewRegions(true);
+  }
+
+  function resetField() {
+    allCells.forEach((c)=>c.state = UNK);
+  }
+
+  function symbolFromIndex(index) {
+    if (index>=0 && index<10) return ""+index;
+    return String.fromCharCode(65+index-10);
+  }
+
+  function getRegionExportString() {
+    renewRegions();
+    var out = "";
+    rows.forEach((row)=>{
+      row.forEach((cell)=>{
+        out += symbolFromIndex(cell.region.index+1);
+      });
+    });
+    return out;
+  }
+
+
+
+   /*####  ##          ###     ######   ######  ########  ######  
+  ##    ## ##         ## ##   ##    ## ##    ## ##       ##    ## 
+  ##       ##        ##   ##  ##       ##       ##       ##       
+  ##       ##       ##     ##  ######   ######  ######    ######  
+  ##       ##       #########       ##       ## ##             ## 
+  ##    ## ##       ##     ## ##    ## ##    ## ##       ##    ## 
+   ######  ######## ##     ##  ######   ######  ########  ####*/
+
+  // CELL
+  function cellProto(that = this) {
+    that.row = 0;
+    that.col = 0;
+    that.region = undefined;
+    that.state = UNK;
+
+    that.isKnown = function() {
+      return (that.state === STAR || that.state === NOSTAR);
+    }
+
+    that.isUnknown = function() {
+      return (that.state === UNK);
+    }
+
+    that.isStar = function() {
+      return (that.state === STAR);
+    }
+
+    that.setStar = function(star=true) {
+      if (star)
+        that.state = STAR;
+      else
+        that.state = NOSTAR;
+    }
+
+    that.notStar = function() {
+      return (that.state === NOSTAR)
+    }
+
+    that.textSymbol = function() {
+      if (that.isStar()) return "☆";
+      if (that.notStar()) return ".";
+      return "";
+    }
+
+    // draw the background for this cell
+    that.drawBG = function() {
+      var [x, y] = that.getPos();
+
+      if (that.state===STAR) {
+        ctx.fillStyle = starColor;
+      } else if (that.state===UNK) {
+        ctx.fillStyle = unkColor;
+      } else if (that.state===NOSTAR) {
+        ctx.fillStyle = noStarColor;
+      }
+
+      // special regions (for editing) shown in a weird color
+      if (that.region.index===-1) {
+        ctx.fillStyle = editColor;
+      }
+
+      ctx.fillRect(x, y, cellSize, cellSize);
+    }
+
+    // draw the main content of this cell
+    that.drawMe = function() {
+      var [x, y] = that.getPos();
+
+      if (that.isKnown()) {
+        ctx.font = (cellSize*0.57)+"px Arial"
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle"; 
+        ctx.fillStyle = '#0009';
+        if (that.isStar())
+          ctx.fillText(that.textSymbol(), x+(cellSize/2), y+(cellSize/1.9));
+        else
+          ctx.fillText(that.textSymbol(), x+(cellSize/2), y+(cellSize/2.5));
+      }
+      that.drawBorders();
+    }
+
+    that.getCornerPos = function(i) {
+      var [x, y] = that.getPos();
+      if (i===0) return [x+cellSize, y];
+      if (i===1) return [x+cellSize, y+cellSize];
+      if (i===2) return [x, y+cellSize];
+      if (i===3) return [x, y];
+    }
+
+    
+    // draw the outline of a cell (including borders between regions)
+    that.drawBorders = function() {
+      var [x, y] = that.getPos();
+
+      // consider each cardinal reiction from this cell
+      for (var i=0; i<4; i++) {
+        // get the neighbouring cell in that direction
+        var nbr = that.cellAt(i);
+
+        // avoid redrawing internal borders
+        if (i<2 && nbr) continue;
+
+        // set the appropriate color for the link
+        var sameRegion = (nbr!==undefined) && (that.region.index === nbr.region.index);
+        if (sameRegion) {
+          ctx.strokeStyle = '#0002'; // light grey
+        } else {
+          ctx.strokeStyle = '#000A'; // black
+        }
+
+        // draw the link
+        ctx.lineCap = "round";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        if (i===0) {
+          ctx.moveTo(x, y);
+          ctx.lineTo(x+cellSize, y);
+        } else if (i===1) {
+          ctx.moveTo(x+cellSize, y);
+          ctx.lineTo(x+cellSize, y+cellSize);
+        } else if (i===2) {
+          ctx.moveTo(x+cellSize, y+cellSize);
+          ctx.lineTo(x, y+cellSize);
+        } else if (i===3) {
+          ctx.moveTo(x, y+cellSize);
+          ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+    }
+    
+    that.leftCell = function() {
+      if (that.col===0) return undefined;
+      return rows[that.row][that.col-1];
+    }
+    that.rightCell = function() {
+      if (that.col===sideLength-1) return undefined;
+      return rows[that.row][that.col+1];
+    }
+    that.topCell = function() {
+      if (that.row===0) return undefined;
+      return rows[that.row-1][that.col];
+    }
+    that.bottomCell = function() {
+      if (that.row===sideLength-1) return undefined;
+      return rows[that.row+1][that.col];
+    }
+
+    that.topRightCell = function() {
+      if (that.row===0 || that.col===sideLength-1) return undefined;
+      return rows[that.row-1][that.col+1];
+    }
+    that.bottomRightCell = function() {
+      if (that.row===sideLength-1 || that.row===sideLength-1) return undefined;
+      return rows[that.row+1][that.col+1];
+    }
+    that.bottomLeftCell = function() {
+      if (that.row===sideLength-1 || that.col===0) return undefined;
+      return rows[that.row+1][that.col-1];
+    }
+    that.topLeftCell = function() {
+      if (that.row===0 || that.col===0) return undefined;
+      return rows[that.row-1][that.col-1];
+    }
+
+
+
+    that.cellAt = function(ind) {
+      if (ind===0) return that.topCell();
+      if (ind===1) return that.rightCell();
+      if (ind===2) return that.bottomCell();
+      if (ind===3) return that.leftCell();
+      return undefined;
+    }
+
+    that.diagCellAt = function(i) {
+      if (i===0) return that.topRightCell();
+      if (i===1) return that.bottomRightCell();
+      if (i===2) return that.bottomLeftCell();
+      if (i===3) return that.topLeftCell();
+      return undefined;
+    }
+
+    that.getAllNeighbours = function(filter=(c)=>true, includeDiag=true) {
+      var nbrs = [];
+
+      // add orthogonal neighbours
+      for (var i=0; i<4; i++) {
+        var nbr = that.cellAt(i);
+        if (nbr && filter(nbr)) nbrs.push(nbr);
+      }
+
+      // add diagonal neighbours
+      if (includeDiag) {
+        for (var i=0; i<4; i++) {
+          var nbr = that.diagCellAt(i);
+          if (nbr && filter(nbr)) nbrs.push(nbr);
+        }
+      }
+      
+      return nbrs;
+    }
+
+    that.getPos = function() {
+      var x = gridOffset + cellSize * that.col;
+      var y = gridOffset + cellSize * that.row;
+      return [x, y];
+    }
+  // end of cellProto definition
+  }
+
+  var autoGroupIndex = 0;
+  class cellGroup extends Array {
+    constructor(i=autoGroupIndex) {
+      super();
+
+      this.index = i;
+
+      // make sure autoGroupIndex is always greater than any index
+      autoGroupIndex = Math.max(i, autoGroupIndex)+1;
+
+    }
+
+    containsCell(cell) {
+      return (this.indexOf(cell)!==-1);
+    }
+
+    onlyUnknowns() {
+      return this.filter((c)=>c.isUnknown());
+    }
+
+    // the number of cells in this group that are confirmed stars
+    numStars() {
+      return this.countIf((c)=>c.isStar());
+    }
+
+    numStarsRemaining() {
+      return 2-this.numStars();
+    }
+
+    numUnknowns() {
+      return this.countIf((c)=>c.isUnknown());
+    }
+
+    // whether all cells are known
+    isCompleted() {
+      return this.forEachUntilFalse((c)=>c.isKnown());
+    }
+
+    removeCell(cell) {
+      this.filterInPlace((c)=>c!==cell);
+    }
+
+    // return a new region that is a subset of this region, but only the unknown cells.
+    onlyUnknowns() {
+      return this.filter((c)=>c.isUnknown());
+    }
+
+    // a sensible name for this group
+    groupName() {
+      this._groupName = `${this.groupType} ${this.index+1}`;
+      return this._groupName;
+      
+    }
+  }
+
+  // REGION
+  class Region extends cellGroup {
+    constructor(i) {
+      super(i);
+      this.groupType = "Region";
+    }
+
+    getTotalSize(returnBounds = false) {
+      var rows = this.map((c)=>c.row);
+      var cols = this.map((c)=>c.col);
+      if (returnBounds)
+        return [1+max(cols)-min(cols), 1+max(rows)-min(rows), min(rows), max(rows), min(cols), max(cols)];
+      else
+        return [1+max(cols)-min(cols), 1+max(rows)-min(rows)];
+    }
+
+    groupIdent(cell) {
+      return cell.region.index;
+    }
+  }
+
+  class Row extends cellGroup {
+    constructor(i) {
+      super(i);
+      this.groupType = "Row";
+    }
+
+    getUnknownLength() {
+      var min = this.length;
+      var max = -1;
+      for (var i=0; i<this.length; i++) {
+        if (this[i].isUnknown()) {
+          if (i < min) min = i;
+          if (i > max) max = i;
+        }
+      }
+      return 1+max-min;
+    }
+
+    groupIdent(cell) {
+      return cell.row;
+    }
+  }
+
+  class Col extends Row {
+    constructor(i) {
+      super(i);
+      this.groupType = "Col";
+    }
+
+    groupIdent(cell) {
+      return cell.col;
+    }
+  }
+
+
+
+
+ /*     ## ######## ##       ########  ######## ########   ######  
+ ##     ## ##       ##       ##     ## ##       ##     ## ##    ## 
+ ##     ## ##       ##       ##     ## ##       ##     ## ##       
+ ######### ######   ##       ########  ######   ########   ######  
+ ##     ## ##       ##       ##        ##       ##   ##         ## 
+ ##     ## ##       ##       ##        ##       ##    ##  ##    ## 
+ ##     ## ######## ######## ##        ######## ##     ##  #####*/
+
+  const INCOMPLETE = 50;
+  const COMPLETE   = 100;
+  const ERROR      = 70;
+
+  function checkErrors(log = true) {
+    var isComplete = !allCells.forEachUntilTrue((cell)=>cell.isUnknown());
+    
+    if (isComplete) {
+      var hasErrors = false;
+
+      // each row has two stars
+      rows.forEach((row)=>{
+        if (row.countIf((cell)=>cell.isStar()) !== 2)
+          hasErrors = true;
+      });
+
+      // each col has two stars
+      cols.forEach((col)=>{
+        if (col.countIf((cell)=>cell.isStar()) !== 2)
+          hasErrors = true;
+      });
+
+      // each region has two stars
+      regions.forEach((rgn)=>{
+        if (rgn.countIf((cell)=>cell.isStar()) !== 2)
+          hasErrors = true;
+      });
+
+      // no stars are adjacent to other stars
+      allCells.forEach((cell)=>{
+        if (cell.isStar()) {
+          cell.getAllNeighbours().forEach((nbr)=>{
+            if (nbr.isStar())
+              hasErrors = true;
+          });
+        }
+      });
+
+      // return 'error' or 'complete'
+      if (hasErrors) {
+        log && consoleError("Puzzle completed, but with errors!");
+        return ERROR;
+      } else {
+        log && consoleWarn("Puzzle completed. No errors found.");
+        return COMPLETE;
+      }
+    } else {
+      // return 'incomplete'
+      log && consoleError("Puzzle could not be completed.");
+      return INCOMPLETE;
+    }
+  }
+
+  function min(arr) {
+    return Math.min(...arr);
+  }
+
+  function max(arr) {
+    return Math.max(...arr);
+  }
+
+  // iterate, counting the number of times fn returns true.
+  Array.prototype.countIf = function(fn) {
+    var count = 0;
+    this.forEach((e)=>{
+      if (fn(e)) count++;
+    });
+    return count;
+  }
+
+  // iterate until fn returns true on an element, at which point return true.
+  // if fn never returns true, return false.
+  Array.prototype.forEachUntilTrue = function(fn) {
+    for (var i=0; i<this.length; i++)
+      if (fn(this[i], i, this)) return true;
+    return false;
+  }
+
+  // iterate until fn returns false on an element, at which point return false.
+  // if fn never returns false, return true.
+  Array.prototype.forEachUntilFalse = function(fn) {
+    for (var i=0; i<this.length; i++)
+      if (!fn(this[i], i, this)) return false;
+    return true;
+  }
+
+  Array.prototype.filterInPlace = function(condition) {
+    let i=0, j=0;
+
+    while (i<this.length) {
+      const val = this[i];
+      if (condition(val, i, this)) this[j++] = val;
+      i++;
+    }
+
+    this.length = j;
+    return this;
+  }
+
+  function getQueryVariable(variable, decode=true) {
+    var query = window.location.search.substring(1);
+    var vars = query.split("&");
+    for (var i=0;i<vars.length;i++) {
+      var pair = vars[i].split("=");
+      if(pair[0] == variable) {
+        if (decode) return decodeURIComponent(pair[1]);
+        return pair[1];
+      }
+    }
+    return undefined;
+  }
+
+  /*####   #######  ##       ##     ## #### ##    ##  ######   
+ ##    ## ##     ## ##       ##     ##  ##  ###   ## ##    ##  
+ ##       ##     ## ##       ##     ##  ##  ####  ## ##        
+  ######  ##     ## ##       ##     ##  ##  ## ## ## ##   #### 
+       ## ##     ## ##        ##   ##   ##  ##  #### ##    ##  
+ ##    ## ##     ## ##         ## ##    ##  ##   ### ##    ##  
+  ######   #######  ########    ###    #### ##    ##  #####*/
+
+var strats = [
+  {
+    name: "Cells around stars",
+    fn: clearAdjacentCells,
+  }, {
+    name: "Finished rows/cols/regions.",
+    fn: checkTwoStars,
+  }, {
+    name: "Filled only available spots.",
+    fn: checkOnlySpots,
+  }, {
+    name: "1x3 Regions",
+    fn: check1x3Regions,
+    static: true,
+  }, {
+    name: "Small Regions",
+    fn: checkSmallRegions,
+  }, {
+    name: "Regions with a 2x2 and a single",
+    fn: checkRegionsWithOne2x2AndOneSingle,
+  }, {
+    name: "1x3 unknown regions",
+    fn: check1x3UnknownRegions,
+    skip: false
+  }, {
+    name: "Small Regions",
+    fn: checkSmallUnknownRegions,
+    skip: false
+  }, {
+    name: "1x3 unknown row/cols",
+    fn: check1x3UnknownRowCols,
+    skip: false
+  }, {
+    name: "Two 2x2 subregions",
+    fn: checkRegionsWithTwo2x2s,
+    skip: false
+  }
+];
+
+function makeProgress(fromButton = false) {
+  // call each strat.fn until one returns true
+  return strats.forEachUntilTrue((strat) => {
+    if (strat.skip) return false;
+    var progress = strat.fn();
+    return progress;
+  });
+}
+
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+function clearAdjacentCells() {
+  var changed = false;
+  allCells.forEach((cell) => {
+    if (cell.isStar()) {
+      cell.getAllNeighbours((c)=>c.isUnknown()).forEach((nbr)=>{
+        changed = true;
+        nbr.setStar(false);
+      });
+    }
+  });
+  if (changed) consoleLog("Cleared cells adjacent to confirmed stars.");
+  return changed;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+function checkTwoStars() {
+  // a function to call on a group, which fills out unknown cells if two
+  // stars are already present in the group.
+  var twoStars = function(group) {
+    if (group.isCompleted()) return false;
+    if (group.numStars()===2) {
+
+      group.forEach((c)=>{
+        if (c.isUnknown()) c.setStar(false);
+      });
+      consoleLog(`Found two stars in ${group.groupName()} and cleared the rest.`);
+      return true;
+    }
+    return false;
+  };
+
+  return allGroups.forEachUntilTrue(twoStars);
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+function checkOnlySpots() {
+  return allGroups.forEachUntilTrue((group) => {
+    if (group.isCompleted()) return false;
+    
+    if (group.numUnknowns() === group.numStarsRemaining()) {
+      group.forEach((c)=>{
+        if (c.isUnknown()) c.setStar();
+      });
+      consoleLog(`Filled in star(s) at only available spots in ${group.groupName()}.`);
+      return true;
+    }
+    return false;
+  });
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+function check1x3Regions() {
+  // find regions of total size 1x3. these must have stars set in the first and last cells of them.
+  return regions.forEachUntilTrue((region)=>{
+    var [w, h] = region.getTotalSize();
+    if ((w===1 && h===3) || (w===3 && h===1)) {
+      var firstCell = region[0];
+      var lastCell = region[2];
+      // check they're not already set
+      if (firstCell.isStar() && lastCell.isStar()) return false;
+      // set them
+      firstCell.setStar();
+      lastCell.setStar();
+      consoleLog(`${region.groupName()} is 1 by 3, so must have stars at its ends.`);
+      return true;
+    }
+  });
+}
+
+
+function check1x3UnknownRegions() {
+  // find regions of total size 1x3. these must have stars set in the first and last cells of them.
+  return regions.forEachUntilTrue((region)=>{
+    if (region.numStars()>0) return false;
+    var unkregion = region.onlyUnknowns();
+    var [w, h] = unkregion.getTotalSize();
+    if ((w===1 && h===3) || (w===3 && h===1)) {
+      var firstCell = unkregion[0];
+      var lastCell = unkregion[2];
+      // set them
+      firstCell.setStar();
+      lastCell.setStar();
+      consoleLog(`${unkregion.groupName()}'s unknowns are 1 by 3, so must have stars at its ends.`);
+      return true;
+    }
+  });
+}
+
+function check1x3UnknownRowCols() {
+  // find regions of total size 1x3. these must have stars set in the first and last cells of them.
+  return allRowCols.forEachUntilTrue((rowcol)=>{
+    // two stars remaining, and 'unknown length' of 3
+    if (rowcol.numStars()>0) return false;
+    if (rowcol.getUnknownLength() !== 3) return false;
+
+    var unkRowcol = rowcol.onlyUnknowns();
+    var firstCell = unkRowcol[0];
+    var lastCell = unkRowcol[2];
+    // set them
+    firstCell.setStar();
+    lastCell.setStar();
+    consoleLog(`${rowcol.groupName()}'s unknowns are of length 3, so must have stars at both ends.`);
+    return true;
+  });
+}
+
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+function checkSmallRegions() {
+  // find regions of total size 3x3 or less.
+  return regions.forEachUntilTrue((region)=>{
+
+    // ignore regions that already have a star
+    if (region.numStars() > 0) return false;
+    
+    // get the total size of the region
+    var [w, h, rmin, rmax, cmin, cmax] = region.getTotalSize(true);
+
+    var changed = false;
+
+    // check if this region is small enough to get knocked out by a single star
+    if (w <= 3 && h <= 3) {
+      // iterate through all cells in the region, turning off any that are
+      // in 'the middle', which would kill the whole region if stars.
+      region.forEach((c)=>{
+        if (c.isKnown()) return;
+
+        if (c.row < rmin+2)
+          if (c.row > rmax-2)
+            if (c.col < cmin+2)
+              if (c.col > cmax-2) {
+                // this cell would wipe out the entire region
+                c.setStar(false);
+                changed = true;
+              }
+      });
+    }
+    if (changed) consoleLog(`${region.groupName()} is 3x3 or smaller - central cells can't be stars.`);
+    return changed;
+  });
+}
+
+
+function checkSmallUnknownRegions() {
+  // find regions of total size 3x3 or less.
+  return regions.forEachUntilTrue((region)=>{
+
+    // ignore regions that already have a star
+    if (region.numStars() > 0) return false;
+
+    var unkRegion = region.onlyUnknowns();
+    
+    // get the total size of the region
+    var [w, h, rmin, rmax, cmin, cmax] = unkRegion.getTotalSize(true);
+
+    var changed = false;
+
+    // check if this region is small enough to get knocked out by a single star
+    if (w <= 3 && h <= 3) {
+      // iterate through all cells in the region, turning off any that are
+      // in 'the middle', which would kill the whole region if stars.
+      unkRegion.forEach((c)=>{
+        if (c.isKnown()) return;
+
+        if (c.row < rmin+2)
+          if (c.row > rmax-2)
+            if (c.col < cmin+2)
+              if (c.col > cmax-2) {
+                // this cell would wipe out the entire region
+                c.setStar(false);
+                changed = true;
+              }
+      });
+    }
+    if (changed) consoleLog(`${unkRegion.groupName()} is 3x3 or smaller - central cells can't be stars.`);
+    return changed;
+  });
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+// walk recursively through cells that are contiguously connected (non-diagonally) to
+// the given cell, as long as they satisfy 'isNbr', storing them all in 'list'.
+function walk(cell, isNbr, markedProp="marked", list=new Region()) {
+
+  // add this cell to the list (we will only step to valid cells)
+  list.push(cell);
+  cell[markedProp] = true;
+  
+  // get all the neighbours that match isNbr
+  var nbrs = cell.getAllNeighbours(isNbr, false);
+
+  // walk recursively through neighbouring cells, picking them up as we go  
+  nbrs.forEach((c)=>{
+    if (c[markedProp]) return;
+    walk(c, isNbr, markedProp, list);
+  });
+
+  return list;
+}
+
+function getUnknownSubregions(group) {
+  if (group.groupType==="Region")
+    return getUnknownSubregionsFromRegion(group);
+  else
+    return getUnknownSubregionsFromRowCol(group);
+}
+
+function getUnknownSubregionsFromRegion(region) {
+  // mark all cells in the region unmarked
+  const mark = "mkCRWTO";
+  region.forEach((c)=>{ c[mark]=undefined; });
+
+  var subregions = [];
+  region.forEach((c)=>{
+    // looking for a starting cell (unknown and unmarked)
+    if (c.isKnown() || c[mark]) return;
+
+    // walk, collecting and marking all contiguous unknown cells in the same region
+    subregions.push(walk(c, (c2)=>c2.isUnknown() && c2.region.index===c.region.index, mark));
+  });
+  return subregions;
+}
+
+function getUnknownSubregionsFromRowCol(rowcol) {
+  var list = [];
+  var prevSub = undefined;
+  rowcol.forEach((cell)=>{
+    if (prevSub === undefined) {
+      if (cell.isUnknown()) {
+        // first unknown in a sequence. make a subregion.
+        prevSub = new Region();
+        prevSub.push(cell);
+      }
+    } else {
+      if (cell.isUnknown()) {
+        // another unknown in the same sequence.
+        prevSub.push(cell);
+      } else {
+        // the previous sequence finished
+        list.push(prevSub);
+        prevSub = undefined;
+      }
+    }
+  });
+  if (prevSub !== undefined)
+    list.push(prevSub);
+  return list;
+}
+
+function is2x2(dims) {
+  return (dims[0]<=2 && dims[1]<=2);
+}
+
+//todo: change regions... below with allGroups...
+function checkRegionsWithOne2x2AndOneSingle() {
+  return regions.forEachUntilTrue((region)=>{
+    var starsLeft = region.numStarsRemaining();
+
+    // we want regions with one or two stars left to place
+    if (starsLeft===0) return false;
+    
+    // get all subregions
+    var subs = getUnknownSubregions(region);
+    
+    // we care about the case where there is one subregion left for each star
+    if (subs.length !== starsLeft) return false;
+
+    // check that each subregion is smaller than 2x2
+    for (var i=0; i<subs.length; i++) {
+      if (!is2x2(subs[i].getTotalSize(true)))
+        return false;
+    }
+
+    // now see if any subregions are a single cell, in which case we set it as a star
+    return subs.forEachUntilTrue((sub)=>{
+      if (sub.length===1) {
+        sub[0].setStar();
+        consoleLog(`${region.groupName()} has two spots for two stars, and one of them is a single cell, so that must be a star.`);
+        return true;
+      }
+      return false;
+    });
+  });
+}
+
+
+function checkRegionsWithTwo2x2s() {
+  return allGroups.forEachUntilTrue((region)=>{
+    var starsLeft = region.numStarsRemaining();
+
+    // we want regions with one or two stars left to place
+    if (starsLeft===0) return false;
+    
+    // get all subregions
+    var subs = getUnknownSubregions(region);
+    
+    // we care about the case where there is one subregion left for each star
+    if (subs.length !== starsLeft) return false;
+
+    // check that each subregion is smaller than 2x2
+    for (var i=0; i<subs.length; i++) {
+      subs[i].tempDims = subs[i].getTotalSize(true);
+      if (!is2x2(subs[i].tempDims))
+        return false;
+    }
+
+    var changed = false;
+    // now we clear any cells outside each 2x2 which would eliminate it
+    subs.forEach((sub)=>{
+      // a full 2x2 doesn't exclude anything
+      if (sub.length===4) return;
+
+      // a 2x2 with three cells excludes one external cell
+      if (sub.length===3) {
+        // iterate through the square containing this 3 cell subregion, and mark
+        // any non-region cells as non-star.
+        var [w, h, rmin, rmax, cmin, cmax] = sub.tempDims;
+        for (var c=cmin; c<=cmax; c++) {
+          for (var r=rmin; r<=rmax; r++) {
+            var cell = rows[r][c];
+            if (!region.containsCell(cell)) {
+              if (cell.isUnknown()) changed = true;              
+              cell.setStar(false);
+            }
+          }
+        }
+      }
+      
+      // a 2x2 which is really just a 1x2, excluding potentially 4 external cells
+      if (sub.length===2) {
+        var [w, h, rmin, rmax, cmin, cmax] = sub.tempDims;
+        // it's either 1x2 or 2x1. depending on which, we expand the outer dims in two directions.
+        if (w===1) {
+          cmin = Math.max(cmin-1, 0);
+          cmax = Math.min(cmax+1, sideLength-1);
+        } else if (h===1) {
+          rmin = Math.max(rmin-1, 0);
+          rmax = Math.min(rmax+1, sideLength-1);
+        }
+        // iterate through the expanded containing block, and mark any non-region cells
+        // as non-star.
+        for (var r=rmin; r<=rmax; r++) {
+          for (var c=cmin; c<=cmax; c++) {
+            var cell = rows[r][c];
+            if (!region.containsCell(cell)) {
+              if (cell.isUnknown()) changed = true;
+              cell.setStar(false);
+            }
+          }
+        }
+      }
+    });
+    return changed;
+
+  });
+}
+
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+
+  $(document).ready(onReady);
+    </script>
+  </head>
+  <body>
+    <a id="selflink" target="_parent" href=""></a>
+    <canvas id="canvas"></canvas>
+    <!-- <button onclick="javascript:meowButton();">Solve</button> -->
+  </body>
+</html>
