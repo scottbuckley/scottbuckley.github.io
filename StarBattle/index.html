@@ -109,7 +109,7 @@
     } else {
       for (var i=0; i<initialSolves; i++)
         makeProgress();
-      refresh();
+      drawField();
     }
   }
 
@@ -234,20 +234,6 @@
         allCells.push(cell);
       }
     }
-  }
-
-  function meowButton() {
-    // randomQuad();
-    // randomCell();
-    // if (makeProgress()) {
-      // setTimeout(meowButton, 10);
-    // }
-    makeProgress(true);
-    drawField();
-  }
-
-  function refresh() {
-    drawField();
   }
 
   function drawField() {
@@ -1231,7 +1217,7 @@ function is2x2(dims) {
 
 //todo: change regions... below with allGroups...
 function checkRegionsWithOne2x2AndOneSingle() {
-  return regions.forEachUntilTrue((region)=>{
+  return allGroups.forEachUntilTrue((region)=>{
     var starsLeft = region.numStarsRemaining();
 
     // we want regions with one or two stars left to place
@@ -1263,15 +1249,20 @@ function checkRegionsWithOne2x2AndOneSingle() {
 
 
 function checkRegionsWithTwo2x2s() {
+  console.log("starting the meow meow");
   return allGroups.forEachUntilTrue((region)=>{
     var starsLeft = region.numStarsRemaining();
 
+    // remove this (debugging)
+    var meow = region.groupName() === "Col 2";
+    if (meow) console.log(region.groupName());
+    
     // we want regions with one or two stars left to place
     if (starsLeft===0) return false;
-    
+
     // get all subregions
     var subs = getUnknownSubregions(region);
-    
+
     // we care about the case where there is one subregion left for each star
     if (subs.length !== starsLeft) return false;
 
@@ -1281,6 +1272,8 @@ function checkRegionsWithTwo2x2s() {
       if (!is2x2(subs[i].tempDims))
         return false;
     }
+
+    if (meow) console.log("sdfds");
 
     var changed = false;
     // now we clear any cells outside each 2x2 which would eliminate it
@@ -1327,6 +1320,7 @@ function checkRegionsWithTwo2x2s() {
           }
         }
       }
+
     });
     return changed;
 
@@ -1336,7 +1330,7 @@ function checkRegionsWithTwo2x2s() {
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-
+  $(window).resize(drawField);
   $(document).ready(onReady);
     </script>
   </head>

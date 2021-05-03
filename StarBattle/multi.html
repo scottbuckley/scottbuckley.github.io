@@ -1,6 +1,44 @@
 <html>
   <head>
     <script src="jquery-3.4.1.min.js"></script>
+    <style>
+      div#iframes {
+        display:flex;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+      }
+
+      .childiframe {
+        width:100%;
+        height:100%;
+        /* height:200px; */
+        position:absolute;
+        top:0; left: 0;
+      }
+
+      .child {
+        flex: 1 0 auto;
+        width: 400px;
+        height: auto;
+        position: relative;
+      }
+
+      .child:before {
+        content: '';
+        display: block;
+        padding-top:100%;
+      }
+
+      .empty {
+        flex: 1 0 auto;
+        width: 400px;
+        height: auto;
+        position: relative;
+        height: 0;
+        margin-top: 0;
+        margin-bottom: 0;
+      }
+    </style>
 <script type="text/javascript">
   var frameSize = 450;
   var easyPuzzles = [
@@ -70,21 +108,25 @@ var mediumPuzzles = [
 ];
 
   $(function(){
+    // buildFrames(easyPuzzles);
     buildFrames(mediumPuzzles);
   });
 
   function buildFrames(puzzles) {
     var cont = $("div#iframes");
     puzzles.forEach((data)=>{
-      cont.append(`<iframe src="index.html?iframe=true&data=${data}" width="${frameSize}px" height="${frameSize}px" frameBorder="0"></iframe>`);
+      cont.append(`<div class="child"><iframe class="childiframe" src="index.html?iframe=true&data=${data}" frameBorder="0"></iframe></div>`);
+      // cont.append(``);
     });
+    for (var i=0; i<10; i++) {
+      cont.append(`<div class="empty"></div>`);
+    }
   }
 </script>
   </head>
 
   <body>
     <div id="iframes">
-      
     </div>
   </body>
 </html>
