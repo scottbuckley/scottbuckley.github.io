@@ -1,3 +1,5 @@
+console.log("sdfsddf");
+
 var words = [
     "APOCALYPSE",
     "PIRATE",

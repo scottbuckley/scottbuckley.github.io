@@ -1,7 +1,6 @@
 <html>
   <head>
     <script type="text/javascript" src="jquery-3.4.1.min.js"></script>
-    <script type="text/javascript" src="words.js"></script>
     <script>
 
     function shuffle(a) {
@@ -16,11 +15,12 @@
     }
 
     $(document).ready(function(){
-        shuffle(words);
+        var code = [1,2,3,4];
+        shuffle(code);
         var cont = $("#showwords");
 
-        for (var i=1; i<=4; i++) {
-            cont.append($(`<span class="wordspan">${i}: ${words.pop()}</span>`));
+        for (var i=0; i<3; i++) {
+            cont.append($(`<span class="wordspan">${code.pop()}</span>`));
         }
     });
     
@@ -31,12 +31,12 @@
             font-family: Verdana, sans-serif;
             white-space:nowrap;
             display:inline-block;
-            font-size:52pt;
+            font-size:96pt;
         }
         div#showwords {
             display:flex;
             flex-wrap:wrap;
-            justify-content:space-evenly;
+            justify-content:center;
         }
     </style>
   </head>
