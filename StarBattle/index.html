@@ -103,6 +103,10 @@
     // set up interaction stuff
     initKeyboardMouse();
 
+    // (maybe) enable only the first N strats
+    // easy puzzles completed by 10
+    // enableOnlyNStrats(12);
+
     // perform starting solve actions
     if (autosolve) {
       doAutoSolve();
@@ -110,6 +114,16 @@
       for (var i=0; i<initialSolves; i++)
         makeProgress();
       drawField();
+    }
+  }
+
+  function enableOnlyNStrats(n) {
+    for (var i=0; i<strats.length; i++) {
+      if (i<n) {
+        strats[i].skip = false;
+      } else {
+        strats[i].skip = true;
+      }
     }
   }
 
@@ -481,11 +495,14 @@
       return (that.state === STAR);
     }
 
+    // returns whether a change happened
     that.setStar = function(star=true) {
+      var oldState = that.state;
       if (star)
         that.state = STAR;
       else
         that.state = NOSTAR;
+      return (oldState !== that.state);
     }
 
     that.notStar = function() {
@@ -908,49 +925,88 @@
 
 var strats = [
   {
-    name: "Cells around stars",
-    fn: clearAdjacentCells,
-  }, {
-    name: "Finished rows/cols/regions.",
-    fn: checkTwoStars,
-  }, {
-    name: "Filled only available spots.",
-    fn: checkOnlySpots,
-  }, {
+    ind: 1,
     name: "1x3 Regions",
+    desc: "Any region of the shape 1x3 must have a star in its 'first' and 'last' cell.",
     fn: check1x3Regions,
     static: true,
   }, {
-    name: "Small Regions",
-    fn: checkSmallRegions,
+    ind: 2,
+    name: "Cells around stars",
+    desc: "Once a star is placed, the cells around it can't be stars.",
+    fn: clearAdjacentCells,
   }, {
+    ind: 3,
+    name: "Finished rows/cols/regions.",
+    desc: "Once a row/col/region already has two stars, the rest of that group can't be a star.",
+    fn: checkTwoStars
+  }, {
+    ind: 4,
+    name: "Filled only available spots.",
+    desc: "If there are only two cells left and two stars to be placed, they must be there. Same for one/one.",
+    fn: checkOnlySpots,
+  }, {
+    ind: 5,
+    name: "Small Regions",
+    desc: "If a region is 3x3 or smaller, then some star locations could rule out the entire region in one star.",
+    fn: checkSmallRegions,
+    static: true
+  }, {
+    ind: 6,
+    name: "Single Width Regions",
+    desc: "If a region is 1xN or Nx1, it will take up both stars for its row/col.",
+    fn: checkNarrowRegions,
+    static: true
+  }, {
+    ind: 7,
     name: "Regions with a 2x2 and a single",
+    desc: "If a region's remaining cells make up a 2x2 and a single cell, that single cell must be on.",
     fn: checkRegionsWithOne2x2AndOneSingle,
   }, {
+    ind: 8,
     name: "1x3 unknown regions",
-    fn: check1x3UnknownRegions,
-    skip: false
+    desc: "If the remaining cells in a region (with no stars) is 1x3, the two stars can be placed.",
+    fn: check1x3UnknownRegions
   }, {
-    name: "Small Regions",
-    fn: checkSmallUnknownRegions,
-    skip: false
+    ind: 9,
+    name: "Small Unknown Regions",
+    desc: "If the remaining cells in a region (with no stars) are within 3x3, we can eliminate any cells that would rule out the entire remaining region.",
+    fn: checkSmallUnknownRegions
   }, {
+    ind: 10,
     name: "1x3 unknown row/cols",
-    fn: check1x3UnknownRowCols,
-    skip: false
+    desc: "If a row/col (with no stars) has its unknowns in a 1x3, they are set at the edges.",
+    fn: check1x3UnknownRowCols
   }, {
+    ind: 11,
     name: "Two 2x2 subregions",
-    fn: checkRegionsWithTwo2x2s,
-    skip: false
+    desc: "If a row/col/group has its remaining unknowns in two subregions of 2x2 or less (or one subregion if there is"+
+          "a star already), those 2x2s can't be excluded. This sets single subregions, and does eliminations for subregions"+
+          "with 2 or 3 cells in them.",
+    fn: checkRegionsWithTwo2x2s
+  }, {
+    ind: 12,
+    name: "One 2x4 subregion",
+    desc: "If the unknown part of a region is 2x4, we can exclude anything non-region cells in its bounding box.",
+    fn: check2x4UnknownRegions
   }
 ];
+
 
 function makeProgress(fromButton = false) {
   // call each strat.fn until one returns true
   return strats.forEachUntilTrue((strat) => {
+    // skip strats marked for skipping
     if (strat.skip) return false;
-    var progress = strat.fn();
-    return progress;
+
+    // return true if the strat succeeds
+    if (strat.fn()) return true;
+
+    // otherwise, if this is a static strat, mark it to be skipped in future
+    // (this is because static strategies can't make progress after they
+    // have returned false for the first time)
+    if (strat.static) strat.skip = true;
+    return false;
   });
 }
 
@@ -1049,7 +1105,7 @@ function check1x3UnknownRegions() {
 }
 
 function check1x3UnknownRowCols() {
-  // find regions of total size 1x3. these must have stars set in the first and last cells of them.
+  // find row/cols with total remaining cells of size 1x3. these must have stars set in the first and last cells of them.
   return allRowCols.forEachUntilTrue((rowcol)=>{
     // two stars remaining, and 'unknown length' of 3
     if (rowcol.numStars()>0) return false;
@@ -1065,6 +1121,32 @@ function check1x3UnknownRowCols() {
     return true;
   });
 }
+
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+function clearRowColExceptRegion(rowcol, region) {
+  var changed = false;
+  rowcol.forEach((c)=>{
+    if (c.region.index!==region.index) {
+      if (c.isUnknown()) changed = true;
+      c.setStar(false);
+    }
+  });
+  return changed;
+}
+
+function checkNarrowRegions() {
+  return regions.forEachUntilTrue((region)=>{
+    var [w, h] = region.getTotalSize(true);
+    if (w===1) {
+      if (clearRowColExceptRegion(cols[region[0].col], region)) return true;
+    } else if (h===1) {
+      if (clearRowColExceptRegion(rows[region[0].row], region)) return true;
+    }
+  });
+}
+
 
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -1085,18 +1167,14 @@ function checkSmallRegions() {
     if (w <= 3 && h <= 3) {
       // iterate through all cells in the region, turning off any that are
       // in 'the middle', which would kill the whole region if stars.
-      region.forEach((c)=>{
-        if (c.isKnown()) return;
 
-        if (c.row < rmin+2)
-          if (c.row > rmax-2)
-            if (c.col < cmin+2)
-              if (c.col > cmax-2) {
-                // this cell would wipe out the entire region
-                c.setStar(false);
-                changed = true;
-              }
-      });
+      for (var r=rmax-1; r<rmin+2; r++) {
+        for (var c=cmax-1; c<cmin+2; c++) {
+          var cell = rows[r][c];
+          if (cell.isUnknown()) changed = true;
+          cell.setStar(false)
+        }
+      }
     }
     if (changed) consoleLog(`${region.groupName()} is 3x3 or smaller - central cells can't be stars.`);
     return changed;
@@ -1122,20 +1200,15 @@ function checkSmallUnknownRegions() {
     if (w <= 3 && h <= 3) {
       // iterate through all cells in the region, turning off any that are
       // in 'the middle', which would kill the whole region if stars.
-      unkRegion.forEach((c)=>{
-        if (c.isKnown()) return;
-
-        if (c.row < rmin+2)
-          if (c.row > rmax-2)
-            if (c.col < cmin+2)
-              if (c.col > cmax-2) {
-                // this cell would wipe out the entire region
-                c.setStar(false);
-                changed = true;
-              }
-      });
+      for (var r=rmax-1; r<rmin+2; r++) {
+        for (var c=cmax-1; c<cmin+2; c++) {
+          var cell = rows[r][c];
+          if (cell.isUnknown()) changed = true;
+          cell.setStar(false)
+        }
+      }
     }
-    if (changed) consoleLog(`${unkRegion.groupName()} is 3x3 or smaller - central cells can't be stars.`);
+    if (changed) consoleLog(`${region.groupName()} is 3x3 or smaller - central cells can't be stars.`);
     return changed;
   });
 }
@@ -1249,7 +1322,6 @@ function checkRegionsWithOne2x2AndOneSingle() {
 
 
 function checkRegionsWithTwo2x2s() {
-  console.log("starting the meow meow");
   return allGroups.forEachUntilTrue((region)=>{
     var starsLeft = region.numStarsRemaining();
 
@@ -1326,6 +1398,41 @@ function checkRegionsWithTwo2x2s() {
 
   });
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+function check2x4UnknownRegions() {
+  console.log("check2x4UnknownRegions");
+  return regions.forEachUntilTrue((region)=>{
+    // this is only useful if there are 7 or fewer cells
+    if (region.numUnknowns()>=8) return false;
+
+    // get the total size of the region
+    var unkRegion = region.onlyUnknowns();
+    var [w, h, rmin, rmax, cmin, cmax] = unkRegion.getTotalSize(true);
+
+    var changed = false;
+    if ((w===2 && h===4) || (w===4 && h===2)) {
+      // any unknown cell inside this region's 2x4 bounding box, but outside of this
+      // region, can't be a star.
+      for (var r=rmin; r<=rmax; r++) {
+        for (var c=cmin; c<=cmax; c++) {
+          var cell = rows[r][c];
+          if (cell.isUnknown()) {
+            if (cell.region.index !== region.index) {
+              cell.setStar(false);
+              changed = true;
+            }
+          }
+        }
+      }
+    }
+
+    return changed;
+
+  });
+}
+
 
 
 //////////////////////////////////////////////////////////////////////////////////////////
