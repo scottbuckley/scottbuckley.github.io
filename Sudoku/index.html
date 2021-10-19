@@ -15,8 +15,7 @@
         </div>
         <div id="history">History:</div>
         <div id="gridcont">
-          
-          <table id="tbl" class="noselect"><canvas id="cnv">meow</canvas></table>
+          <table id="tbl" class="noselect withboxes"><canvas id="cnv">meow</canvas></table>
         </div>
         <div id="ctrl">
           <div>
@@ -57,6 +56,10 @@
         <!-- <button onclick="javascript:resetButton();">Reset</button> -->
         <button onclick="javascript:statefulExportButton();">Full Export</button>
         <a id="exportLink" href="">Export Link</a>
+        <select id="displaymode">
+          <option value="display_normal">Show Boxes</option>
+          <option value="display_noboxes">Hide Boxes</option>
+        </select>
       </div>
     </div>
   </body>

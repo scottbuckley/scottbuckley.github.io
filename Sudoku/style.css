@@ -116,22 +116,28 @@ button.selected {
 #tbl {
   border-collapse:collapse;
 }
-#tbl tr.row:nth-child(3n+1) td.cell {
-  /* bottom block borders */
+
+
+/* OUTER BORDER */
+#tbl tr.row:nth-child(2) td.cell  { border-top:3px solid black; }
+#tbl tr.row:nth-child(10) td.cell { border-bottom:3px solid black; }
+#tbl tr.row td.cell:nth-child(2)  { border-left:3px solid black; }
+#tbl tr.row td.cell:nth-child(10) { border-right:3px solid black; }
+
+/* BOX BORDERS */
+#tbl.withboxes tr.row:nth-child(4) td.cell,
+#tbl.withboxes tr.row:nth-child(7) td.cell {
+  /* horizontal box dividers */
   border-bottom:3px solid black;
 }
-#tbl tr.row:nth-child(3n+2) td.cell {
-  /* top block borders */
-  border-top:3px solid black;
-}
-#tbl tr.row td.cell:nth-child(3n+1) {
-  /* right block borders */
+
+#tbl.withboxes tr.row td.cell:nth-child(4),
+#tbl.withboxes tr.row td.cell:nth-child(7) {
+  /* vertical box dividers */
   border-right:3px solid black;
 }
-#tbl tr.row td.cell:nth-child(3n+2) {
-  /* left block borders */
-  border-left:3px solid black;
-}
+
+
 c1,c2,c3,c4,c5,c6,c7,c8,c9 {
   text-align:center;
   font-size:5vh;

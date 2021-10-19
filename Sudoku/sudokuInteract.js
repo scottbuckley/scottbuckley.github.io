@@ -248,6 +248,11 @@
         controlClicked.call(that, ind, SETCOLOR);
       });
     });
+
+    $("select#displaymode").change(function(){
+      var newmode = $(this).val();
+      setDisplayMode(newmode);
+    });
   }
 
   function initKeyboardMouse() {
@@ -257,6 +262,16 @@
       dragState = undefined;
     });
   }
+
+  /* DISPLAY MODES */
+  function setDisplayMode(mode) {
+    if (mode === "display_noboxes") {
+      $("table#tbl").toggleClass("withboxes", false);
+    } else if (mode === "display_normal") {
+      $("table#tbl").toggleClass("withboxes", true);
+    }
+  }
+
 
 /*
      #######  ##    ##  ######  ##       ####  ######  ##    ##    ######## ########  ######
