@@ -155,6 +155,7 @@
     if (sandwich) enableStrats("Sandwich");
     if (antiknight) enableStrats("Anti-Knight");
     if (xsudoku) enableStrats("X Sudoku")
+    setupAutoClearOption();
 
     // set up the individual solver buttons
     buildUI && initSolverButtons();
@@ -265,6 +266,23 @@
       dragState = undefined;
     });
   }
+
+  /* AUTO-CLEAR BUTTON */
+  function setupAutoClearOption() {
+    var check = $("#autoclearadjs");
+
+    // load saved state
+    var rawval = ls.getItem("autoclearadjs");
+    var checked = (rawval === null) || (rawval === 'true');
+    check.prop("checked", checked);
+
+    // set up save behaviour
+    check.off("change").change(function(){
+      ls.setItem("autoclearadjs", $(this).prop("checked"));
+    });
+  }
+
+  
 
   /* DISPLAY MODES */
   const DEFAULT_DISPLAY_MODE = "display_normal"
