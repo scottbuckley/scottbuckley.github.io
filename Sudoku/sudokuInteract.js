@@ -92,6 +92,7 @@
 
   // kropki dot styles
   const KROPDIAMOND = "D";
+  const KROPWALL = "W";
   
 
 /*
@@ -143,6 +144,9 @@
 
     // get kropkis
     parseKropkis();
+
+    // maybe set display mode
+    parseDisplayMode();
 
     // get thermos
     parseLines();
@@ -250,8 +254,7 @@
     });
 
     $("select#displaymode").change(function(){
-      var newmode = $(this).val();
-      setDisplayMode(newmode);
+      setDisplayMode($(this).val());
     });
   }
 
@@ -264,12 +267,29 @@
   }
 
   /* DISPLAY MODES */
-  function setDisplayMode(mode) {
-    if (mode === "display_noboxes") {
+  const DEFAULT_DISPLAY_MODE = "display_normal"
+  var display_mode = DEFAULT_DISPLAY_MODE;
+
+  function getDisplayMode() {
+    return display_mode;
+  }
+
+  function setDisplayMode(mode, overrideGUI=false) {
+    display_mode = mode;
+    if (overrideGUI) overrideDisplayMode(display_mode);
+
+    if (display_mode === "display_noboxes") {
       $("table#tbl").toggleClass("withboxes", false);
-    } else if (mode === "display_normal") {
+    } else if (display_mode === "display_normal") {
       $("table#tbl").toggleClass("withboxes", true);
     }
+  }
+
+  function overrideDisplayMode(mode) {
+    $("select#displaymode>option").each(function(index, t) {
+      var opt = $(t);
+      opt.prop('selected', opt.val() === mode);
+    });
   }
 
 
@@ -295,6 +315,10 @@ function setCellsOnly() {
 
 function setCellsNot() {
   setCellsNotPropmt(getSelectedCells());
+}
+
+function setCellsSame() {
+  setCellsSameActual(getSelectedCells());
 }
 
 function setCellsOnlyPropmt(cells) {
@@ -360,6 +384,39 @@ function setCellsNotPropmt(cells) {
     }
   }
   saveStoredUndoState("Removed "+input+" from "+cells.map((c)=>c.pos).join("+"));
+  refresh();
+}
+
+function setCellsSameActual(cells, confirmCells=false) {
+  if (cells.length<2) {
+    alert("Select multiple cells before using this feature.");
+    return;
+  };
+  clearSolvedCache();
+  storeUndoState();
+
+  // figure out which candidates are in all cells
+  var candIntersection = [true, true, true, true, true, true, true, true, true];
+  for (var v=0; v<9; v++) {
+    var all = true;
+    for (var c=0; c<cells.length; c++)
+      if (!cells[c][v]) {
+        candIntersection[v] = false;
+        break;
+      }
+  }
+  var changed = false;
+  for (var v=0; v<9; v++) {
+    if (candIntersection[v] === false) {
+      for (var c=0; c<cells.length; c++) {
+        if (!changed && cells[c][v]) changed = true;
+        cells[c][v] = false;
+      }
+    }
+  }
+
+  if (changed)
+    saveStoredUndoState("Intersected candidates in "+cells.map((c)=>c.pos).join("+"));
   refresh();
 }
 
@@ -550,6 +607,8 @@ function setDblClick(element, cell) {
       setCellsOnly();
     } else if (code==="KeyN" && !modKey) {
       setCellsNot();
+    } else if (code==="KeyM" && !modKey) {
+      setCellsSame();
     }
     return true;
   }
@@ -853,6 +912,11 @@ function setDblClick(element, cell) {
     sudokuLines = parseCellLists(getQueryVariable('lines'));
   }
 
+  function parseDisplayMode() {
+    var mode = getQueryVariable('display');
+    setDisplayMode(mode, true);
+  }
+
   function getSolvedString() {
     var output = "";
     var isBlank = true;
@@ -958,6 +1022,9 @@ function setDblClick(element, cell) {
 
     var lines = getLinesExportString();
     if (lines) URLentries.push(`lines=${lines}`);
+
+    if (getDisplayMode() !== DEFAULT_DISPLAY_MODE)
+      URLentries.push(`display=${getDisplayMode()}`);
 
     if (data)
       URLentries.push(`data=${data}`);
@@ -1760,7 +1827,6 @@ function refreshRegionLabels() {
     if (style===KROPDIAMOND) {
       var d = size;
       ctx.lineWidth = d*0.3;
-      console.log(x, y);
       ctx.beginPath();
       ctx.moveTo(x, y-d);
       ctx.lineTo(x+d, y);
