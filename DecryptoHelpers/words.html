@@ -1,0 +1,46 @@
+<html>
+  <head>
+    <script type="text/javascript" src="jquery-3.4.1.min.js"></script>
+    <script type="text/javascript" src="words.js"></script>
+    <script>
+
+    function shuffle(a) {
+        var j, x, i;
+        for (i = a.length - 1; i > 0; i--) {
+            j = Math.floor(Math.random() * (i + 1));
+            x = a[i];
+            a[i] = a[j];
+            a[j] = x;
+        }
+        return a;
+    }
+
+    $(document).ready(function(){
+        shuffle(words);
+        var cont = $("#showwords");
+
+        for (var i=1; i<=4; i++) {
+            cont.append($(`<span class="wordspan">${i}: ${words.pop()}</span>`));
+        }
+    });
+    
+    </script>
+    <style>
+        span.wordspan {
+            padding-right:1em;
+            font-family: Verdana, sans-serif;
+            white-space:nowrap;
+            display:inline-block;
+            font-size:52pt;
+        }
+        div#showwords {
+            display:flex;
+            flex-wrap:wrap;
+            justify-content:space-evenly;
+        }
+    </style>
+  </head>
+  <body>
+    <div id="showwords"></div>
+  </body>
+</html>
