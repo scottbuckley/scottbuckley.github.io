@@ -90,9 +90,6 @@
 
   var ls = window.localStorage;
 
-  // kropki dot styles
-  const KROPDIAMOND = "D";
-  const KROPWALL = "W";
   
 
 /*
@@ -289,6 +286,8 @@
   var display_mode = DEFAULT_DISPLAY_MODE;
 
   function getDisplayMode() {
+    if (display_mode === undefined)
+      display_mode = DEFAULT_DISPLAY_MODE;
     return display_mode;
   }
 
@@ -1601,8 +1600,18 @@ function refreshRegionLabels() {
     ##   ##  ##    ##  ##     ## ##        ##   ##   ##
     ##    ## ##     ##  #######  ##        ##    ## ####
 */
+
+  // kropki dot styles
+  const KROPDIAMOND = "D";
+  const KROPWALL = "W";
+
+  function getKropkiStyle() {
+    var kropstyle = $("select#kropkistyle").val();
+    return kropstyle;
+  }
+
   function addKropki() {
-    var kropkiStyle = KROPDIAMOND; // for later having a few types of dots
+    var kropkiStyle = getKropkiStyle();
     var kropkiCells = getSelectedCells();
     if (kropkiCells.length!=2) {
       alert("Select exactly two cells before pressing the Kropki button.");
@@ -1620,8 +1629,11 @@ function refreshRegionLabels() {
   }
 
   function drawKropki(kropki) {
-    var center = midpoint(getCellCenter(kropki.cell1), getCellCenter(kropki.cell2));
-    canvKropkiDot(center, kropki.style);
+    var c1 = getCellCenter(kropki.cell1);
+    var c2 = getCellCenter(kropki.cell2);
+    var center = midpoint(c1, c2);
+    var angle = midangle(c1, c2);
+    canvKropkiDot(center, kropki.style, angle);
   }
 
 
@@ -1810,6 +1822,10 @@ function refreshRegionLabels() {
     ];
   }
 
+  function midangle(p1, p2) {
+    return Math.atan2(p2[0]-p1[0], p1[1]-p2[1]);
+  }
+
   function getSomeCellWidth() {
     return getCellWidth(sudoku[0][0]);
   }
@@ -1836,13 +1852,28 @@ function refreshRegionLabels() {
     ctx.stroke();
   }
 
-  function canvKropkiDot(center, style, size=getSomeCellWidth()*0.15) {
+  function canvKropkiDot(center, style, angle) {
+    
+    var size = getSomeCellWidth()*0.15;
+    
     // the style here indicates which kropki dot will be drawn
     ctx.fillStyle = NOTATION_BASE_CLR;
     ctx.strokeStyle = "#FFF";
     var [x, y] = center;
 
-    if (style===KROPDIAMOND) {
+
+    if (style===KROPWALL) {
+      var d = getSomeCellWidth()*0.5;
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "#000";
+      ctx.beginPath();
+      ctx.moveTo(x + Math.cos(angle)*d, y + Math.sin(angle)*d);
+      ctx.lineTo(x - Math.cos(angle)*d, y - Math.sin(angle)*d);
+      // ctx.lineTo(x + Math.sin(angle)*d, y - Math.cos(angle)*d);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.fill();
+    } else if (style===KROPDIAMOND) {
       var d = size;
       ctx.lineWidth = d*0.3;
       ctx.beginPath();
