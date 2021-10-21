@@ -82,14 +82,15 @@
   const SETTHERMO = 4;
   const SETLINE = 5;
   const SETARROW = 6;
+  
+  const NUM_COLOURS = 18;
 
   // input state
   var inputState = SETNOTHING;
-  var dragState  = undefined; // undefined = nothing. -1 = clear. 0-8 = set swatch. -2 = select
+  var dragState  = undefined; // undefined = nothing. -1 = clear. 0-(NUM_COLOURS-1) = set swatch. -2 = select
   var inputNum   = undefined;
 
   var ls = window.localStorage;
-
   
 
 /*
@@ -972,7 +973,7 @@ function setDblClick(element, cell) {
 
   function getStatefulExportString() {
     var output = [];
-    for (var r=0; r<9; r++) {
+    for (var r=0; r<9; r++) {undoStack
       for (var c=0; c<9; c++) {
         var cell = sudoku[r][c];
         var cellstring = "";
@@ -1471,6 +1472,15 @@ function refreshRegionLabels() {
       case 6: return "yellow";
       case 7: return "orange";
       case 8: return "red";
+      case 9: return "darkgreen 2";
+      case 10: return "lightblue 2";
+      case 11: return "darkblue 2";
+      case 12: return "lightgreen 2";
+      case 13: return "pink 2";
+      case 14: return "purple 2";
+      case 15: return "yellow 2";
+      case 16: return "orange 2";
+      case 17: return "red 2";
     }
   }
 
@@ -1549,7 +1559,7 @@ function refreshRegionLabels() {
       if (dragState === -1 && cell.swatch !== undefined) {
         saveUndoState(cell.pos+" blank");
         cell.swatch = undefined;
-      } else if (dragState >= 0 && dragState <= 8) {
+      } else if (dragState >= 0 && dragState <= NUM_COLOURS) {
         if (cell.swatch !== dragState) {
           saveUndoState(cell.pos+" "+zoneName(dragState));
           cell.swatch = dragState;

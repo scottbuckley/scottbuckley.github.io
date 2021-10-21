@@ -32,9 +32,19 @@ div#endspacer {  }
 }
 
 #history {
+  flex-grow:1;
+  flex-basis:1;
   overflow-y:auto;
-  width:80px;
+  /* overflow: none; */
+  /* min-width:80px; */
   font-size:8pt;
+  word-break: break-all;
+  padding-left:1em;
+}
+
+#flexspacer {
+  flex-grow:1;
+  flex-basis:1;
 }
 
 #ctrl {
@@ -220,12 +230,34 @@ tr td[swatch=""],  #tbl tr.row td.cell[swatch=""]  { background-color:#ffffff66;
 tr td[swatch="0"], #tbl tr.row td.cell[swatch="0"] { background-color:#1bd56f66; }
 tr td[swatch="1"], #tbl tr.row td.cell[swatch="1"] { background-color:#77eee766; }
 tr td[swatch="2"], #tbl tr.row td.cell[swatch="2"] { background-color:#4aa3e866; }
-tr td[swatch="3"], #tbl tr.row td.cell[swatch="3"] { background-color:#7eee7766; }
+tr td[swatch="3"], #tbl tr.row td.cell[swatch="3"] { background-color:#9dee7766; }
 tr td[swatch="4"], #tbl tr.row td.cell[swatch="4"] { background-color:#ffb4ff66; }
 tr td[swatch="5"], #tbl tr.row td.cell[swatch="5"] { background-color:#ac77ee66; }
 tr td[swatch="6"], #tbl tr.row td.cell[swatch="6"] { background-color:#eee77766; }
 tr td[swatch="7"], #tbl tr.row td.cell[swatch="7"] { background-color:#eeac7766; }
 tr td[swatch="8"], #tbl tr.row td.cell[swatch="8"] { background-color:#ee777e66; }
+
+tr td[swatch="9"],  #tbl tr.row td.cell[swatch="9"]  { background-color:#1bd56f66; }
+tr td[swatch="10"], #tbl tr.row td.cell[swatch="10"] { background-color:#77eee766; }
+tr td[swatch="11"], #tbl tr.row td.cell[swatch="11"] { background-color:#4aa3e866; }
+tr td[swatch="12"], #tbl tr.row td.cell[swatch="12"] { background-color:#9dee7766; }
+tr td[swatch="13"], #tbl tr.row td.cell[swatch="13"] { background-color:#ffb4ff66; }
+tr td[swatch="14"], #tbl tr.row td.cell[swatch="14"] { background-color:#ac77ee66; }
+tr td[swatch="15"], #tbl tr.row td.cell[swatch="15"] { background-color:#eee77766; }
+tr td[swatch="16"], #tbl tr.row td.cell[swatch="16"] { background-color:#eeac7766; }
+tr td[swatch="17"], #tbl tr.row td.cell[swatch="17"] { background-color:#ee777e66; }
+
+tr td[swatch="9"],  #tbl tr.row td.cell[swatch="9"],
+tr td[swatch="10"], #tbl tr.row td.cell[swatch="10"],
+tr td[swatch="11"], #tbl tr.row td.cell[swatch="11"],
+tr td[swatch="12"], #tbl tr.row td.cell[swatch="12"],
+tr td[swatch="13"], #tbl tr.row td.cell[swatch="13"],
+tr td[swatch="14"], #tbl tr.row td.cell[swatch="14"],
+tr td[swatch="15"], #tbl tr.row td.cell[swatch="15"],
+tr td[swatch="16"], #tbl tr.row td.cell[swatch="16"],
+tr td[swatch="17"], #tbl tr.row td.cell[swatch="17"] {
+  border-radius:50%;
+}
 
 /* #tbl tr.row td.cell[region="yes"] { background-color:#ff000033; } */
 #tbl tr.row td.cell[region="yes"]:before {
