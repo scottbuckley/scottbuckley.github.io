@@ -13,7 +13,9 @@ body {
   max-height:100%;
 }
 
-div#endspacer {  }
+div#endspacer {
+  flex-grow:1;
+}
 
 /* #topbuttons { flex-grow:0; } */
 #bottombuttons { flex-grow:0 }
@@ -32,19 +34,21 @@ div#endspacer {  }
 }
 
 #history {
-  flex-grow:1;
-  flex-basis:1;
-  overflow-y:auto;
-  /* overflow: none; */
-  /* min-width:80px; */
+  position:absolute;
+  max-width:100%;
+  max-height:100%;
+}
+
+#historywrapper {
+  flex-grow:2;
   font-size:8pt;
   word-break: break-all;
   padding-left:1em;
+  position:relative;
 }
 
 #flexspacer {
   flex-grow:1;
-  flex-basis:1;
 }
 
 #ctrl {
