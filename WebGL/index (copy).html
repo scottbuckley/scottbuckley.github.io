@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>My first three.js app</title>
+		<style>
+			body { margin: 0; }
+		</style>
+	</head>
+	<body>
+		<script src="js/three.min.js"></script>
+		<script>
+            
+    // set up random field
+    const buffSize = 32;
+    const data = new Uint8Array(4 * buffSize * buffSize);
+    for(let i = 0; i < buffSize*buffSize; i++) {
+        const stride = i * 4;
+        data[stride] = Math.random()*255;
+        data[stride + 1] = Math.random()*255;
+        data[stride + 2] = Math.random()*255;
+        data[stride + 3] = 255;
+    }
+
+
+    const vertShader = `
+    void main() {
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }`;
+
+    const fragComputeShader = `
+    uniform sampler2D tex;
+    void main() {
+        // gl_FragColor = texture2D(tex, gl_FragCoord.xy/32.0) + 1.0;
+        gl_FragColor = vec4(1.0, 0.0, 1.0, 1.0);
+    }`;
+    
+    const fragShader = `
+    uniform vec2 resolution;
+    uniform sampler2D tex;
+    void main() {
+        
+        vec4 thing = texture2D(tex, gl_FragCoord.xy/resolution);
+        
+        gl_FragColor = vec4(thing.rgba);
+    }`;
+    
+    
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const camsize = 1;
+    const camera = new THREE.OrthographicCamera(-camsize, camsize, camsize, -camsize, 1, 10 );
+    camera.position.z = 10;
+    
+    
+    // display renderer
+    const renderer = new THREE.WebGLRenderer();
+    renderer.setSize( window.innerWidth, window.innerHeight );
+    
+    // buffer renderer
+    const bufferRenderer = new THREE.WebGLRenderer();
+    bufferRenderer.setSize(buffSize, buffSize);
+    document.body.appendChild(bufferRenderer.domElement);
+    document.body.appendChild(renderer.domElement);
+    
+    // data textures
+    const textureA = new THREE.WebGLRenderTarget(buffSize, buffSize, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter});
+    const textureB = new THREE.WebGLRenderTarget(buffSize, buffSize, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter});
+    const textureInit = new THREE.DataTexture(data, buffSize, buffSize, THREE.RGBAFormat);
+    textureA.magFilter = textureA.minFilter = textureB.magFilter = textureB.minFilter = THREE.NearestFilter;
+    textureInit.magFilter = textureInit.minFilter = THREE.NearestFilter;
+    textureA.needsUpdate = textureB.needsUpdate = true;
+    textureInit.needsUpdate = true;
+
+    // material
+    // const materialA = new THREE.ShaderMaterial( {
+    //     uniforms: {
+    //         resolution: { value: new THREE.Vector2(width, height) },
+    //         tex: {type: 't', value: textureA}
+    //     },
+    //     vertexShader: vertShader,
+    //     fragmentShader: fragComputeShader
+    // } );
+    // const materialB = new THREE.ShaderMaterial( {
+    //     uniforms: {
+    //         resolution: { value: new THREE.Vector2(width, height) },
+    //         tex: {type: 't', value: textureB}
+    //     },
+    //     vertexShader: vertShader,
+    //     fragmentShader: fragComputeShader
+    // } );
+
+
+    const geometry = new THREE.PlaneGeometry(2, 2);
+    const planeA = new THREE.Mesh( geometry, new THREE.MeshBasicMaterial({map:textureInit}) );
+    const planeB = new THREE.Mesh( geometry, new THREE.MeshBasicMaterial({map:textureInit}) );
+    
+    const sceneA = new THREE.Scene();
+    const sceneB = new THREE.Scene();
+    sceneA.add( planeA );
+    sceneB.add( planeB );
+
+
+    var initialiseBufferTexture = function() {
+        const planeInit = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({map:textureInit}));
+        const sceneInit = new THREE.Scene();
+        sceneInit.add(planeInit);
+        // bufferRenderer.render(sceneInit, camera, textureA);
+    };
+
+    const sceneShow = new THREE.Scene();
+    var boxMaterial = new THREE.MeshBasicMaterial({color:0xF06565});
+    var boxGeometry = new THREE.BoxGeometry( 1, 1, 1 );
+    var mainBoxObject = new THREE.Mesh(boxGeometry,boxMaterial);
+    sceneShow.add(mainBoxObject);
+
+
+    const sceneShow2 = new THREE.Scene();
+    var boxMaterial2 = new THREE.MeshBasicMaterial({map:textureA});
+    var boxGeometry2 = new THREE.BoxGeometry( 1, 1, 1 );
+    var mainBoxObject2 = new THREE.Mesh(boxGeometry2,boxMaterial2);
+    sceneShow2.add(mainBoxObject2);
+
+    var which = true;
+    // bufferRenderer.render(sceneInit, camera);
+    // bufferRenderer.copyTextureToTexture(new THREE.Vector2(0.0,0.0), textureInit, textureA);
+    function animate() {
+        requestAnimationFrame( animate );
+    // bufferRenderer.render(sceneInit, camera);
+
+    // bufferRenderer.render(sceneShow2, camera, textureA);
+    bufferRenderer.render(sceneShow, camera, textureA);
+    bufferRenderer.render(sceneShow2, camera);
+
+        if (which) {
+            // console.log("A to B");
+            // bufferRenderer.render(sceneA, camera);
+        } else {
+            // console.log("B to A");
+            // bufferRenderer.render(sceneB, camera);
+        }
+        which = !which;
+        mainBoxObject.rotation.y += 0.01;
+        mainBoxObject.rotation.x += 0.01;
+        
+
+        // initialiseBufferTexture();
+
+        // renderer.render( sceneShow2, camera );
+    };
+
+    animate();
+    </script>
+	</body>
+    </html>

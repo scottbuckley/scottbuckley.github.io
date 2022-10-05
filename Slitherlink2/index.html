@@ -1,0 +1,1468 @@
+<html>
+  <head>
+    <title>Slitherlink</title>
+    <!-- <link rel="stylesheet" href="style.css" type="text/css"/> -->
+    <script src="jquery-3.3.1.js"></script>
+    <script type="text/javascript">
+
+      const UNK = 0;
+      const OFF = 1;
+      const ON = 2;
+
+      const SPECIAL = 99;
+
+      const autosolve = true;
+
+      // CONSTANTS
+      // some example slitherlinks
+      const data_test1 = "--3-4-3322-4-1--3-44-1-23-2-01--2-1-";
+      const data_test2 = "--354-5---44-12-3-45-1-5344--3--23-4----43-3-4-----5--4-4---4";
+      const data_test3 = "-5-25-------5--4-43----5---5-5-4--5-44--5-43-534--3-2545----2";
+      const data_test4 = "-----4-5-33-4--34---5-22-3--3-53--4---3-5----41------32544--2";
+      const data_testbig1 = "-----33-4-4-335--5--31--5-4-----2-5-4-----4---5---4203-4--4--2---23----2--5231--53-4-4-4----4-53--4--345-5323-535454-34----44444-43--3-3454-----------5-4534-444-5433----33--42----445---354-4--43-----3--3---5---2--2-5-";
+      const data_testbig2 = "512-------3-5-5-53-2323---345-----4----4344---5-2---3--1444-2-53-354----4-33---53----44-444-54--24-44--5---4-4-5---5-----344-42-34-33534----4-----5--444-54-4-543--22-4----33---134----------353--55-3---4--4-1-5---3-3-3";
+      const data_testbig3 = "4-4------42--3-44-44--2-5-4----4--5--22----54-4-5-1-453--354-4------244-3---44-13-2-----4-45--22--43444-345-3434-44---344-445---------5---34--554---33-4--354---4335----3--5--253--5--123-23--3----5-5-5--5-44324-3--43-1";
+      const data_default = data_test1; // this one will be loaded automatically.
+
+      const sideLength = 9;
+      const fieldHeight = (sideLength*2)-1;
+      var cellSize;
+      const sqrt3on2 = Math.sqrt(3)/2;
+
+      const bgColor = randomPastel();
+      var canvasMid = undefined;
+
+      var field = [];
+      var allCells = [];
+      var allTriples = [];
+      var allLinks = [];
+      
+      var canvas;
+      var ctx = undefined;
+
+      function onReady() {
+        console.log("starting");
+
+        canvas = $("#canvas")[0];
+        ctx = canvas.getContext("2d");
+        
+        buildField(data_default);
+        
+        drawField();
+
+        if (autosolve) {
+          function step() {
+            if (makeProgress()) {
+              setTimeout(step, 5);
+            } else {
+              if (checkErrors(false)) {
+                console.error("Could not complete the puzzle, or completed with errors.");
+              } else {
+                console.warn("Puzzle successfully completed. No errors found.");
+              }
+            }
+            drawField();
+          }
+          step();
+        }
+      }
+
+      function linkProto(st = UNK) {
+        this.state = st;
+        this.cells = [];
+        this.adjs = [];
+        this.allAdjs_cache = undefined;
+
+        this.allAdjs = function() {
+          if (this.allAdjs_cache===undefined) {
+            this.allAdjs_cache = [];
+            for (var i=0; i<this.adjs.length; i++) {
+              this.allAdjs_cache.push(this.adjs[i][0]);
+              this.allAdjs_cache.push(this.adjs[i][1]);
+            }
+          }
+          return this.allAdjs_cache;
+        }
+      }
+
+      function stateCount(list, state) {
+        var count = 0;
+        for (var i=0; i<list.length; i++)
+          if (list[i].state === state) count++;
+        return count;
+      }
+
+      function cellProto(that = this) {
+        that.links = [];
+        that.spokes = [new linkProto(OFF), new linkProto(OFF), new linkProto(OFF),
+                       new linkProto(OFF), new linkProto(OFF), new linkProto(OFF)];
+        that.ord = -1;
+        that.row = 0;
+        that.col = 0;
+
+        that.useful = true;
+
+        that.isOrd = function() {
+          return (that.ord >= 0);
+        }
+
+        that.drawMe = function() {
+          var [x, y] = that.getPos();
+          if (that.isOrd()) {
+            ctx.font = (cellSize*0.57)+"px Arial"
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle"; 
+            if (that.useful===true)
+              ctx.fillStyle = '#000';
+            else
+              ctx.fillStyle = '#0005';
+            ctx.fillText(that.ord, x, y+1);
+          }
+          that.drawLinks();
+        }
+
+        that.onCount       = function() { return stateCount(that.links, ON); }
+        that.offCount      = function() { return stateCount(that.links, OFF); }
+        that.unkCount      = function() { return stateCount(that.links, UNK); }
+        that.onSpokeCount  = function() { return stateCount(that.spokes, ON); }
+        that.offSpokeCount = function() { return stateCount(that.spokes, OFF); }
+        that.unkSpokeCount = function() { return stateCount(that.spokes, UNK); }
+
+        that.maxConsecutiveOffSpokes = function() {
+          var maxCount = -1;
+          var maxStart = -1;
+          var curStart = -1;
+          var curCount = 0;
+          for (var i2=0; i2<12; i2++) {
+            var i = i2%6;
+            if (that.spokes[i].state===OFF) {
+              if (curCount===0) curStart = i;
+              curCount = curCount + 1;
+              if (curCount > maxCount) {
+                maxCount = curCount;
+                maxStart = curStart;
+              } else if (curCount===maxCount && that.links[maxStart].state!==UNK && that.links[curStart].state===UNK) {
+                // if there are two equal maxes, prioritise the one that has unknowns
+                maxCount = curCount;
+                maxStart = curStart;
+              }
+            } else {
+              curCount = 0;
+            }
+          }
+          return [maxCount, maxStart];
+        }
+
+        that.availLinks = function() {
+          return 6-that.offCount();
+        }
+
+        that.drawLinks = function() {
+          var size = cellSize*0.577; // tan(30deg)
+          var [x, y] = that.getPos();
+          ctx.lineWidth = 3;
+          for (var i=0; i<6; i++) {
+            // do not re-draw interior lines
+            if (i<3 && that.cellAt(i)) continue;
+            // set the appropriate color for the link
+            var state = that.links[i].state;
+            ctx.lineCap = "round";
+            if (state === UNK) {
+              ctx.strokeStyle = '#0002'; // light grey
+            } else if (state === OFF) {
+              ctx.strokeStyle = '#F003'; // light red
+            } else if (state === ON) {
+              ctx.strokeStyle = '#000A'; // black
+            } else if (state === SPECIAL) {
+              ctx.strokeStyle = '#0FF'; // green?
+            }
+            // draw the link
+            ctx.beginPath();
+              ctx.moveTo(x+cos(270+i*60)*size,y+sin(270+i*60)*size);
+              ctx.lineTo(x+cos(330+i*60)*size,y+sin(330+i*60)*size);
+            ctx.stroke();
+          }
+
+        }
+        
+        that.leftCell = function() {
+          return field[that.row][that.col-1];
+        }
+        that.rightCell = function() {
+          return field[that.row][that.col+1];
+        }
+        that.upleftCell = function() {
+          if (that.row===0) return undefined;
+          if (that.row<sideLength) return field[that.row-1][that.col-1];
+          return field[that.row-1][that.col];
+        }
+        that.uprightCell = function() {
+          if (that.row===0) return undefined;
+          if (that.row<sideLength) return field[that.row-1][that.col];
+          return field[that.row-1][that.col+1];
+        }
+        that.downleftCell = function() {
+          if (that.row===fieldHeight-1) return undefined;
+          if (that.row<sideLength-1) return field[that.row+1][that.col];
+          return field[that.row+1][that.col-1];
+        }
+        that.downrightCell = function() {
+          if (that.row===fieldHeight-1) return undefined;
+          if (that.row<sideLength-1) return field[that.row+1][that.col+1];
+          return field[that.row+1][that.col];
+        }
+
+        that.cellAt = function(ind) {
+          if (ind===0) return that.uprightCell();
+          if (ind===1) return that.rightCell();
+          if (ind===2) return that.downrightCell();
+          if (ind===3) return that.downleftCell();
+          if (ind===4) return that.leftCell();
+          if (ind===5) return that.upleftCell();
+          return undefined;
+        }
+
+        // return the indexes of the adjacent cells with ord = "ord"
+        that.getAdjs = function(ord) {
+          var out = [];
+          for (var i=0; i<6; i++) {
+            var adj = that.cellAt(i);
+            if (adj && adj.ord === ord)
+              out.push(i);
+          }
+          return out;
+        }
+
+        that.getSpokes = function() {
+          if (that.upleftCell())
+            that.spokes[0] = that.upleftCell().links[1];
+          else if (that.uprightCell())
+            that.spokes[0] = that.uprightCell().links[4];
+          
+          if (that.rightCell())
+            that.spokes[1] = that.rightCell().links[5];
+          else if(that.uprightCell())
+            that.spokes[1] = that.uprightCell().links[2];
+
+          if (that.rightCell())
+            that.spokes[2] = that.rightCell().links[3];
+          else if (that.downrightCell())
+            that.spokes[2] = that.downrightCell().links[0];
+
+          if (that.downleftCell())
+            that.spokes[3] = that.downleftCell().links[1];
+          else if (that.downrightCell())
+            that.spokes[3] = that.downrightCell().links[4];
+
+          if (that.leftCell())
+            that.spokes[4] = that.leftCell().links[2];
+          else if (that.downleftCell())
+            that.spokes[4] = that.downleftCell().links[5];
+          
+          if (that.leftCell())
+            that.spokes[5] = that.leftCell().links[0];
+          else if (that.upleftCell())
+            that.spokes[5] = that.upleftCell().links[3];
+          
+        }
+
+        that.buildSpokes = function() {
+          that.getSpokes();
+        }
+
+        that.buildLinks = function() {
+
+          // (sometimes) create the left/upleft/upright links
+          var leftLink;
+          if (that.col===0)
+            leftLink = new linkProto();
+          else
+            leftLink = field[that.row][that.col-1].links[1];
+          
+
+          var upleftLink;
+          if (that.row===0 || (that.col===0 && that.row<sideLength))
+            upleftLink = new linkProto();
+          else if(that.row<sideLength)
+            upleftLink = field[that.row-1][that.col-1].links[2];
+          else
+            upleftLink = field[that.row-1][that.col].links[2];
+
+          var uprightLink;
+          if (that.row===0 || (that.col===(rowLength(that.row)-1) && that.row<sideLength))
+            uprightLink = new linkProto();
+          else if (that.row<sideLength)
+            uprightLink = field[that.row-1][that.col].links[3];
+          else
+            uprightLink = field[that.row-1][that.col+1].links[3];
+
+          // always create the right/downright/downleft links
+          var rightLink = new linkProto();
+          var downrightLink = new linkProto;
+          var downleftLink = new linkProto();
+
+          // remember in this cell what my links are
+          that.links[0] = uprightLink;
+          that.links[1] = rightLink;
+          that.links[2] = downrightLink;
+          that.links[3] = downleftLink;
+          that.links[4] = leftLink
+          that.links[5] = upleftLink;
+
+          // link all the cells to me
+          uprightLink.cells.push(that);
+          rightLink.cells.push(that);
+          downrightLink.cells.push(that);
+          downleftLink.cells.push(that);
+          leftLink.cells.push(that);
+          upleftLink.cells.push(that);
+        }
+
+        that.getPos = function() {
+          // var y = (that.col - sideLength)*cellSize;
+          // var x = (that.row - sideLength)*cellSize;
+          var y = ((that.row-sideLength+1)*(cellSize*sqrt3on2));
+          var x = ((that.col-sideLength+1)*cellSize)+ (Math.abs(that.row-sideLength+1)*(cellSize/2));
+          return [canvasMid + x, canvasMid + y];
+        }
+      }
+
+      function rowLength(rowNum) {
+        if (rowNum<fieldHeight/2) {
+          return sideLength + rowNum;
+        } else {
+          return sideLength + (fieldHeight-rowNum)-1;
+        }
+      }
+
+      function buildField(data) {
+        field = [];
+        allCells = [];
+        allTriples = [];
+        allLinks = [];
+
+        var i = 0;
+        for (var r=0; r<fieldHeight; r++) {
+          field[r] = [];
+          for (var c=0; c<rowLength(r); c++) {
+            var cell = new cellProto();
+            cell.row = r;
+            cell.col = c;
+            field[r][c] = cell;
+            var ch = parseInt(data.charAt(i++));
+            if (ch !== NaN)
+              cell.ord = ch;
+            else
+              cell.ord = -1;
+            allCells.push(cell);
+          }
+        }
+        // initialise all cell links
+        for (var i=0; i<allCells.length; i++) {
+          allCells[i].buildLinks();
+        }
+        // initialise all cell links
+        for (var i=0; i<allCells.length; i++) {
+          allCells[i].buildSpokes();
+        }
+        //get a list of all triples
+        for (var i=0; i<allCells.length; i++) {
+          var cell = allCells[i];
+          // the triple straight up
+          allTriples.push([cell.links[0], cell.links[5], cell.spokes[0]]);
+          // the triple straight down
+          allTriples.push([cell.links[2], cell.links[3], cell.spokes[3]]);
+          // allTriples around the edges
+          if (cell.row===0)
+            allTriples.push([cell.links[0], cell.links[1], cell.spokes[1]]);
+          else if (cell.col===rowLength(cell.row)-1 && cell.row<sideLength)
+            allTriples.push([cell.links[0], cell.links[1], cell.spokes[1]]);
+          if (cell.col===0 && cell.row<sideLength)
+            allTriples.push([cell.links[4], cell.links[5], cell.spokes[5]]);
+          if (cell.col===0 && cell.row>=sideLength-1)
+            allTriples.push([cell.links[3], cell.links[4], cell.spokes[4]]);
+          if(cell.row===fieldHeight-1)
+            allTriples.push([cell.links[1], cell.links[2], cell.spokes[2]]);
+          else if (cell.col===rowLength(cell.row)-1 && cell.row>=sideLength-1)
+            allTriples.push([cell.links[1], cell.links[2], cell.spokes[2]]);
+        }
+        // tell all links what their adjacent links are.
+        // each link will have 4 adjacent links
+        for (var i=0; i<allTriples.length; i++) {
+          var [a, b, c] = allTriples[i];
+          a.adjs.push([b, c]);
+          b.adjs.push([a, c]);
+          c.adjs.push([a, b]);
+        }
+
+        // construct a list of all links
+        for (var c=0; c<allCells.length; c++) {
+          var cell = allCells[c];
+          for (var i=0; i<6; i++) {
+            if (i<3 && cell.cellAt(i)) continue;
+            allLinks.push(cell.links[i]);
+          }
+        }
+      }
+
+      function maybeStartLine(link, id) {
+        if (link.state!==ON) return false; // only numbering confirmed lines
+        if (link.lineID!==0) return false; // this link is already numbered
+        link.lineID = id;
+        for (var i=0; i<link.allAdjs().length; i++) {
+          maybeStartLine(link.allAdjs()[i], id);
+        }
+        return true;
+      }
+
+      function maybeStartUNKLine(link, id) {
+        if (link.state!==UNK) return false; // only numbering unknown links
+        if (link.UNKLineID!==0) return false; // this link is already numbered
+        link.UNKLineID = id;
+        for (var i=0; i<link.adjs.length; i++) {
+          var a1 = link.adjs[i][0];
+          var a2 = link.adjs[i][1];
+          if (a1.state===UNK && a2.state===OFF) {
+            // try to continue the UNKLine onto a1.
+            maybeStartUNKLine(a1, id);
+          } else if (a1.state===OFF && a2.state===UNK) {
+            // try to continue the UNKLine onto a2
+            maybeStartUNKLine(a2, id);
+          }
+        }
+        return true;
+      }
+
+      function numberLines() {
+        // clear all loop IDs
+        for (var i=0; i<allLinks.length; i++) {
+          allLinks[i].lineID = 0;
+          allLinks[i].UNKLineID = 0;
+        }
+        
+        // write new line IDs to the confirmed lines
+        var lineID = 1;
+        for (var i=0; i<allLinks.length; i++)
+          if (maybeStartLine(allLinks[i],lineID))
+            lineID = lineID+1;
+        
+        // give consecutive UNK lines their own numbers too, making sure
+        // UNKLineIDs don't overflow with LineIDs.
+        var UNKLineID = lineID + 1;
+        for (var i=0; i<allLinks.length; i++)
+          if (maybeStartUNKLine(allLinks[i],UNKLineID))
+          UNKLineID = UNKLineID+1;
+        
+        return lineID;
+      }
+
+      function considerLoops() {
+        // put numbers on all ON links, to link them up
+        numberLines();
+
+        // look for an unknown link with the same lineID on both sides
+        for (var i=0; i<allLinks.length; i++) {
+          var link = allLinks[i];
+          if (link.state === UNK) {
+            var lineID = -1;
+            for (var a=0; a<link.allAdjs().length; a++) {
+              var adj = link.allAdjs()[a];
+              if (adj.lineID>0 && lineID === -1)
+                lineID = adj.lineID;
+              else if (lineID>0 && adj.lineID === lineID) {
+                // the same loop id is on both sides of this link
+                console.log("Found a link that would close a loop.");
+                link.state = OFF;
+                return true;
+              }
+            }
+          }
+        }
+
+        // look for loops that would be created by linking a line to an UNKline
+        var lineEnds = [];
+        var examineEnds = function(lineID, unkLinkID) {
+          if (lineEnds[lineID]===undefined) { // not looked at this line before
+            lineEnds[lineID] = [unkLinkID];
+          } else if (lineEnds[lineID].indexOf(unkLinkID)===-1) { // not seen this combination before
+            lineEnds[lineID].push(unkLinkID);
+          } else {
+            // we have seen this lineID and this unkLinkID together before.
+            // This means that this unkLink would form a closed loop!
+            return true;
+          }
+          return false;
+        }
+
+        for (var i=0; i<allTriples.length; i++) {
+          var counts = tripleCounts(allTriples[i]);
+          if (counts[ON]===1 && counts[UNK]===2) {
+            // this triple has a line ending
+            for (var u=0; u<3; u++) {
+              var link = allTriples[i][u];
+              if (link.state===ON) {
+                // this is the ON at the end of this line
+                for (var off=1; off<3; off++) {
+                  var otherlink = allTriples[i][(u+off)%3];
+                  if (examineEnds(link.lineID, otherlink.UNKLineID)) {
+                    // this unkLine would close a loop!
+                    if (cancelUNKLine(otherlink.UNKLineID)) {
+                      console.log("Found a sequence of UNK links that must be adjoined, but would close a loop if confirmed. Turning them all OFF.");
+                      return true;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        return false;
+      }
+
+      function thing() {
+        for (var i=0; i<allLinks.length; i++) {
+          var link = allLinks[i];
+          if (link.state===UNK && link.UNKLineID===0) {
+            console.log(i);
+          }
+        }
+      }
+
+      function cancelUNKLine(UNKID) {
+        var chg = false;
+        for (var i=0; i<allLinks.length; i++) {
+          var link = allLinks[i];
+          if (link.state===UNK && link.UNKLineID===UNKID) {
+            chg = true;
+            link.state = OFF;
+          }
+        }
+        return chg;
+      }
+
+      function processZero(cell) {
+        if (!cell.ord===0) return false;
+
+        var chg = false;
+        for (var i=0; i<6; i++) {
+          chg = chg || cell.links[i].state!==1 || cell.spokes[i].state!==1;
+          cell.links[i].state = cell.spokes[i].state = OFF;
+        }
+        cell.useful = false;
+        if (chg) console.log("Cleared around a zero cell.");
+        return chg;
+      }
+
+      function processFullOFFs(cell) {
+        if (cell.offCount()!==(6-cell.ord)) return false;
+        var chg = false;
+        for (var i=0; i<6; i++)
+          if (cell.links[i].state!==1) {
+            chg = chg || cell.links[i].state!==2;
+            cell.links[i].state = 2;
+          }
+        cell.useful = false;
+        if (chg) console.log("A cell already had enough OFF links.");
+        return chg;
+      }
+
+      function processFullONs(cell) {
+        if (cell.onCount()!==cell.ord) return false;
+
+        var chg = false;
+        for (var i=0; i<6; i++)
+          if (cell.links[i].state!==2) {
+            chg = chg || cell.links[i].state!==1;
+            cell.links[i].state = 1;
+          }
+        cell.useful = false;
+        if (chg) console.log("A cell already had enough ON links.");
+        return chg;
+      }
+
+      function process5ONSpokes(cell) {
+        var chg = false;
+        for (var s=0; s<6; s++) {
+          if (cell.spokes[s].state === 2) {
+            for (var off=1; off<5; off++) {
+              var i = (s+off)%6;
+              chg = chg || cell.links[i].state!==2;
+              cell.links[i].state = 2;
+            }
+            if (chg) console.log("A 5 cell an ON spoke.");
+            return chg;
+          }
+        }
+      }
+
+      function process5OFFSpokes(cell) {
+        var chg = false;
+        for (var s=0; s<6; s++) {
+          if (cell.spokes[s].state === 1) {
+            var s2 = (s+5)%6;
+            chg = chg || (cell.links[s].state!==2) || (cell.links[s2].state!==2);
+            cell.links[s].state = 2;
+            cell.links[s2].state = 2;
+          }
+        }
+        if (chg) console.log("A 5 cell had OFF spoke(s).");
+        return chg;
+      }
+
+      function process4OFFSpokes(cell) {
+        if (cell.ord!==4) return false;
+        var chg = false;
+        for (var s=0; s<6; s++) {
+          if (cell.spokes[s].state===OFF) {
+            for (var i2=2; i2<5; i2++) {
+              var i = (s+i2)%6;
+              if (cell.spokes[i].state===ON) {
+                chg = chg || cell.links[s].state!==ON;
+                cell.links[s].state = ON;
+              }
+            }
+          }
+        }
+        if (chg) console.log("Found interaction between ON and OFF spokes on a 4 cell.");
+        return chg;
+      }
+
+      function processTwoUnknowns(cell) {
+        if (cell.unkCount()!==2) return false;
+        // check if the unknowns are consecutive
+        for (var i=0; i<6; i++) {
+          var i2 = (i+1)%6;
+          if (cell.links[i].state===UNK && cell.links[i2].state===UNK) {
+            // they are consecutive
+            if (cell.spokes[(i+1)%6].state!==ON) {
+              cell.spokes[(i+1)%6].state = ON;
+              console.log("An ordinal cell had two unknowns.");
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+
+      function processEnoughOFFSpokes(cell) {
+        var offSpokeCount = cell.offSpokeCount();
+        if (!(offSpokeCount >= cell.ord || offSpokeCount >= (6-cell.ord))) return false;
+
+        var [count, ind] = cell.maxConsecutiveOffSpokes();
+        if ((count+1) > (6-cell.ord)) {
+          var chg = false;
+          for (var i2=0; i2<=count; i2++) {
+            var i = (ind+i2+5)%6;
+            chg = chg || cell.links[i].state!==ON;
+            cell.links[i].state = ON;
+          }
+          if (chg) console.log("An ordinal cell had enough consecutive OFF spokes to confirm a section.");
+          return chg;
+        } else if ((count+1) > cell.ord) {
+          var chg = false;
+          for (var i2=0; i2<=count; i2++) {
+            var i = (ind+i2+5)%6;
+            chg = chg || cell.links[i].state!==OFF;
+            cell.links[i].state = OFF;
+          }
+          if (chg) console.log("An ordinal cell had enough consecutive OFF spokes to block a section.");
+          return chg;
+        }
+        return false;
+      }
+
+      function processOFFSpokes(cell) {
+        if (cell.offSpokeCount() === 0) return false;
+
+        var [count, ind] = cell.maxConsecutiveOffSpokes();
+        // count the cells away from the long section
+        var offCount = 0; var onCount = 0;
+        for (var off=0; off<(6-count-1); off++) {
+          var i = (ind+count+off)%6;
+          if (cell.links[i].state===ON) onCount++;
+          else if (cell.links[i].state===OFF) offCount++;
+        }
+        var newState = UNK;
+        if (offCount+count+1 > (6-cell.ord)) newState = ON;
+        if (onCount+count+1 > cell.ord) newState = OFF;
+        if (newState === UNK) return false;
+        var chg = false;
+        for (var off=0; off<=count; off++) {
+          var i = (ind+off+5)%6;
+          chg = chg || cell.links[i].state!==newState;
+          cell.links[i].state = newState;
+        }
+        if (chg) console.log("A sequence of OFF spokes had one option ruled out.");
+        return chg;
+      }
+
+      function processAdj55(cell) {
+        if (cell.ord!==5) return false;
+        var adjs = cell.getAdjs(5);
+        for (var ai=0; ai<adjs.length; ai++) {
+          var i = adjs[ai];
+          var adj = cell.cellAt(i);
+          var chg = false;
+          // turn the middle link is ON
+          chg = chg || cell.links[i].state!==ON;
+          cell.links[i].state = ON;
+          // turn the three links away from the middle ON
+          for (var off=2; off<5; off++) {
+            var i2 = (i+off)%6;
+            var i3 = (i+off+3)%6;
+            chg = chg || cell.links[i2].state!==ON || adj.links[i3].state!==ON;
+            cell.links[i2].state = ON;
+            adj.links[i3].state = ON;
+          }
+          if (chg) {
+            console.log("Adjacent 5s spotted. Turned ON links at their intersection and the three links away from their intersection.");
+            return true;
+          }
+        }
+        return false;
+      }
+
+      function processAdj51(cell) {
+        if (cell.ord!==5) return false;
+        var adjs = cell.getAdjs(1);
+        for (var ai=0; ai<adjs.length; ai++) {
+          var i = adjs[ai];
+          var chg = false;
+          // turn the middle link and its left and right links ON
+          for (var off=0; off<3; off++) {
+            var i2 = (i+off+5)%6;
+            chg = chg || cell.links[i2].state!==ON;
+            cell.links[i2].state = ON;
+          }
+          if (chg) {
+            console.log("Adjacent 5 and 1 spotted. Turned ON the 5's three links nearest the 1.");
+            return true;
+          } 
+        }
+        return false;
+      }
+
+      function processAdj11(cell) {
+        if (cell.ord!==1) return false;
+        var adjs = cell.getAdjs(1);
+        for (var ai=0; ai<adjs.length; ai++) {
+          var i = adjs[ai];
+          // turn the middle link OFF
+          if (cell.links[i].state!==OFF) {
+            cell.links[i].state = OFF;
+            console.log("Adjacent 1s spotted. Turning OFF the link at their intersection.");
+            return true;
+          }
+        }
+        return false;
+      }
+
+      function processAdj54(cell) {
+        if (cell.ord!==5) return false;
+        var adjs = cell.getAdjs(4);
+        for (var ai=0; ai<adjs.length; ai++) {
+          var i = adjs[ai];
+          var adj = cell.cellAt(i);
+          // count adj's three farthest links
+          var offCount = 0;
+          var onCount = 0;
+          for (var off=0; off<3; off++) {
+            var i2 = (i+off+5)%6;
+            if (adj.links[i2].state===OFF) offCount++;
+            if (adj.links[i2].state===ON)  onCount++;
+          }
+          if (onCount === 3) {
+            // the link at their intersection can't be off. must be on.
+            if (cell.links[i].state!==ON) {
+              cell.links[i].state = ON;
+              console.log("Adjacent 5 and 4 spotted, with a configuration such that their intersecting link cannot be OFF.");
+              return true;
+            }
+          }
+          if (offCount > 0) {
+            // this 5 can't give the 4 two more OFFs, so the
+            // far links can't be OFF.
+            var chg = false;
+            for (var off=0; off<3; off++) {
+              var i5 = (i+off+2)%6;
+              var i4 = (i+off+5)%6;
+              chg = chg || cell.links[i5].state!==ON || adj.links[i4].state===UNK;
+              cell.links[i5].state = ON;
+              if (adj.links[i4].state===UNK) adj.links[i4].state = ON;
+            }
+            if (chg) {
+              console.log("Adjacent 5 and 4 spotted, with a configuration such that the 5 cannot give the 4 two more OFFs, so the 5's far three links must be ON. Also the 4 cannot give the 4 two OFFs, so its far three links can only have one OFF.");
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+
+      function regularCount(cell, alreadyCounted) {
+        var onCount = 0;
+        var offCount = 0;
+        var countError = 0;
+
+        for (var i=0; i<6; i++) {
+          if (alreadyCounted.indexOf(i)===-1) {
+            var link = cell.links[i];
+            if (link.state===ON) {
+              onCount++;
+              alreadyCounted.push(i);
+            } else if (link.state===OFF) {
+              offCount++;
+              alreadyCounted.push(i);
+            }
+          }
+        }
+        return [onCount, offCount, countError];
+      }
+
+      function has(arr, item) {
+        return (arr.indexOf(item)!==-1);
+      }
+
+      function deepSpokeCount(cell, alreadyCounted) {
+        var onCount = 0;
+        var offCount = 0;
+        var countError = 0;
+        var consecSpokeCount = 0;
+
+        var used = (i) => alreadyCounted.indexOf(i)!==-1;
+
+        // count how many consecutive ON spokes surrounded by unknown
+        // links are at the END of the cycle. We do this because we only
+        // apply the effect of these spokes once we reach a spoke that isn't
+        // ON. Without this, a sequence passing zero would not be processed.
+        for (var i=5; i>0; i--) {
+          if (!used(i) && !used((i+5)%6)
+              && cell.spokes[i].state===ON
+              && cell.links[i].state===UNK && cell.links[(i+5)%6].state===UNK) {
+            alreadyCounted.push(i);
+            alreadyCounted.push((i+5)%6);
+            consecSpokeCount++;
+          } else {
+            break;
+          }
+        }
+
+        // look at all the ON spokes
+        for (var i=0; i<6; i++) {
+          if (cell.spokes[i].state!==ON) {
+            // there is no ON link here, process the previous ones (if they exist).
+            if (consecSpokeCount===1) {
+              onCount  += 1;
+              offCount += 1;
+            } else if (consecSpokeCount===2) {
+              onCount  += 1;
+              offCount += 1;
+              countError += 1;
+            } else if (consecSpokeCount===3) {
+              onCount  += 2;
+              offCount += 2;
+            } else if (consecSpokeCount===4) {
+              onCount  += 2;
+              offCount += 2;
+              countErrpr += 1;
+            } else if (consecSpokeCount===5) {
+              onCount += 3;
+              offCount += 3;
+            }
+            consecSpokeCount = 0;
+          } else if (cell.spokes[i].state===ON && cell.links[i].state===UNK && cell.links[(i+5)%6].state===UNK) {
+            // double check that the links on either side of this spoke are unused
+            if (!used(i) && !used((i+5)%6)) {
+              // there is an ON spoke here, with unknowns around it.
+              // remember that these unknown links are from spokes, so are "spoken for"
+              alreadyCounted.push(i);
+              alreadyCounted.push((i+5)%6);
+              consecSpokeCount++;
+            }
+          }
+        }
+
+        // if there is an ON spoke with a double on both sides, add one more to onCount and offCount
+        for (var i=0; i<6; i++) {
+          if (cell.spokes[i].state===ON
+              && cell.spokes[(i+1)%6].state===OFF && cell.spokes[(i+5)%6].state===OFF
+              && cell.links[i].state===UNK && cell.links[(i+5)%6].state===UNK
+              && cell.links[(i+1)%6].state===UNK && cell.links[(i+4)%6].state===UNK
+              && !used(i) && !used((i+1)%6) && !used((i+5)%6) && !used((i+4)%6)) {
+                onCount++;
+                offCount++;
+                alreadyCounted.push(i);
+                alreadyCounted.push((i+5)%6);
+                alreadyCounted.push((i+1)%6);
+                alreadyCounted.push((i+4)%6);
+              }
+        }
+
+        return [onCount, offCount, countError];
+      }
+
+      function deep5AdjCount(cell, alreadyCounted) {
+        // if there is a 5 adjacent, and our relationship with it is entirely unknown,
+        // add one to onCount and offCount, plus an error.
+        var onCount = 0;
+        var offCount = 0;
+        var countError = 0;
+
+        var used = (i) => alreadyCounted.indexOf(i)!==-1;
+
+        for (var i=0; i<6; i++) {
+          var i1 = (i+5)%6;
+          var i2 = i;
+          var i3 = (i+1)%6;
+          if (cell.links[i1].state===UNK && cell.links[i2].state===UNK && cell.links[i3].state===UNK) {
+            if (!used(i1) && !used(i2) && !used(i3)) {
+              var adj = cell.cellAt(i);
+              if (adj && adj.ord===5) {
+                onCount  += 1;
+                offCount += 1;
+                countError += 1;
+
+                alreadyCounted.push(i1);
+                alreadyCounted.push(i2);
+                alreadyCounted.push(i3);
+              }
+            }
+          }
+        }
+        return [onCount, offCount, countError];
+      }
+
+      function deepCountFillsOrd(cell, onCount, offCount, alreadyCounted) {
+        var chg = false;
+
+        // enough ONs are spoken for (including undetermined spoke continuations)
+        // set all unmarked UNK's to OFF.
+        if (onCount===cell.ord) {
+          for (var i=0; i<6; i++) {
+            if (cell.links[i].state===UNK) {
+              if (alreadyCounted.indexOf(i)===-1) {
+                chg = true;
+                cell.links[i].state = OFF;
+              }
+            }
+          }
+          if (chg) {
+            console.log("A deeper count of a cell's known ONs (even when undecided) has reached a maximum, so some links are marked OFF.");
+            return true;
+          }
+        }
+        
+        if (offCount===(6-cell.ord)) {
+          // enough OFFs are spoken for (including indetermined spoke continuations)
+          // set all unmarked UNKs to ON.
+          for (var i=0; i<6; i++) {
+            if (cell.links[i].state===UNK) {
+              if (alreadyCounted.indexOf(i)===-1) {
+                chg = true;
+                cell.links[i].state = ON;
+              }
+            }
+          }
+          if (chg) {
+            console.log("A deeper count of a cell's known OFFs (even when undecided) has reached a maximum, so some links are marked ON.");
+            return true;
+          }
+        }
+
+        return false;
+      }
+
+      function deepCountEnsuresSpoke(cell, onCount, offCount, alreadyCounted) {
+        if (onCount+1===cell.ord && offCount+1===(6-cell.ord)) {
+          // there are exactly two uncounted unknowns, one ON and one OFF.
+          // if they are consecutive, the spoke between them will be ON.
+          for (var i1=0; i1<6; i1++) {
+            var i2 = (i1+1)%6;
+            if (cell.links[i1].state===UNK && cell.links[i2].state===UNK) {
+              // they are consecutive and unknown
+              if (alreadyCounted.indexOf(i1)===-1 && alreadyCounted.indexOf(i2)===-1) {
+                // they are uncounted
+                if (cell.spokes[i2].state===UNK) {
+                  cell.spokes[i2].state = ON;
+                  console.log("A deeper count revealed that two consecutive links must be ON and OFF, so the spoke between them must be ON.");
+                  return true;
+                }
+              }
+            }
+          }
+        }
+        return false;
+      }
+
+      function deepCountBlocksDouble(cell, onCount, offCount, alreadyCounted) {
+        if (onCount+2 > cell.ord || offCount+2 > (6-cell.ord)) {
+          for (var i=0; i<6; i++) {
+            var s = i;
+            var l1 = i;
+            var l2 = (i+5)%6;
+            if (cell.spokes[s].state===OFF && alreadyCounted.indexOf(l1)===-1 && alreadyCounted.indexOf(l2)===-1 && cell.links[l1].state===UNK && cell.links[l2].state===UNK) {
+              if (onCount+2 > cell.ord) {
+                cell.links[l1].state = OFF;
+                cell.links[l2].state = OFF;
+                console.log("An OFF spoke would provide too many ON links for an ordinal cell, according to a deeper count.");
+                return true;
+              } else if (offCount+2 > (6-cell.ord)) {
+                cell.links[l1].state = ON;
+                cell.links[l2].state = ON;
+                console.log("An OFF spoke would provide too many OFF links for an ordinal cell, according to a deeper count.");
+                return true;
+              }
+            }
+          }
+        }
+        return false;
+      }
+
+
+      // this can be used to set the inner and outer values of a sequence of ON spokes
+      // surrounded by UNK links, if we decide this is possible.
+      function setInnerOuter(cell, inner, outer) {
+        var consecSpokeCount_again = 0;
+        // as before, count the ON spokes at the 'end'
+        for (var i=5; i>0; i--) {
+          if (cell.spokes[i].state===ON && cell.links[i].state===UNK && cell.links[(i+5)%6].state===UNK) {
+            consecSpokeCount_again++;
+          } else break;
+        }
+        // count from the start to the end
+        for (var i=0; i<6; i++) {
+          if (cell.spokes[i].state!==ON) {
+            if (consecSpokeCount_again===2) {
+              cell.links[(i+5)%6].state = outer;
+              cell.links[(i+4)%6].state = inner;
+              cell.links[(i+3)%6].state = outer;
+              console.log("A deeper count found a scenario where setting the OUTER links of an even ON/UNK spoke/link sequence to ON or OFF would provide too many links for an ordinal cell.");
+              return true;
+            }
+          } else if (cell.spokes[i].state===ON && cell.links[i].state===UNK && cell.links[(i+5)%6].state===UNK) {
+            consecSpokeCount_again += 1;
+          }
+        }
+      }
+
+    function deepCountingErrorOneWay(cell, onCount, offCount, countError) {
+      // The 'counting error' means one of the spoke counts had an option for more ONs or OFFs.
+      // The option for another ON would be too many. Choose the option with fewer ONs.
+      if (countError===1 && onCount+countError > cell.ord) {
+        if (setInnerOuter(cell, ON, OFF)) return true;
+      }
+
+      // The 'counting error' means one of the spoke counts had an option for more ONs or OFFs.
+      // The option for another OFF would be too many. Choose the option with fewer OFFs.
+      if (countError===1 && offCount+countError > (6-cell.ord)) {
+        if (setInnerOuter(cell, OFF, ON)) return true;
+      }
+
+      return false;
+    }
+
+    function deepCountingBinaryDouble(cell, onCount, offCount, used) {
+      if (onCount+2===cell.ord && offCount+2===(6-cell.ord)) {
+        for (var i=0; i<6; i++) {
+          var l1 = i;
+          var l2 = (i+5)%6;
+          if (cell.spokes[i].state===OFF
+              && cell.links[l1].state===UNK && cell.links[l2].state===UNK
+              && !used(l1) && !used(l2)) {
+            // this is a double UNK link, and it's unused.
+            // we know all unused unknowns are the same value.
+            // maybe create UNK spokes
+            var chg = false;
+            for (var off=2; off<5; off++) {
+              var s = (i+off)%6;
+              if (cell.spokes[s].state===UNK
+                && cell.links[s].state===UNK && cell.links[(s+5)%6].state===UNK
+                && !used(s) && !used((s+5)%6)) {
+                  chg = true;
+                  cell.spokes[s].state = OFF;
+              }
+            }
+            if (chg) {
+              console.log("From a deeper count, there is a double UNK that ensures all other uncounted UNKs are the same value. This will turn off a spoke.");
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    }
+
+
+
+
+
+      function deeperCount(cell, debug=false, extra=false) {
+        // we can't do anything with 6 spokes.
+        if (cell.onSpokeCount()===6) return false;
+
+        var ord = cell.ord;
+        var onCount = 0;
+        var offCount = 0;
+        var countError = 0;
+        var alreadyCounted = [];
+
+        var unused = (i) => alreadyCounted.indexOf(i)===-1;
+        var used   = (i) => alreadyCounted.indexOf(i)!==-1;
+
+        var updateCounts = function(deltas) {
+          var [onCountDelta, offCountDelta, countErrorDelta] = deltas;
+          onCount += onCountDelta;
+          offCount += offCountDelta;
+          countError += countErrorDelta;
+        }
+
+        // count the regular links.
+        updateCounts(regularCount(cell, alreadyCounted));
+
+        // count the potential values from ON spokes surrounded by UNK links.
+        updateCounts(deepSpokeCount(cell, alreadyCounted));
+
+        // add the potential counts from an adjacent 5
+        updateCounts(deep5AdjCount(cell, alreadyCounted));
+        
+
+        // print counts, if debugging is enabled
+        if (debug) {
+          console.log(cell);
+          console.log("ord", ord);
+          console.log("onCount", onCount);
+          console.log("offCount", offCount);
+          console.log("countError", countError);
+          console.log("alreadyCounted", alreadyCounted);
+        }
+        
+
+        // check if the count dictates the maximum ON or OFF links.
+        if (deepCountFillsOrd(cell, onCount, offCount, alreadyCounted)) return true;
+
+
+        // check for the case where the last two unknowns are consecutive and known
+        // to be ON and OFF. Turn the spoke between them ON.
+        if (deepCountEnsuresSpoke(cell, onCount, offCount, alreadyCounted)) return true;
+
+        // check for the case where a spoke is OFF with unused links. Both of these being ONs
+        // or OFFs may be too much for the ordinality.
+        if (deepCountBlocksDouble(cell, onCount, offCount, alreadyCounted)) return true;
+        
+        // given the counting error, see if one of the on/off options would break the rules
+        // for the ordinal cell.
+        if (deepCountingErrorOneWay(cell, onCount, offCount, countError)) return true; 
+
+        // if there's a double somewhere, and that double either completes the ONs or completes
+        // the OFFs, then all other uncounted unknowns must be the same value.
+        if (deepCountingBinaryDouble(cell, onCount, offCount, used)) return true;
+
+        return false;
+      }
+
+
+
+
+      function anyCell(fn, onlyUseful=true, onlyOrd=true) {
+        for (var i=0; i<allCells.length; i++) {
+          var cell = allCells[i];
+          if (onlyUseful && !cell.useful) continue;
+          if (onlyOrd && !cell.isOrd()) continue;
+          if (fn(cell)) return true;
+        }
+        return false;
+      }
+
+      function anyCellByOrd(ord, fn, onlyUseful=true, onlyOrd=true) {
+        for (var i=0; i<allCells.length; i++) {
+          var cell = allCells[i];
+          if (cell.ord!==ord) continue;
+          if (onlyUseful && !cell.useful) continue;
+          if (onlyOrd && !cell.isOrd()) continue;
+          if (fn(cell)) return true;
+        }
+        return false;
+      }
+
+      function considerCells() {
+        // ignore cells that are no longer useful
+
+        // zero cells
+        if (anyCellByOrd(0, processZero)) return true;
+
+        // cell has enough ONs
+        if (anyCell(processFullONs)) return true;
+
+        // cell has enough OFFs
+        if (anyCell(processFullOFFs)) return true;
+
+        // strategies for 4 cells
+        if (anyCellByOrd(4, process4OFFSpokes)) return true;
+
+        // strategies for 5 cells
+        if (anyCellByOrd(5, process5ONSpokes)) return true;
+        if (anyCellByOrd(5, process5OFFSpokes)) return true;
+        if (anyCellByOrd(5, processAdj55)) return true;
+        if (anyCellByOrd(5, processAdj51)) return true;
+        if (anyCellByOrd(5, processAdj54)) return true;
+
+        // adjacent 1s
+        if (anyCellByOrd(1, processAdj11)) return true;
+
+        // exactly two unknown links
+        if (anyCell(processTwoUnknowns)) return true;
+
+        // enough spokes are OFF to be interesting
+        if (anyCell(processEnoughOFFSpokes)) return true;
+
+        // some off spokes, which could possibly be useful
+        if (anyCell(processOFFSpokes)) return true;
+
+        // check if there is exactly one unknown spoke. This will be trivially solved via parity.
+        if (anyCell(processOneUnknownSpoke, false, false)) return true;
+        
+        // perform a deeper count, that considers undecided cells.
+        if (anyCell(deeperCount)) return true;
+        // for (var i=0; i<allCells.length; i++) {
+        //   var cell = allCells[i];
+        //   if (!deeperCount(cell)) {
+        //     if (deeperCount(cell, true)) {
+        //       console.log(cell);
+        //       doafail();
+        //     }
+        //   }
+        // }
+
+        return false;
+      }
+
+      function processOneUnknownSpoke(cell) {
+        if (cell.unkSpokeCount()!==1) return false;
+
+        var onSpokeCount = cell.onSpokeCount();
+
+        for (var i=0; i<6; i++) {
+          if (cell.spokes[i].state===UNK) {
+            if (onSpokeCount%2===0) {
+              // even ONs. the UNK will be OFF.
+              cell.spokes[i].state = OFF;
+              console.log("A cell had only one unknown spoke, and an even number of ON spokes. The unknown must be OFF.");
+              return true;
+            } else {
+              // odd ONs. the UNK will be OFF.
+              cell.spokes[i].state = ON;
+              console.log("A cell had only one unknown spoke, and an odd number of ON spokes. The unknown must be ON.");
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+
+      function makeProgress() {
+        // consider allTriples
+        for (var i=0; i<allTriples.length; i++)
+          if (considerTriple(allTriples[i])) return true;
+
+        // consider cells
+        if (considerCells()) return true;
+
+        // consider loops
+        if (considerLoops()) return true;
+      }
+
+      function checkErrors(log = true) {
+        for (var i=0; i<allCells.length; i++) {
+          var cell = allCells[i];
+          if (cell.isOrd()) {
+            if (cell.onCount() > cell.ord) {
+              log && console.error("A cell has too many ON links!");
+              return true;
+            }
+            if (cell.offCount() > (6-cell.ord)) {
+              log && console.error("A cell has too many OFF links!");
+              return true;
+            }
+          }
+        }
+
+        if (numberLines()!==2) {
+          log && console.error("There are multiple lines!");
+          return true;
+        }
+
+        for (var i=0; i<allTriples.length; i++) {
+          var triple = allTriples[i];
+          if (tripleCounts(triple)[ON]%2!==0) {
+            log && console.error("There are unfinished lines!");
+            return true;
+          }
+        }
+
+        return false;
+      }
+
+      // a and b are links. the third link at this point is off.
+      function otherOneOff(a, b) {
+        if (a.state===1) b.state = 1;
+        if (b.state===1) a.state = 1;
+        if (a.state===2) b.state = 2;
+        if (b.state===2) a.state = 2;
+      }
+
+      function tripleCounts(triple) {
+        var counts = [];
+        counts[ON]=counts[OFF]=counts[UNK]=0;
+        for (var i=0; i<3; i++)
+          counts[triple[i].state]++;
+        return counts;
+      }
+
+      function considerTriple(triple) {
+        // count the ONs, the OFFs, and the UNKs
+        var counts = tripleCounts(triple);
+        
+        // if there are 0 or 2 unknowns, we can do nothing.
+        if (counts[UNK]===0) return false;
+        if (counts[UNK]===2) return false;
+
+        // if two links are ON, or two are OFF. The third must be OFF.
+        if (counts[ON]===2 || counts[OFF]===2)
+          for (var i=0; i<3; i++)
+            if (triple[i].state===UNK) {
+              triple[i].state = OFF;
+              console.log("Disabled a dead-end link.");
+              return true;
+            }
+
+        // if one is ON and one is OFF, the other must be ON.
+        if (counts[ON]===1 && counts[OFF]===1)
+          for (var i=0; i<3; i++)
+            if (triple[i].state===UNK) {
+              triple[i].state = ON;
+              console.log("Continued a line.");
+              return true;
+            }
+
+        return false;
+      }
+
+      var triplei=0;
+      var tempTriple;
+      function randomTriple() {
+        if (tempTriple===undefined) tempTriple = allTriples[0];
+        tempTriple[0].state = 0;
+        tempTriple[1].state = 0;
+        tempTriple[2].state = 0;
+        // tempTriple = allTriples[Math.floor(Math.random()*allTriples.length)];
+        tempTriple = allTriples[triplei++];
+        tempTriple[0].state = 1;
+        tempTriple[1].state = 1;
+        tempTriple[2].state = 1;
+      }
+
+      var celli = 0;
+      var tempCell;
+      function randomCell() {
+        if (tempCell===undefined) tempCell = allCells[0];
+        for (var i=0; i<6; i++) {
+          tempCell.spokes[i].state = 0;
+        }
+        tempCell = allCells[celli++];
+        for (var i=0; i<6; i++) {
+          tempCell.spokes[i].state = 1;
+        }
+      }
+
+
+      function meowButton() {
+        // randomTriple();
+        // randomCell();
+        if (makeProgress()) {
+          // setTimeout(meowButton, 10);
+        }
+        drawField();
+      }
+
+      function refresh() {
+        drawField();
+      }
+
+      function randomPastel() {
+        return "hsl(" + 360 * Math.random() + ',' +
+                 (25 + 70 * Math.random()) + '%,' + 
+                 (80 + 5 * Math.random()) + '%)';
+      }
+
+      function drawField() {
+        var canvasSize = Math.min(window.innerHeight, window.innerWidth)-20;
+        if (canvas.height!==canvasSize || canvas.width!==canvasSize) {
+          canvas.height = canvasSize;
+          canvas.width  = canvasSize;
+          canvasMid = canvasSize/2;
+          cellSize = (canvasSize/sideLength)*0.5;
+        }
+
+        // circleSize = (canvas.width/width)/5;
+        var center = canvas.width/2;
+
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        for (var i=0; i<allCells.length; i++) {
+          allCells[i].drawMe();
+        }
+      }
+
+
+      // function drawHex(x,y,size) {
+      //   ctx.beginPath();
+      //   ctx.moveTo(x+cos(30)*size,y+sin(30)*size);
+      //   ctx.lineTo(x+cos(90)*size,y+sin(90)*size);
+      //   ctx.lineTo(x+cos(150)*size,y+sin(150)*size);
+      //   ctx.lineTo(x+cos(210)*size,y+sin(210)*size);
+      //   ctx.lineTo(x+cos(270)*size,y+sin(270)*size);
+      //   ctx.lineTo(x+cos(330)*size,y+sin(330)*size);
+      //   ctx.lineTo(x+cos(30)*size,y+sin(30)*size);
+      //   ctx.stroke();
+      // }
+
+      // function drawCircle(x, y, color, radius) {
+      //   ctx.beginPath();
+      //   ctx.arc(x, y, radius, 0, 2 * Math.PI, false);
+      //   ctx.fillStyle = color;
+      //   ctx.fill();
+      // }
+
+
+
+
+      // sin and cos, in degrees, with results memoised
+      var toRadians = (a) => a*(Math.PI/180);
+      var sinCache = [];
+      function sin(x) {
+        var result = sinCache[x];
+        if (result === undefined)
+          sinCache[x] = result = Math.sin(toRadians(x));;
+        return result;
+      }
+      var cosCache = [];
+      function cos(x) {
+        var result = cosCache[x];
+        if (result === undefined)
+          cosCache[x] = result = Math.cos(toRadians(x));;
+        return result;
+      }
+
+      
+
+
+
+      $(document).ready(onReady);
+    </script>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <!-- <button onclick="javascript:meowButton();">Solve</button> -->
+  </body>
+</html>

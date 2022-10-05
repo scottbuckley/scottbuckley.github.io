@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>My first three.js app</title>
+		<style>
+			body { margin: 0; }
+		</style>
+	</head>
+	<body>
+		<script src="js/r138/three.min.js"></script>
+		<script>
+
+
+    // set up random field
+    const buffSize = 32;
+    const data = new Uint8Array(4 * buffSize * buffSize);
+    for(let i = 0; i < buffSize*buffSize; i++) {
+        const stride = i * 4;
+        data[stride] = Math.random()*255;
+        data[stride + 1] = Math.random()*255;
+        data[stride + 2] = Math.random()*255;
+        data[stride + 3] = 255;
+    }
+
+    const textureInit = new THREE.DataTexture(data, buffSize, buffSize, THREE.RGBAFormat);
+    textureInit.magFilter = textureInit.minFilter = THREE.NearestFilter;
+    textureInit.needsUpdate = true;
+            
+    
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    //basic scene
+    var scene = new THREE.Scene();
+    var camera = new THREE.PerspectiveCamera(70,width/height, 1, 1000);
+
+    var renderer = new THREE.WebGLRenderer();
+    renderer.setSize(width, height);
+    document.body.appendChild(renderer.domElement);
+
+    //create off-screen render target
+    var bufferScene = new THREE.Scene();
+    var bufferTexture = new THREE.WebGLRenderTarget(width, height, {minFilter:THREE.LinearFilter, magFilter:THREE.NearestFilter});
+    
+    //create a red box
+    var redMaterial = new THREE.MeshBasicMaterial({color:0xD034FF});
+    var boxGeometry = new THREE.BoxGeometry( 5, 5, 5 );
+    var boxObject = new THREE.Mesh( boxGeometry, redMaterial );
+    boxObject.position.z = -10; 
+    bufferScene.add(boxObject);//We add it to the bufferScene instead of the normal scene!
+
+    ///And a blue plane behind it
+    var blueMaterial = new THREE.MeshBasicMaterial({color:0x7074FF})
+    var plane = new THREE.PlaneBufferGeometry( window.innerWidth, window.innerHeight );
+    var planeObject = new THREE.Mesh(plane,blueMaterial);
+    planeObject.position.z = -15;
+    bufferScene.add(planeObject);//We add it to the bufferScene instead of the normal scene!
+
+    //Now we use our bufferTexture as a material to render it onto our main scene
+    var boxMaterial = new THREE.MeshBasicMaterial({map:bufferTexture});
+    var boxGeometry2 = new THREE.BoxGeometry( 5, 5, 5 );
+    var mainBoxObject = new THREE.Mesh(boxGeometry2,boxMaterial);
+    mainBoxObject.position.z = -10;
+    scene.add(mainBoxObject);
+
+    //Render everything!
+    function render() {
+
+        requestAnimationFrame( render );
+
+        //Make the box rotate on box axises
+        boxObject.rotation.y += 0.01;
+        boxObject.rotation.x += 0.01;
+        //Rotate the main box too
+        mainBoxObject.rotation.y += 0.01;
+        mainBoxObject.rotation.x += 0.01;
+
+        //Render onto our off screen texture
+        renderer.render(bufferScene,camera,bufferTexture);
+
+        //Finally, draw to the screen
+        renderer.render( scene, camera );
+
+    }
+    render();
+
+    </script>
+	</body>
+    </html>

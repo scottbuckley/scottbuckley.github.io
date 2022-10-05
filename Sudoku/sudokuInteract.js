@@ -1614,6 +1614,8 @@ function refreshRegionLabels() {
   // kropki dot styles
   const KROPDIAMOND = "D";
   const KROPWALL = "W";
+  const KROPBLACK = "B"
+  const KROPCIRCLE = "C"
 
   function getKropkiStyle() {
     var kropstyle = $("select#kropkistyle").val();
@@ -1893,6 +1895,17 @@ function refreshRegionLabels() {
       ctx.lineTo(x-d, y);
       ctx.closePath();
       ctx.stroke();
+      ctx.fill();
+    } else if (style===KROPCIRCLE) {
+      ctx.beginPath();
+      ctx.arc(center[0], center[1], size*0.6, 0, 2*Math.PI);
+      ctx.strokeStyle = "#666";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    } else if (style===KROPBLACK) {
+      ctx.beginPath();
+      ctx.arc(center[0], center[1], size*0.6, 0, 2*Math.PI);
+      ctx.fillStyle = "#666";
       ctx.fill();
     } else {  
       ctx.beginPath();
