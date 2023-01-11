@@ -1,0 +1,330 @@
+<html>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.5.0/font/bootstrap-icons.css" />
+<link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
+<script>
+</script>
+<body>
+    <div class="form-box">
+        <h1>Calculating some mead things</h1>
+        <form name="calc">
+            <div class="form-group">
+                <label for="og">OG</label>
+                <div class="input-group">
+                    <input class="form-control" id="og" name="OG"
+                        type="number" step="0.001" value="1.140"
+                        onchange="setSGDisplay(this);updateCalculations(this);" >
+                    <div class="input-group-text"><input class="form-check-input mt-0" type="radio" name="target" value="og" onchange="targetChanged(this);"></div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="fg">FG</label>
+                <div class="input-group">
+                    <input class="form-control" id="fg" name="FG"
+                        type="number" step="0.001" value="1.040"
+                        onchange="setSGDisplay(this);updateCalculations(this);" >
+                    <div class="input-group-text"><input class="form-check-input mt-0" type="radio" name="target" value="fg" onchange="targetChanged(this);"></div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="abv">ABV (%)</label>
+                <div class="input-group">
+                    <input class="form-control" id="abv" type="number" name="ABV" disabled="true">
+                    <div class="input-group-text"><input class="form-check-input mt-0" type="radio" name="target" value="abv" checked  onchange="targetChanged(this);"></div>
+                </div>
+            </div>
+            <div class="form-group align-items-right">
+                <label for="nafg">
+                    <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
+                       title="Non-alcohol final gravity"
+                       data-bs-content="Alcohol has a density less than water, so its presence reduces the specific gravity
+                       of your must. We can reliably calculate the specific gravity of the must minus any alcohol, given the ABV."></a>
+                    Non-alcohol FG
+                </label>
+                <input class="form-control" id="nafg" type="number" name="NAFG" value="0" disabled="true">
+            </div>
+            <div class="form-group align-items-right">
+                <label for="nsfg">
+                    <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
+                       title="Approximate non-sugar final gravity"
+                       data-bs-content="The final gravity of the must if there was no sugar remaining.
+                       This is extrapolated only from the given ABV, assuming normal levels of non-fermentables are present in the must.
+                       Obviously this calculator doesn't know what non-fermentables are in your must, but uses data collected from
+                       mead makers who completely fermented away all sugars and then measured their gravity, for various ABVs."></a>
+                    Approx. non-sugar FG
+                </label>
+                <input class="form-control" id="nsfg" type="number" name="NSFG" value="0" disabled="true">
+            </div>
+            <div class="form-group">
+                <label for="nsnafg">
+                    <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
+                       title="Approx. non-sugar, non-alcohol final gravity"
+                       data-bs-content="The presence of alcohol decreases the specific gravity of your must.
+                       This calculates what the final gravity of your must would be if there was no sugar *and* no alcohol in it.
+                       Essentially this is approximating the density contributed by non-fermentable solutes in your must."></a>
+                    Approx. non-sugar non-alcohol FG
+                </label>
+                <input class="form-control" id="nsnafg" type="number" name="NSNAFG" value="0" disabled="true">
+            </div>
+            <div class="form-group">
+                <label for="osfg">
+                    <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
+                       title="Approximate sugar-only final gravity"
+                       data-bs-content="Your final gravity is influenced by (potential) sugar, alcohol, and non-fermentables.
+                       If we subtract the gravity contributions from ethanol at the given ABV, as well as the approximated
+                       gravity contributions from non-fermentables, we get a gravity that we can assume is only influenced
+                       by remaining sugar."></a>
+                       Approx. sugar-only FG
+                    </label>
+                <input class="form-control" id="osfg" type="number" name="OSFG" value="0" disabled="true">
+            </div>
+            <div class="form-group">
+                <label for="rs">
+                    <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
+                       title="Approximate residual sugars"
+                       data-bs-content="We calculate the residual sugars by converting the sugar-only final gravity
+                       into Brix."></a>
+                       Approx. residual sugars
+                    </label>
+                <input class="form-control" id="rs" type="number" name="RS" value="0" disabled="true">
+            </div>
+            <div class="form-group">
+                <label for="delle">
+                    <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
+                       title="Approximate Delle units"
+                       data-bs-content="We calculate the Delle units from the ABV and the sugar-only final gravity."></a>
+                       Approx. Delle units
+                    </label>
+                <input class="form-control" id="delle" type="number" name="Delle" value="0" disabled="true">
+            </div>
+        </form>
+      </div>
+      <script>
+        const getid = (id => document.getElementById(id));
+        const getval = (id => document.getElementById(id).value);
+        const getnum = (id => Number(document.getElementById(id).value));
+        // interface
+        const limit_to_3dp = false;
+        function setSGDisplay(el) {
+            if (limit_to_3dp)
+                el.value = parseFloat(el.value).toFixed(3);
+        };
+
+        function setTargetDisabled(target) {
+            ["og", "fg", "abv"].forEach(id => {
+                getid(id).disabled = (id === target);
+            });
+        }
+
+        function targetChanged(el) {
+            const newTarget = document.forms.calc.elements.target.value;
+            setTargetDisabled(newTarget);
+            getid("")
+            console.log(el);
+            console.log(x);
+            console.log(y);
+            console.log(event);
+            ["og", "fg", "abv"].forEach(id => {
+                getid(id).disabled = false;
+            });
+            el.disabled = true;
+        }
+
+        // this gets the first element (from the list below) that is disabled.
+        // the idea is that only one of these can be solved for, so we solve for that one.
+        function getTargetElement() {
+            return ["og", "fg", "abv"].find(id => getid(id).disabled);
+        }
+        function updateCalculations(el) {
+            if (el && el.disabled) return;
+            var target = getTargetElement();
+            switch (target) {
+                case "abv": updateABV(); break;
+                case "og": updateOG(); break;
+                case "fg": updateFG(); break;
+            }
+            updateRest();
+        }
+
+        function updateRest() {
+            const fg = getnum("fg");
+            const abv = getnum("abv");
+            updateNAFG(abv, fg);
+            updateNSFG(abv);
+            updateNSNAFG(abv);
+            updateOSFG();
+            const osfg = getnum("osfg");
+            updateRS(osfg);
+            updateDelle(abv);
+        }
+
+        function updateABV(og, fg) {
+            if (og===undefined) og = getnum("og");
+            if (fg===undefined) fg = getnum("fg");
+            const abv = ABVFromSGs(og, fg);
+            getid("abv").value = abv;
+            return abv;
+        }
+
+        function updateNAFG(abv, fg) {
+            if (abv === undefined) abv = getnum("abv");
+            if (fg === undefined)  fg = getnum("fg");
+            const nafg = adjustForAlcohol(fg, abv);
+            getid("nafg").value = nafg;
+            return nafg;
+        }
+
+        function updateNSFG(abv) {
+            if (abv === undefined) abv = getnum("abv");
+            const nsfg = NSFGFromABV(abv);
+            getid("nsfg").value = nsfg;
+            return nsfg;
+        }
+
+        function updateNSNAFG(abv) {
+            if (abv === undefined) abv = getnum("abv");
+            const nsnafg = NSNAFGFromABV(abv);
+            getid("nsnafg").value = nsnafg;
+            return nsnafg;
+        }
+
+        function updateOSFG(nafg, nsnafg) {
+            if (nafg === undefined) nafg  = getnum("nafg");
+            if (nsnafg === undefined) nsnafg  = getnum("nsnafg");
+            const osfg = 1 + (nafg - nsnafg);
+            getid("osfg").value = osfg;
+            return osfg;
+        }
+
+        function updateRS(osfg) {
+            if (osfg === undefined) osfg = getnum("osfg");
+            const rs = RSFromOSFG(osfg);
+            getid("rs").value = rs;
+            return rs;
+        }
+
+        function updateDelle(abv, rs) {
+            if (abv === undefined) abv = getnum("abv");
+            if (rs === undefined) rs = getnum("rs");
+            const delle = 4.5*abv + rs;
+            getid("delle").value = delle;
+            return delle;
+        }
+
+
+
+
+        // conversions
+        function ABVFromSGs(og, fg) {
+            return DuncanActonABV(og, fg);
+            // return GotMeadABV(og, fg);
+        }
+
+        function DuncanActonABV(og, fg, kg) {
+            if (kg === undefined) kg = og - 0.007;
+            const abv = (1000 * (og - fg)) / (7.75 - (3.75 * (kg - 1)));
+            return abv;
+        }
+
+        function GotMeadABV(og, fg) {
+            return 145-145/(1+og-fg);
+        }
+
+
+        /*
+        start with: measured total SG
+
+        SG -> NASG
+        *with known ABV (eg 14%)*
+        SG water = 1.000
+        SG pure ethanol = 0.789
+
+        FG = 1.039
+        14% is ethanol
+        14% has a SG of 0.789
+        the rest must have a higher SG
+
+        NASG - we can figure this out reliably.
+
+        residual sugar is converted from the SUGAR-ONLY gravity
+
+
+        if you ferment completely dry (= no sugar)
+        and your final ABV = 14%
+        then your final gravity (INCLUDING ALCOHOL) = 0.995
+        so your final gravity WITHOUT ALCOHOL = ???
+
+        if you ferment completely dry (= no sugar)
+        and your final ABV = 18%
+        then your final gravity = 0.990
+
+
+        get non-alcohol-affected SG
+        convert SG -> Brix (very similar to RS)
+        */
+
+
+        function NSFGFromABV(abv) {
+            // this ESTIMATES the non-sugar specific gravity of a must,
+            // assuming a particular ABV. This extrapolates from two
+            // reference points.
+            // references:
+            const smallABV = 14;
+            const smallNSFG = 0.995;
+            const bigABV = 18;
+            const bigNSFG = 0.990;
+            // calculation:
+            var slope = (bigNSFG-smallNSFG)/(bigABV-smallABV);
+            var smallABVDelta = (abv - smallABV);
+            var nsfg = smallNSFG + (slope * smallABVDelta);
+            return nsfg;
+        }
+
+        function NSNAFGFromABV(abv) {
+            /* assuming no sugar is present, and given a specific abv and a final gravity
+               that includes the negative addition from ethanol, calculate the non-alcohol
+               specific gravity that must exist.
+
+               We get the non-sugar final gravity (including ethanol), and work back from there.
+            */
+            const nsfg = NSFGFromABV(abv);
+            return (nsfg*100 - 0.789*abv) / (100-abv);
+        }
+
+        function adjustForAlcohol(fg, abv) {
+            return (fg*100 - 0.789*abv) / (100-abv);
+        }
+
+        function OSFGFromABVFG(abv, fg) {
+            const nsnafg = NSNAFGFromABV(abv);
+            const osfg = 1 + fg - nsnafg;
+            return osfg;
+        }
+
+        function RSFromOSFG(osfg) {
+            const brix = 182.4601 * Math.pow(osfg, 3)
+                       - 775.6821 * Math.pow(osfg, 2)
+                       + 1262.7794 * osfg
+                       - 669.5622;
+            return brix;
+        }
+
+        function DelleFromFGABV(fg, abv) {
+            var brix = BrixFromFGABV(fg, abv);
+            console.log(4.5 * abv);
+            var delle = 4.5 * abv + brix;
+            console.log(delle)
+        }
+
+        updateCalculations();
+
+        // interface stuff
+        var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'))
+        var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
+            return new bootstrap.Popover(popoverTriggerEl)
+        })
+      </script>
+</body>
+</html>
