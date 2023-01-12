@@ -1,14 +1,15 @@
 <html>
+<head>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.5.0/font/bootstrap-icons.css" />
 <link rel="stylesheet" href="style.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
-<script>
-</script>
+<title>Mead Numbers</title>
+</head>
 <body>
     <div class="form-box">
-        <h1>Calculating some mead things</h1>
+        <h1>ABV / Delle Calculator</h1>
         <form name="calc">
             <div class="form-group">
                 <label for="og">OG</label>
@@ -31,20 +32,25 @@
             <div class="form-group">
                 <label for="abv">ABV (%)</label>
                 <div class="input-group">
-                    <input class="form-control" id="abv" type="number" name="ABV" disabled="true">
+                    <input class="form-control" id="abv" name="ABV" 
+                        type="number" step="0.1" value="0.0" disabled="true"
+                        onchange="updateCalculations(this);" >
                     <div class="input-group-text"><input class="form-check-input mt-0" type="radio" name="target" value="abv" checked  onchange="targetChanged(this);"></div>
                 </div>
             </div>
+            <!-- ^^^ inputs ^^^                   vvv outputs vvv -->
             <div class="form-group align-items-right">
                 <label for="nafg">
                     <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
                        title="Non-alcohol final gravity"
                        data-bs-content="Alcohol has a density less than water, so its presence reduces the specific gravity
-                       of your must. We can reliably calculate the specific gravity of the must minus any alcohol, given the ABV."></a>
+                       of your must. We can reliably calculate the specific gravity of the must minus the influence of alcohol'script
+                       density, given the ABV. We are actually calculating what the SG would be if we replaced all alcohol with pure water."></a>
                     Non-alcohol FG
                 </label>
                 <input class="form-control" id="nafg" type="number" name="NAFG" value="0" disabled="true">
             </div>
+            <div style="display:none;">
             <div class="form-group align-items-right">
                 <label for="nsfg">
                     <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
@@ -80,12 +86,14 @@
                     </label>
                 <input class="form-control" id="osfg" type="number" name="OSFG" value="0" disabled="true">
             </div>
+            </div>
             <div class="form-group">
                 <label for="rs">
                     <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
                        title="Approximate residual sugars"
-                       data-bs-content="We calculate the residual sugars by converting the sugar-only final gravity
-                       into Brix."></a>
+                       data-bs-content="We calculate the residual sugars by converting the ABV-adjusted final gravity
+                       into Brix. We use a standard SG to Brix conversion, and then multiple again by SG, as
+                       described at <a href='https://www.vinolab.hr/calculator/gravity-density-sugar-conversions-en19'>Vinolab</a>."></a>
                        Approx. residual sugars
                     </label>
                 <input class="form-control" id="rs" type="number" name="RS" value="0" disabled="true">
@@ -99,6 +107,7 @@
                     </label>
                 <input class="form-control" id="delle" type="number" name="Delle" value="0" disabled="true">
             </div>
+            
         </form>
       </div>
       <script>
@@ -119,18 +128,8 @@
         }
 
         function targetChanged(el) {
-            return;
             const newTarget = document.forms.calc.elements.target.value;
             setTargetDisabled(newTarget);
-            getid("")
-            console.log(el);
-            console.log(x);
-            console.log(y);
-            console.log(event);
-            ["og", "fg", "abv"].forEach(id => {
-                getid(id).disabled = false;
-            });
-            el.disabled = true;
         }
 
         // this gets the first element (from the list below) that is disabled.
@@ -152,13 +151,28 @@
         function updateRest() {
             const fg = getnum("fg");
             const abv = getnum("abv");
-            updateNAFG(abv, fg);
+            const nafg = updateNAFG(abv, fg);
             updateNSFG(abv);
             updateNSNAFG(abv);
             updateOSFG();
-            const osfg = getnum("osfg");
-            updateRS(osfg);
+            updateRS(nafg);
             updateDelle(abv);
+        }
+
+        function updateOG(fg, abv) {
+            if (fg===undefined) fg = getnum("fg");
+            if (abv===undefined) abv = getnum("abv");
+            const og = OGFromFGABV(fg, abv);
+            getid("og").value = og;
+            return og;
+        }
+
+        function updateFG(og, abv) {
+            if (og===undefined) og = getnum("og");
+            if (abv===undefined) abv = getnum("abv");
+            const fg = FGFromOGABV(og, abv);
+            getid("fg").value = fg;
+            return fg;
         }
 
         function updateABV(og, fg) {
@@ -199,9 +213,9 @@
             return osfg;
         }
 
-        function updateRS(osfg) {
-            if (osfg === undefined) osfg = getnum("osfg");
-            const rs = RSFromOSFG(osfg);
+        function updateRS(nafg) {
+            if (nafg === undefined) nafg = getnum("nafg");
+            const rs = BrixFromSG(nafg);
             getid("rs").value = rs;
             return rs;
         }
@@ -215,12 +229,42 @@
         }
 
 
-
+        const ABV_BAUME = 1;
+        const ABV_DUNCANACTON = 2;
+        const ABVMethod = ABV_BAUME;
 
         // conversions
         function ABVFromSGs(og, fg) {
-            return DuncanActonABV(og, fg);
-            // return GotMeadABV(og, fg);
+            switch (ABVMethod) {
+                case ABV_BAUME:
+                    return BaumeABV(og, fg);
+                case ABV_DUNCANACTON:
+                    return DuncanActonABV(og, fg);
+                default:
+                    alert("something went wrong. I guess we haven't finished developing this ABV calculation method yet."); return;
+            }
+        }
+
+        function OGFromFGABV(fg, abv) {
+            switch (ABVMethod) {
+                case ABV_BAUME:
+                    return BaumeOG(fg, abv);
+                // case ABV_DUNCANACTON:
+                //     return DuncanActonABV(og, fg);
+                default:
+                    alert("something went wrong. I guess we haven't finished developing this ABV calculation method yet."); return;
+            }
+        }
+
+        function FGFromOGABV(og, abv) {
+            switch (ABVMethod) {
+                case ABV_BAUME:
+                    return BaumeFG(og, abv);
+                // case ABV_DUNCANACTON:
+                //     return DuncanActonABV(og, fg);
+                default:
+                    alert("something went wrong. I guess we haven't finished developing this ABV calculation method yet."); return;
+            }
         }
 
         function DuncanActonABV(og, fg, kg) {
@@ -229,8 +273,17 @@
             return abv;
         }
 
-        function GotMeadABV(og, fg) {
+        // the Baume method
+        function BaumeABV(og, fg) {
             return 145-145/(1+og-fg);
+        }
+
+        function BaumeFG(og, abv) {
+            return (1+og) - 145/(145-abv);
+        }
+
+        function BaumeOG(fg, abv) {
+            return 145/(145-abv) - (1-fg);
         }
 
 
@@ -294,8 +347,45 @@
             return (nsfg*100 - 0.789*abv) / (100-abv);
         }
 
-        function adjustForAlcohol(fg, abv) {
-            return (fg*100 - 0.789*abv) / (100-abv);
+        /*
+
+        My thoughts on correcting for alcohol in SG measurements, before
+        converting to residual sugar measurements.
+        If we know the SG of a must is (for example) 1.050 and the ABV is 11%,
+        we know that the alcohol content is bringing that SG down.
+
+
+
+        SG 1.050
+        ABV 9%
+        ethanol SG 0.789
+
+        91% is ?????
+        9% is 0.789
+
+        0.91*x + 0.09*0.789 = 1.050
+
+        x = (1.050 - (0.09*0.789)) / 0.91
+
+        SG (after removing alcohol) 1.07581318681
+
+        HOWEVER, this is the SG of the stuff if we
+        removed all the alcohol, not just the
+        INFLUENCE of the alcohol.
+
+        So we dilute this by adding that 9% back
+        as pure water.
+
+        SGc = 1.07581318681*0.91 + 1.000*0.09
+            = 1.06899
+
+
+        */
+
+        function adjustForAlcohol(sg, abv) {
+            const removeEthanol = (sg*100 - 0.789*abv) / (100-abv);
+            const diluteBackToVolume = (removeEthanol*(100-abv) + abv) / 100;
+            return diluteBackToVolume;
         }
 
         function OSFGFromABVFG(abv, fg) {
@@ -304,10 +394,10 @@
             return osfg;
         }
 
-        function RSFromOSFG(osfg) {
-            const brix = 182.4601 * Math.pow(osfg, 3)
-                       - 775.6821 * Math.pow(osfg, 2)
-                       + 1262.7794 * osfg
+        function BrixFromSG(sg) {
+            const brix = 182.4601 * Math.pow(sg, 3)
+                       - 775.6821 * Math.pow(sg, 2)
+                       + 1262.7794 * sg
                        - 669.5622;
             return brix;
         }
@@ -324,8 +414,8 @@
         // interface stuff
         var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'))
         var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
-            return new bootstrap.Popover(popoverTriggerEl)
-        })
+            return new bootstrap.Popover(popoverTriggerEl, {html:true});
+        });
       </script>
 </body>
 </html>
