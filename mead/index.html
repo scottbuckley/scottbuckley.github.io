@@ -17,7 +17,7 @@
                 <div class="input-group">
                     <input class="form-control" id="og" name="OG"
                         type="number" step="0.001" value="1.140"
-                        onchange="setSGDisplay(this);updateCalculations(this);" >
+                        oninput="updateCalculations(this)" >
                     <div class="input-group-text"><input class="form-check-input mt-0" type="radio" name="target" value="og" onchange="targetChanged(this);"></div>
                 </div>
             </div>
@@ -26,7 +26,7 @@
                 <div class="input-group">
                     <input class="form-control" id="fg" name="FG"
                         type="number" step="0.001" value="1.040"
-                        onchange="setSGDisplay(this);updateCalculations(this);" >
+                        oninput="updateCalculations(this);" >
                     <div class="input-group-text"><input class="form-check-input mt-0" type="radio" name="target" value="fg" onchange="targetChanged(this);"></div>
                 </div>
             </div>
@@ -35,7 +35,7 @@
                 <div class="input-group">
                     <input class="form-control" id="abv" name="ABV" 
                         type="number" step="0.1" value="0.0" disabled="true"
-                        onchange="updateCalculations(this);" >
+                        oninput="updateCalculations(this);" >
                     <div class="input-group-text"><input class="form-check-input mt-0" type="radio" name="target" value="abv" checked  onchange="targetChanged(this);"></div>
                 </div>
             </div>
@@ -45,8 +45,8 @@
                     <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
                        title="Non-alcohol final gravity"
                        data-bs-content="Alcohol has a density less than water, so its presence reduces the specific gravity
-                       of your must. We can reliably calculate the specific gravity of the must minus the influence of alcohol'script
-                       density, given the ABV. We are actually calculating what the SG would be if we replaced all alcohol with pure water."></a>
+                       of your must. We can reliably calculate the specific gravity of the must minus the influence of alcohol's low
+                       density, given the ABV. We are actually calculating what the SG would be if we replaced the pure alcohol with pure water."></a>
                     Non-alcohol FG
                 </label>
                 <input class="form-control" id="nafg" type="number" name="NAFG" value="0" disabled="true">
@@ -91,9 +91,9 @@
             <div class="form-group">
                 <label for="rs">
                     <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
-                       title="Approximate residual sugars"
+                       title="Approximate Residual sugars"
                        data-bs-content="We calculate the residual sugars by converting the ABV-adjusted final gravity
-                       into Brix. We use a standard SG to Brix conversion, and then multiple again by SG, as
+                       into Brix. We use a standard SG to Brix conversion, and then multiply again by the non-alcohol FG, as
                        described at <a href='https://www.vinolab.hr/calculator/gravity-density-sugar-conversions-en19'>Vinolab</a>."></a>
                        Approx. residual sugars
                     </label>
@@ -103,7 +103,7 @@
                 <label for="delle">
                     <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
                        title="Approximate Delle units"
-                       data-bs-content="We calculate the Delle units from the ABV and the sugar-only final gravity."></a>
+                       data-bs-content="We calculate the Delle units from the ABV and the residual sugars."></a>
                        Approx. Delle units
                     </label>
                 <input class="form-control" id="delle" type="number" name="Delle" value="0" disabled="true">
@@ -216,7 +216,7 @@
 
         function updateRS(nafg) {
             if (nafg === undefined) nafg = getnum("nafg");
-            const rs = BrixFromSG(nafg);
+            const rs = BrixFromSG(nafg) * nafg;
             getid("rs").value = rs;
             return rs;
         }
@@ -224,17 +224,18 @@
         function updateDelle(abv, rs) {
             if (abv === undefined) abv = getnum("abv");
             if (rs === undefined) rs = getnum("rs");
-            const delle = 4.5*abv + rs;
+            const delle = DelleFromRSABV(rs, abv);
             getid("delle").value = delle;
             return delle;
         }
 
 
+        // conversions
+
         const ABV_BAUME = 1;
         const ABV_DUNCANACTON = 2;
         const ABVMethod = ABV_BAUME;
 
-        // conversions
         function ABVFromSGs(og, fg) {
             switch (ABVMethod) {
                 case ABV_BAUME:
@@ -384,9 +385,11 @@
         */
 
         function adjustForAlcohol(sg, abv) {
-            const removeEthanol = (sg*100 - 0.789*abv) / (100-abv);
+            /* const removeEthanol = (sg*100 - 0.789*abv) / (100-abv);
             const diluteBackToVolume = (removeEthanol*(100-abv) + abv) / 100;
             return diluteBackToVolume;
+            this simplifies to the following */
+            return sg + 0.00211 * abv;
         }
 
         function OSFGFromABVFG(abv, fg) {
@@ -394,6 +397,7 @@
             const osfg = 1 + fg - nsnafg;
             return osfg;
         }
+
 
         function BrixFromSG(sg) {
             const brix = 182.4601 * Math.pow(sg, 3)
@@ -403,11 +407,10 @@
             return brix;
         }
 
-        function DelleFromFGABV(fg, abv) {
-            var brix = BrixFromFGABV(fg, abv);
-            console.log(4.5 * abv);
-            var delle = 4.5 * abv + brix;
-            console.log(delle)
+        function DelleFromRSABV(rs, abv) {
+            if (rs === undefined) rs = getnum("rs");
+            if (abv === undefined) abv = getnum("abv");
+            return 4.5 * abv + rs;
         }
 
         updateCalculations();
