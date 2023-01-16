@@ -39,6 +39,27 @@
                     <div class="input-group-text"><input class="form-check-input mt-0" type="radio" name="target" value="abv" checked  onchange="targetChanged(this);"></div>
                 </div>
             </div>
+            <div class="form-group">
+                <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
+                title="ABV calculation method"
+                data-bs-container="body"
+                viewport="container"
+                data-bs-content='There are various ways to approximate ABV from a given OG and FG.
+                <br><br>
+                Baume <code>145-145/(1+og-fg)</code> is used by <a href="http://meadcalc.freevar.com/">MeadCalc</a> and <a href="https://gotmead.com/blog/the-mead-calculator/">GotMead</a>.
+                <br><br>
+                Linear <code>(og-fg)*131.25</code> is used by <a href="https://www.brewersfriend.com/abv-calculator/">Brewers Friend</a> "standard".
+                <br><br>
+                Duncan & Acton <code>(1000 * (og - fg)) / (7.75 - (3.75 * (og - k - 1)))</code> is used by <a href="https://fermcalc.com/">FermCalc</a>.
+                '></a>
+                <label for="abvmethod">ABV Calculation Method</label>
+                <select id="abvmethod" class="form-select"
+                    onchange="updateCalculations(this);">
+                    <option value="BAUME" selected>Baume</option>
+                    <option value="LINEAR">Linear</option>
+                    <option value="DUNCANACTON">Duncan & Acton</option>
+                </select>
+            </div>
             <!-- ^^^ inputs ^^^                   vvv outputs vvv -->
             <div class="form-group align-items-right">
                 <label for="nafg">
@@ -164,7 +185,7 @@
             if (fg===undefined) fg = getnum("fg");
             if (abv===undefined) abv = getnum("abv");
             const og = OGFromFGABV(fg, abv);
-            getid("og").value = og;
+            getid("og").value = smartRound(og);
             return og;
         }
 
@@ -172,7 +193,7 @@
             if (og===undefined) og = getnum("og");
             if (abv===undefined) abv = getnum("abv");
             const fg = FGFromOGABV(og, abv);
-            getid("fg").value = fg;
+            getid("fg").value = smartRound(fg);
             return fg;
         }
 
@@ -180,7 +201,7 @@
             if (og===undefined) og = getnum("og");
             if (fg===undefined) fg = getnum("fg");
             const abv = ABVFromSGs(og, fg);
-            getid("abv").value = abv;
+            getid("abv").value = smartRound(abv);
             return abv;
         }
 
@@ -188,21 +209,21 @@
             if (abv === undefined) abv = getnum("abv");
             if (fg === undefined)  fg = getnum("fg");
             const nafg = adjustForAlcohol(fg, abv);
-            getid("nafg").value = nafg;
+            getid("nafg").value = smartRound(nafg);
             return nafg;
         }
 
         function updateNSFG(abv) {
             if (abv === undefined) abv = getnum("abv");
             const nsfg = NSFGFromABV(abv);
-            getid("nsfg").value = nsfg;
+            getid("nsfg").value = smartRound(nsfg);
             return nsfg;
         }
 
         function updateNSNAFG(abv) {
             if (abv === undefined) abv = getnum("abv");
             const nsnafg = NSNAFGFromABV(abv);
-            getid("nsnafg").value = nsnafg;
+            getid("nsnafg").value = smartRound(nsnafg);
             return nsnafg;
         }
 
@@ -210,14 +231,14 @@
             if (nafg === undefined) nafg  = getnum("nafg");
             if (nsnafg === undefined) nsnafg  = getnum("nsnafg");
             const osfg = 1 + (nafg - nsnafg);
-            getid("osfg").value = osfg;
+            getid("osfg").value = smartRound(osfg);
             return osfg;
         }
 
         function updateRS(nafg) {
             if (nafg === undefined) nafg = getnum("nafg");
             const rs = BrixFromSG(nafg) * nafg;
-            getid("rs").value = rs;
+            getid("rs").value = smartRound(rs);
             return rs;
         }
 
@@ -225,22 +246,23 @@
             if (abv === undefined) abv = getnum("abv");
             if (rs === undefined) rs = getnum("rs");
             const delle = DelleFromRSABV(rs, abv);
-            getid("delle").value = delle;
+            getid("delle").value = smartRound(delle);
             return delle;
         }
 
 
         // conversions
-
-        const ABV_BAUME = 1;
-        const ABV_DUNCANACTON = 2;
-        const ABVMethod = ABV_BAUME;
+        function getABVMethod() {
+            return (getid("abvmethod").value);
+        }
 
         function ABVFromSGs(og, fg) {
-            switch (ABVMethod) {
-                case ABV_BAUME:
+            switch (getABVMethod()) {
+                case "BAUME":
                     return BaumeABV(og, fg);
-                case ABV_DUNCANACTON:
+                case "LINEAR":
+                    return LinearABV(og, fg);
+                case "DUNCANACTON":
                     return DuncanActonABV(og, fg);
                 default:
                     alert("something went wrong. I guess we haven't finished developing this ABV calculation method yet."); return;
@@ -248,31 +270,29 @@
         }
 
         function OGFromFGABV(fg, abv) {
-            switch (ABVMethod) {
-                case ABV_BAUME:
+            switch (getABVMethod()) {
+                case "BAUME":
                     return BaumeOG(fg, abv);
-                // case ABV_DUNCANACTON:
-                //     return DuncanActonABV(og, fg);
+                case "LINEAR":
+                    return LinearOG(fg, abv);
+                case "DUNCANACTON":
+                    return DuncanActonOG(fg, abv);
                 default:
                     alert("something went wrong. I guess we haven't finished developing this ABV calculation method yet."); return;
             }
         }
 
         function FGFromOGABV(og, abv) {
-            switch (ABVMethod) {
-                case ABV_BAUME:
+            switch (getABVMethod()) {
+                case "BAUME":
                     return BaumeFG(og, abv);
-                // case ABV_DUNCANACTON:
-                //     return DuncanActonABV(og, fg);
+                case "LINEAR":
+                    return LinearFG(og, abv);
+                case "DUNCANACTON":
+                    return DuncanActonFG(og, abv);
                 default:
                     alert("something went wrong. I guess we haven't finished developing this ABV calculation method yet."); return;
             }
-        }
-
-        function DuncanActonABV(og, fg, kg) {
-            if (kg === undefined) kg = og - 0.007;
-            const abv = (1000 * (og - fg)) / (7.75 - (3.75 * (kg - 1)));
-            return abv;
         }
 
         // the Baume method
@@ -288,39 +308,57 @@
             return 145/(145-abv) - (1-fg);
         }
 
+        // the linear method
+        function LinearABV(og, fg) {
+            return (og-fg)*131.25;
+        }
 
-        /*
-        start with: measured total SG
+        function LinearFG(og, abv) {
+            return og - (abv/131.25);
+        }
 
-        SG -> NASG
-        *with known ABV (eg 14%)*
-        SG water = 1.000
-        SG pure ethanol = 0.789
+        function LinearOG(fg, abv) {
+            return (abv/131.25) + fg;
+        }
 
-        FG = 1.039
-        14% is ethanol
-        14% has a SG of 0.789
-        the rest must have a higher SG
+        // the Duncan Acton method
+        function DuncanActonABV(og, fg, k) {
+            if (k === undefined) k = 0.007;
+            const abv = (1000 * (og - fg)) / (7.75 - (3.75 * (og - k - 1)));
+            return abv;
+        }
 
-        NASG - we can figure this out reliably.
+        function DuncanActonFG(og, abv, k) {
+            if (k === undefined) k = 0.007;
+            const fg = og + (abv*3.75*og - abv*(3.75*k + 11.5))/1000;
+            return fg;
+        }
 
-        residual sugar is converted from the SUGAR-ONLY gravity
+        function DuncanActonOG(fg, abv, k) {
+            if (k === undefined) k = 0.007;
+            const og = (1000*fg + abv*(3.75*k + 11.5))/(1000 + abv*3.75);
+            return og;
+        }
 
+        // "Smart" rounding to round if you ever find '000' or '999'
+        // in the decimal places.
+        function smartRound(n) {
+            // ignore if already simple under 4dp
+            if (n == Number(n.toFixed(4))) return n;
 
-        if you ferment completely dry (= no sugar)
-        and your final ABV = 14%
-        then your final gravity (INCLUDING ALCOHOL) = 0.995
-        so your final gravity WITHOUT ALCOHOL = ???
+            const decimals = n.toString().substring(n.toString().indexOf('.')+1);
+            const zeroes = decimals.indexOf('000');
+            const nines  = decimals.indexOf('999');
 
-        if you ferment completely dry (= no sugar)
-        and your final ABV = 18%
-        then your final gravity = 0.990
+            var cutoff;
+            if (zeroes === -1 && nines === -1) return n;
+            if (zeroes > -1 && nines > -1) cutoff = Math.min(zeroes, nines);
+            else cutoff = Math.max(zeroes, nines);
 
-
-        get non-alcohol-affected SG
-        convert SG -> Brix (very similar to RS)
-        */
-
+            const simpleN = Number(n.toFixed(cutoff));
+            console.log("simplified", n, "to", simpleN);
+            return simpleN;
+        }
 
         function NSFGFromABV(abv) {
             // this ESTIMATES the non-sugar specific gravity of a must,
@@ -348,41 +386,6 @@
             const nsfg = NSFGFromABV(abv);
             return (nsfg*100 - 0.789*abv) / (100-abv);
         }
-
-        /*
-
-        My thoughts on correcting for alcohol in SG measurements, before
-        converting to residual sugar measurements.
-        If we know the SG of a must is (for example) 1.050 and the ABV is 11%,
-        we know that the alcohol content is bringing that SG down.
-
-
-
-        SG 1.050
-        ABV 9%
-        ethanol SG 0.789
-
-        91% is ?????
-        9% is 0.789
-
-        0.91*x + 0.09*0.789 = 1.050
-
-        x = (1.050 - (0.09*0.789)) / 0.91
-
-        SG (after removing alcohol) 1.07581318681
-
-        HOWEVER, this is the SG of the stuff if we
-        removed all the alcohol, not just the
-        INFLUENCE of the alcohol.
-
-        So we dilute this by adding that 9% back
-        as pure water.
-
-        SGc = 1.07581318681*0.91 + 1.000*0.09
-            = 1.06899
-
-
-        */
 
         function adjustForAlcohol(sg, abv) {
             /* const removeEthanol = (sg*100 - 0.789*abv) / (100-abv);
@@ -418,7 +421,7 @@
         // interface stuff
         var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'))
         var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
-            return new bootstrap.Popover(popoverTriggerEl, {html:true});
+            return new bootstrap.Popover(popoverTriggerEl, {html:true, container: 'body'});
         });
       </script>
 </body>
