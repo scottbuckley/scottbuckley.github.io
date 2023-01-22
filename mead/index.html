@@ -12,7 +12,7 @@
     <div class="form-box">
         <h1>ABV / Delle Calculator</h1>
         <form name="calc">
-            <div class="form-group">
+            <div class="form-group mb-2">
                 <label for="og">OG</label>
                 <div class="input-group">
                     <input class="form-control" id="og" name="OG"
@@ -21,7 +21,7 @@
                     <div class="input-group-text"><input class="form-check-input mt-0" type="radio" name="target" value="og" onchange="targetChanged(this);"></div>
                 </div>
             </div>
-            <div class="form-group">
+            <div class="form-group mb-2">
                 <label for="fg">FG</label>
                 <div class="input-group">
                     <input class="form-control" id="fg" name="FG"
@@ -30,7 +30,7 @@
                     <div class="input-group-text"><input class="form-check-input mt-0" type="radio" name="target" value="fg" onchange="targetChanged(this);"></div>
                 </div>
             </div>
-            <div class="form-group">
+            <div class="form-group mb-2">
                 <label for="abv">ABV (%)</label>
                 <div class="input-group">
                     <input class="form-control" id="abv" name="ABV" 
@@ -39,7 +39,7 @@
                     <div class="input-group-text"><input class="form-check-input mt-0" type="radio" name="target" value="abv" checked  onchange="targetChanged(this);"></div>
                 </div>
             </div>
-            <div class="form-group">
+            <div class="form-group mb-2">
                 <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
                 title="ABV calculation method"
                 data-bs-container="body"
@@ -48,7 +48,7 @@
                 <br><br>
                 Baume <code>145-145/(1+og-fg)</code> is used by <a href="http://meadcalc.freevar.com/">MeadCalc</a> and <a href="https://gotmead.com/blog/the-mead-calculator/">GotMead</a>.
                 <br><br>
-                Linear <code>(og-fg)*131.25</code> is used by <a href="https://www.brewersfriend.com/abv-calculator/">Brewers Friend</a> "standard".
+                Linear <code>(og-fg)*131.25</code> is used by <a href="https://www.brewersfriend.com/abv-calculator/">Brewers Friend</a> "standard". Interestingly, this formula is derived directly from the molecular weights of CO2 and Ethanol.
                 <br><br>
                 Duncan & Acton <code>(1000 * (og - fg)) / (7.75 - (3.75 * (og - k - 1)))</code> is used by <a href="https://fermcalc.com/">FermCalc</a>.
                 '></a>
@@ -61,7 +61,8 @@
                 </select>
             </div>
             <!-- ^^^ inputs ^^^                   vvv outputs vvv -->
-            <div class="form-group align-items-right">
+            <hr class="hr hr-blurry" />
+            <div class="form-group mb-2">
                 <label for="nafg">
                     <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
                        title="Non-alcohol final gravity"
@@ -72,44 +73,7 @@
                 </label>
                 <input class="form-control" id="nafg" type="number" name="NAFG" value="0" disabled="true">
             </div>
-            <div style="display:none;">
-            <div class="form-group align-items-right">
-                <label for="nsfg">
-                    <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
-                       title="Approximate non-sugar final gravity"
-                       data-bs-content="The final gravity of the must if there was no sugar remaining.
-                       This is extrapolated only from the given ABV, assuming normal levels of non-fermentables are present in the must.
-                       Obviously this calculator doesn't know what non-fermentables are in your must, but uses data collected from
-                       mead makers who completely fermented away all sugars and then measured their gravity, for various ABVs."></a>
-                    Approx. non-sugar FG
-                </label>
-                <input class="form-control" id="nsfg" type="number" name="NSFG" value="0" disabled="true">
-            </div>
-            <div class="form-group">
-                <label for="nsnafg">
-                    <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
-                       title="Approx. non-sugar, non-alcohol final gravity"
-                       data-bs-content="The presence of alcohol decreases the specific gravity of your must.
-                       This calculates what the final gravity of your must would be if there was no sugar *and* no alcohol in it.
-                       Essentially this is approximating the density contributed by non-fermentable solutes in your must."></a>
-                    Approx. non-sugar non-alcohol FG
-                </label>
-                <input class="form-control" id="nsnafg" type="number" name="NSNAFG" value="0" disabled="true">
-            </div>
-            <div class="form-group">
-                <label for="osfg">
-                    <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
-                       title="Approximate sugar-only final gravity"
-                       data-bs-content="Your final gravity is influenced by (potential) sugar, alcohol, and non-fermentables.
-                       If we subtract the gravity contributions from ethanol at the given ABV, as well as the approximated
-                       gravity contributions from non-fermentables, we get a gravity that we can assume is only influenced
-                       by remaining sugar."></a>
-                       Approx. sugar-only FG
-                    </label>
-                <input class="form-control" id="osfg" type="number" name="OSFG" value="0" disabled="true">
-            </div>
-            </div>
-            <div class="form-group">
+            <div class="form-group mb-2">
                 <label for="rs">
                     <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
                        title="Approximate Residual sugars"
@@ -120,7 +84,7 @@
                     </label>
                 <input class="form-control" id="rs" type="number" name="RS" value="0" disabled="true">
             </div>
-            <div class="form-group">
+            <div class="form-group mb-2">
                 <label for="delle">
                     <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
                        title="Approximate Delle units"
@@ -133,32 +97,39 @@
         </form>
       </div>
       <script>
+        // INTERFACE
+
+        // helpers / abbrevs
         const getid = (id => document.getElementById(id));
         const getval = (id => document.getElementById(id).value);
         const getnum = (id => Number(document.getElementById(id).value));
-        // interface
+
+        // this rounds values in an output field to 3dp. not currently used.
         const limit_to_3dp = false;
         function setSGDisplay(el) {
             if (limit_to_3dp)
                 el.value = parseFloat(el.value).toFixed(3);
         };
 
-        function setTargetDisabled(target) {
+        // disables the target element (of the main three), and enables the other two.
+        function setTargetElement(target) {
             ["og", "fg", "abv"].forEach(id => {
                 getid(id).disabled = (id === target);
             });
         }
 
-        function targetChanged(el) {
-            const newTarget = document.forms.calc.elements.target.value;
-            setTargetDisabled(newTarget);
-        }
-
-        // this gets the first element (from the list below) that is disabled.
-        // the idea is that only one of these can be solved for, so we solve for that one.
+        // get the id of the currently disabled element (this is the target element)
         function getTargetElement() {
             return ["og", "fg", "abv"].find(id => getid(id).disabled);
         }
+
+        // when the "target" (solve for) radio selection is changed.
+        function targetChanged(el) {
+            const newTarget = document.forms.calc.elements.target.value;
+            setTargetElement(newTarget);
+        }
+
+        // update calculations when some input has changed.
         function updateCalculations(el) {
             if (el && el.disabled) return;
             var target = getTargetElement();
@@ -167,16 +138,14 @@
                 case "og": updateOG(); break;
                 case "fg": updateFG(); break;
             }
-            updateRest();
+            // always update the secondary fields
+            updateSecondary();
         }
 
-        function updateRest() {
+        function updateSecondary() {
             const fg = getnum("fg");
             const abv = getnum("abv");
             const nafg = updateNAFG(abv, fg);
-            updateNSFG(abv);
-            updateNSNAFG(abv);
-            updateOSFG();
             updateRS(nafg);
             updateDelle(abv);
         }
@@ -211,28 +180,6 @@
             const nafg = adjustForAlcohol(fg, abv);
             getid("nafg").value = smartRound(nafg);
             return nafg;
-        }
-
-        function updateNSFG(abv) {
-            if (abv === undefined) abv = getnum("abv");
-            const nsfg = NSFGFromABV(abv);
-            getid("nsfg").value = smartRound(nsfg);
-            return nsfg;
-        }
-
-        function updateNSNAFG(abv) {
-            if (abv === undefined) abv = getnum("abv");
-            const nsnafg = NSNAFGFromABV(abv);
-            getid("nsnafg").value = smartRound(nsnafg);
-            return nsnafg;
-        }
-
-        function updateOSFG(nafg, nsnafg) {
-            if (nafg === undefined) nafg  = getnum("nafg");
-            if (nsnafg === undefined) nsnafg  = getnum("nsnafg");
-            const osfg = 1 + (nafg - nsnafg);
-            getid("osfg").value = smartRound(osfg);
-            return osfg;
         }
 
         function updateRS(nafg) {
@@ -340,8 +287,11 @@
             return og;
         }
 
-        // "Smart" rounding to round if you ever find '000' or '999'
-        // in the decimal places.
+        // "Smart" rounding. Do a small round if you ever find '000' or '999'
+        // in the decimal places. This is a weird round with a base 10 bias, but
+        // it makes numbers that look nice, and it often corrects for rounding
+        // errors created by recalculating using complex calculated numbers, as
+        // often happens when you change target.
         function smartRound(n) {
             // ignore if already simple under 4dp
             if (n == Number(n.toFixed(4))) return n;
@@ -360,45 +310,12 @@
             return simpleN;
         }
 
-        function NSFGFromABV(abv) {
-            // this ESTIMATES the non-sugar specific gravity of a must,
-            // assuming a particular ABV. This extrapolates from two
-            // reference points.
-            // references:
-            const smallABV = 14;
-            const smallNSFG = 0.995;
-            const bigABV = 18;
-            const bigNSFG = 0.990;
-            // calculation:
-            var slope = (bigNSFG-smallNSFG)/(bigABV-smallABV);
-            var smallABVDelta = (abv - smallABV);
-            var nsfg = smallNSFG + (slope * smallABVDelta);
-            return nsfg;
-        }
-
-        function NSNAFGFromABV(abv) {
-            /* assuming no sugar is present, and given a specific abv and a final gravity
-               that includes the negative addition from ethanol, calculate the non-alcohol
-               specific gravity that must exist.
-
-               We get the non-sugar final gravity (including ethanol), and work back from there.
-            */
-            const nsfg = NSFGFromABV(abv);
-            return (nsfg*100 - 0.789*abv) / (100-abv);
-        }
-
         function adjustForAlcohol(sg, abv) {
             /* const removeEthanol = (sg*100 - 0.789*abv) / (100-abv);
             const diluteBackToVolume = (removeEthanol*(100-abv) + abv) / 100;
             return diluteBackToVolume;
             this simplifies to the following */
             return sg + 0.00211 * abv;
-        }
-
-        function OSFGFromABVFG(abv, fg) {
-            const nsnafg = NSNAFGFromABV(abv);
-            const osfg = 1 + fg - nsnafg;
-            return osfg;
         }
 
 
