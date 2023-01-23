@@ -101,15 +101,41 @@
 
         // helpers / abbrevs
         const getid = (id => document.getElementById(id));
-        const getval = (id => document.getElementById(id).value);
-        const getnum = (id => Number(document.getElementById(id).value));
 
-        // this rounds values in an output field to 3dp. not currently used.
-        const limit_to_3dp = false;
-        function setSGDisplay(el) {
-            if (limit_to_3dp)
-                el.value = parseFloat(el.value).toFixed(3);
-        };
+        // set the value of a number input, saving the precise value in the DOM
+        // tree, but displaying a simplified number.
+        const showRoundedValue = true;
+        function setnum(id, val, dp=4) {
+            const el = getid(id);
+            el.preciseValue = val;
+            el.preciseValueRounding = dp;
+            if (showRoundedValue)
+                el.value = val.toFixed(dp);
+            else
+                el.value = val;
+        }
+
+        // get the value of a number input/output, using the precise value if it is
+        // available (checking that is is close to the)
+        function getnum(id) {
+            const el = getid(id);
+            if (el.preciseValue === undefined || el.preciseValueRounding === undefined)
+                return Number(el.value);
+            if (Number(el.preciseValue.toFixed(el.preciseValueRounding)) === Number(el.value)) {
+                return el.preciseValue;
+            } else {
+                console.log("no match from preciseValue", id, ". Defaulting to displayed value.");
+                // console.log(el.value);
+                // console.log(el.preciseValue);
+                // console.log(el.preciseValueRounding);
+                // console.log(Number(el.preciseValue.toFixed(el.preciseValueRounding)));
+                return Number(el.value);
+            }
+        }
+
+        function updatePreciseOnInput(el) {
+            el.preciseValue = Number(el.value);
+        }
 
         // disables the target element (of the main three), and enables the other two.
         function setTargetElement(target) {
@@ -130,8 +156,13 @@
         }
 
         // update calculations when some input has changed.
+        // this is called on update by some forms, in which case we will update
+        // their preciseValue too.
         function updateCalculations(el) {
-            if (el && el.disabled) return;
+            if (el) {
+                if (el.disabled) return;
+                else updatePreciseOnInput(el);
+            }
             var target = getTargetElement();
             switch (target) {
                 case "abv": updateABV(); break;
@@ -154,7 +185,7 @@
             if (fg===undefined) fg = getnum("fg");
             if (abv===undefined) abv = getnum("abv");
             const og = OGFromFGABV(fg, abv);
-            getid("og").value = smartRound(og);
+            setnum("og", og, 3);
             return og;
         }
 
@@ -162,7 +193,7 @@
             if (og===undefined) og = getnum("og");
             if (abv===undefined) abv = getnum("abv");
             const fg = FGFromOGABV(og, abv);
-            getid("fg").value = smartRound(fg);
+            setnum("fg", fg, 3);
             return fg;
         }
 
@@ -170,7 +201,7 @@
             if (og===undefined) og = getnum("og");
             if (fg===undefined) fg = getnum("fg");
             const abv = ABVFromSGs(og, fg);
-            getid("abv").value = smartRound(abv);
+            setnum("abv", abv, 2);
             return abv;
         }
 
@@ -178,14 +209,14 @@
             if (abv === undefined) abv = getnum("abv");
             if (fg === undefined)  fg = getnum("fg");
             const nafg = adjustForAlcohol(fg, abv);
-            getid("nafg").value = smartRound(nafg);
+            setnum("nafg", nafg, 4);
             return nafg;
         }
 
         function updateRS(nafg) {
             if (nafg === undefined) nafg = getnum("nafg");
             const rs = BrixFromSG(nafg) * nafg;
-            getid("rs").value = smartRound(rs);
+            setnum("rs", rs, 3);
             return rs;
         }
 
@@ -193,7 +224,7 @@
             if (abv === undefined) abv = getnum("abv");
             if (rs === undefined) rs = getnum("rs");
             const delle = DelleFromRSABV(rs, abv);
-            getid("delle").value = smartRound(delle);
+            setnum("delle", delle, 1);
             return delle;
         }
 
