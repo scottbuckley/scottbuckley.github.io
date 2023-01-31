@@ -147,7 +147,7 @@
         // set the value of a number input, saving the precise value in the DOM
         // tree, but displaying a simplified number.
         const showRoundedValue = true;
-        function setnum(id, val, dp=4) {
+        function setnum(id, val, dp=3) {
             const el = getid(id);
             el.preciseValue = val;
             el.preciseValueRounding = dp;
@@ -176,6 +176,8 @@
             }
         }
 
+        // if a field is edited by the user, set their preciseValue to be the
+        // same as that new input.
         function updatePreciseOnInput(el) {
             el.preciseValue = Number(el.value);
         }
@@ -196,6 +198,7 @@
         function targetChanged(el) {
             const newTarget = document.forms.calc.elements.target.value;
             setTargetElement(newTarget);
+            updateCalculations();
         }
 
         function tempCorrectionToggle(el) {
@@ -207,18 +210,23 @@
                 $(".tempcorrectionon").addClass("d-none");
                 $(".tempcorrectionoff").removeClass("d-none");
             }
+            updateCalculations();
         }
 
         // update calculations when some input has changed.
         // this is called on update by some forms, in which case we will update
         // their preciseValue too.
         function updateCalculations(el) {
+            // this method is often called by an input as it is updated. If this is
+            // true, we do nothing if that input is disabled (we update disabled inputs
+            // programatically). The browser probably protects us from this, but we are
+            // just being careful
             if (el) {
                 if (el.disabled) return;
                 else updatePreciseOnInput(el);
             }
 
-            
+            // figure out what we are solving for
             var target = getTargetElement();
             switch (target) {
                 case "abv": updateABV(); break;
@@ -229,6 +237,8 @@
             // always update the secondary fields
             updateTemps();
             updateSecondary();
+
+            saveInputs();
         }
 
         function updateSecondary() {
@@ -553,11 +563,49 @@
 
 
 
+        // localStorage
+        const ls = window.localStorage;
+        const ls_numericInputs = ["og", "fg", "abv"];
+        const ls_optionInputs = ["target", "tempunit"];
+        const ls_checkboxInputs = ["tempcorrection"];
+
+        function saveInputs() {
+            ls_numericInputs.forEach(id => {
+                const val = getnum(id);
+                ls.setItem(id, val);
+            });
+            ls_optionInputs.forEach(id => {
+                const val = document.forms.calc.elements[id].value;
+                ls.setItem(id, val);
+            });
+            ls_checkboxInputs.forEach(id => {
+                const val = getid(id).checked;
+                ls.setItem(id, val);
+            });
+        }
+
+        function loadInputs() {
+            if (ls.getItem("og") === null) return;
+            ls_numericInputs.forEach(id => {
+                const val = Number(ls.getItem(id));
+                const dp = (id==="abv")?2:3; // the number of decimal points to display
+                setnum(id, val, dp);
+            });
+            ls_optionInputs.forEach(id => {
+                const val = ls.getItem(id);
+                document.forms.calc.elements[id].value = val;
+            });
+            ls_checkboxInputs.forEach(id => {
+                const val = ls.getItem(id);
+                getid(id).checked = (val==='true');
+            });
+        }
 
 
 
         // INIT
-
+        loadInputs();
+        targetChanged();
         tempCorrectionToggle();
         updateCalculations();
 
