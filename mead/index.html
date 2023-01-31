@@ -6,37 +6,60 @@
 <link rel="stylesheet" href="style.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
+<style>
+    .form-group :has(~ .d-none):not(:has(~ :not(.d-none))) {
+        border-top-right-radius: 0.25rem !important;
+        border-bottom-right-radius: 0.25rem !important;
+    }
+</style>
 <title>Mead Numbers</title>
 </head>
 <body>
     <div class="form-box">
-        <h1>ABV / Delle Calculator</h1>
+        <h1>Mead Numbers</h1>
         <form name="calc">
             <div class="form-group mb-2">
                 <label for="og">OG</label>
                 <div class="input-group">
-                    <input class="form-control" id="og" name="OG"
+                    <label class="input-group-text" for="targetog"><input class="form-check-input mt-0" type="radio" name="target" id="targetog" value="og" onchange="targetChanged(this);"></label>
+                    <input class="form-control w-25" id="og" name="OG"
                         type="number" step="0.001" value="1.140"
                         oninput="updateCalculations(this)" >
-                    <div class="input-group-text"><input class="form-check-input mt-0" type="radio" name="target" value="og" onchange="targetChanged(this);"></div>
+                    <span class="input-group-text tempcorrectionon">@</span>
+                    <input class="form-control tempcorrectionon" id="ogtemp" name="OGTemp"
+                        type="number" step="0.1" placeholder="Temp" value="20"
+                        oninput="updateCalculations(this)" >
+                    <span class="input-group-text tempcorrectionon show-temp-unit">&#8451</span>
+                </div>
+                <div class="tempcorrectionon">
+                    <span>=</span>&nbsp;<span id="ogtempcorrected">temp</span>&nbsp;<span>@</span>&nbsp;<span class="show-basis-temp">12345</span>&nbsp;<span class="show-temp-unit">&#8451</span>
                 </div>
             </div>
             <div class="form-group mb-2">
                 <label for="fg">FG</label>
                 <div class="input-group">
-                    <input class="form-control" id="fg" name="FG"
+                    <label class="input-group-text" for="targetfg"><input class="form-check-input mt-0" type="radio" name="target" id="targetfg" value="fg" onchange="targetChanged(this);"></label>
+                    <input class="form-control w-25" id="fg" name="FG"
                         type="number" step="0.001" value="1.040"
                         oninput="updateCalculations(this);" >
-                    <div class="input-group-text"><input class="form-check-input mt-0" type="radio" name="target" value="fg" onchange="targetChanged(this);"></div>
+                    <span class="input-group-text tempcorrectionon">@</span>
+                    <input class="form-control tempcorrectionon" id="fgtemp" name="FGTemp"
+                        type="number" step="0.1" placeholder="Temp" value="20"
+                        oninput="updateCalculations(this)" >
+                    <span class="input-group-text tempcorrectionon show-temp-unit">&#8451</span>
+                </div>
+                <div class="tempcorrectionon">
+                    <span>=</span>&nbsp;<span id="fgtempcorrected">temp</span>&nbsp;<span>@</span>&nbsp;<span class="show-basis-temp">12345</span>&nbsp;<span class="show-temp-unit">&#8451</span>
                 </div>
             </div>
             <div class="form-group mb-2">
-                <label for="abv">ABV (%)</label>
+                <label for="abv">ABV</label>
                 <div class="input-group">
+                    <label class="input-group-text" for="targetabv"><input class="form-check-input mt-0" type="radio" name="target" id="targetabv" value="abv" checked  onchange="targetChanged(this);"></label>
                     <input class="form-control" id="abv" name="ABV" 
                         type="number" step="0.1" value="0.0" disabled="true"
                         oninput="updateCalculations(this);" >
-                    <div class="input-group-text"><input class="form-check-input mt-0" type="radio" name="target" value="abv" checked  onchange="targetChanged(this);"></div>
+                    <label class="input-group-text" for="abv">%</label>
                 </div>
             </div>
             <div class="form-group mb-2">
@@ -48,7 +71,11 @@
                 <br><br>
                 Baume <code>145-145/(1+og-fg)</code> is used by <a href="http://meadcalc.freevar.com/">MeadCalc</a> and <a href="https://gotmead.com/blog/the-mead-calculator/">GotMead</a>.
                 <br><br>
-                Linear <code>(og-fg)*131.25</code> is used by <a href="https://www.brewersfriend.com/abv-calculator/">Brewers Friend</a> "standard". Interestingly, this formula is derived directly from the molecular weights of CO2 and Ethanol.
+                Linear <code>(og-fg)*131.25</code> is used by <a href="https://www.brewersfriend.com/abv-calculator/">Brewers Friend</a> "standard".
+                Interestingly, this formula is derived directly from the molecular weights of CO2 and Ethanol.
+                They use 0.8 as the density of gravity, which is only accurate at about 7C.
+                This implies that the true temperature basis would be 7C, but I assume it here to be 15.56C (60F), as there is no way that homebrewers everywhere have been using 7C (45F) with this method for years.
+                Ethanols density is 0.792 at 15.56C and 0.789 at 20C.
                 <br><br>
                 Duncan & Acton <code>(1000 * (og - fg)) / (7.75 - (3.75 * (og - k - 1)))</code> is used by <a href="https://fermcalc.com/">FermCalc</a>.
                 '></a>
@@ -93,7 +120,22 @@
                     </label>
                 <input class="form-control" id="delle" type="number" name="Delle" value="0" disabled="true">
             </div>
-            
+            <hr class="hr hr-blurry" />
+            <div class="form-group mb-2">
+                <label for="delle">Gravity temperature correction</label>
+                <div class="input-group">
+                    <label class="input-group-text" for="tempcorrection"><input id="tempcorrection" class="form-check-input mt-0" type="checkbox" oninput="tempCorrectionToggle(this)"></label>
+                    <!-- Temp Correction Off -->
+                    <span class="input-group-text tempcorrectionoff">Off</span>
+                    
+                    <!-- Temp Correction On -->
+                    <!-- <span class="input-group-text tempcorrectionon d-none">On</span> -->
+                    <label class="input-group-text tempcorrectionon" for="tempC">Celcius</label>
+                    <label class="input-group-text tempcorrectionon" for="tempC"><input checked class="form-check-input mt-0" type="radio" name="tempunit" id="tempC" value="C" onchange="updateCalculations();"></label>
+                    <label class="input-group-text tempcorrectionon" for="tempF">Farenheit</label>
+                    <label class="input-group-text tempcorrectionon" for="tempF"><input class="form-check-input mt-0" type="radio" name="tempunit" id="tempF" value="F" onchange="updateCalculations();"></label>
+                </div>
+            </div>
         </form>
       </div>
       <script>
@@ -111,6 +153,7 @@
             el.preciseValueRounding = dp;
             if (showRoundedValue)
                 el.value = val.toFixed(dp);
+                // el.value = val;
             else
                 el.value = val;
         }
@@ -155,6 +198,17 @@
             setTargetElement(newTarget);
         }
 
+        function tempCorrectionToggle(el) {
+            if (el === undefined) el = getid("tempcorrection");
+            if (el.checked) {
+                $(".tempcorrectionon").removeClass("d-none");
+                $(".tempcorrectionoff").addClass("d-none");
+            } else {
+                $(".tempcorrectionon").addClass("d-none");
+                $(".tempcorrectionoff").removeClass("d-none");
+            }
+        }
+
         // update calculations when some input has changed.
         // this is called on update by some forms, in which case we will update
         // their preciseValue too.
@@ -163,18 +217,22 @@
                 if (el.disabled) return;
                 else updatePreciseOnInput(el);
             }
+
+            
             var target = getTargetElement();
             switch (target) {
                 case "abv": updateABV(); break;
                 case "og": updateOG(); break;
                 case "fg": updateFG(); break;
             }
+
             // always update the secondary fields
+            updateTemps();
             updateSecondary();
         }
 
         function updateSecondary() {
-            const fg = getnum("fg");
+            const fg = getMaybeTempCorrected("fg");
             const abv = getnum("abv");
             const nafg = updateNAFG(abv, fg);
             updateRS(nafg);
@@ -182,24 +240,26 @@
         }
 
         function updateOG(fg, abv) {
-            if (fg===undefined) fg = getnum("fg");
+            if (fg===undefined) fg = getMaybeTempCorrected("fg");
             if (abv===undefined) abv = getnum("abv");
             const og = OGFromFGABV(fg, abv);
-            setnum("og", og, 3);
+            setMaybeTempCorrected("og", og, 3);
+            // setnum("og", og, 3);
             return og;
         }
 
         function updateFG(og, abv) {
-            if (og===undefined) og = getnum("og");
+            if (og===undefined) og = getMaybeTempCorrected("og");
             if (abv===undefined) abv = getnum("abv");
             const fg = FGFromOGABV(og, abv);
-            setnum("fg", fg, 3);
+            setMaybeTempCorrected("fg", fg, 3);
+            // setnum("fg", fg, 3);
             return fg;
         }
 
         function updateABV(og, fg) {
-            if (og===undefined) og = getnum("og");
-            if (fg===undefined) fg = getnum("fg");
+            if (og===undefined) og = getMaybeTempCorrected("og");
+            if (fg===undefined) fg = getMaybeTempCorrected("fg");
             const abv = ABVFromSGs(og, fg);
             setnum("abv", abv, 2);
             return abv;
@@ -207,7 +267,7 @@
 
         function updateNAFG(abv, fg) {
             if (abv === undefined) abv = getnum("abv");
-            if (fg === undefined)  fg = getnum("fg");
+            if (fg === undefined)  fg = getMaybeTempCorrected("fg");
             const nafg = adjustForAlcohol(fg, abv);
             setnum("nafg", nafg, 4);
             return nafg;
@@ -364,6 +424,141 @@
             return 4.5 * abv + rs;
         }
 
+        function performingTempCorrection() {
+            return getid("tempcorrection").checked;
+        }
+
+        function getMaybeTempCorrected(id) {
+            if (!performingTempCorrection())
+                return getnum(id);
+            if (id === "og") return getTempCorrectedOG();
+            if (id === "fg") return getTempCorrectedFG();
+            return getnum(id);
+        }
+
+        // returning setnum(...), which is undefined, but thats ok.
+        function setMaybeTempCorrected(id, val, dp=3) {
+            if (!performingTempCorrection())
+                return setnum(id, val, dp);
+            if (id === "og") return setnum("og", getReverseTempCorrectedOG(val), dp);
+            if (id === "fg") return setnum("fg", getReverseTempCorrectedFG(val), dp);
+            return setnum(id, val, dp);
+        }
+
+        function getReverseTempCorrectedOG(og) {
+            const readTemp = getnum("ogtemp");
+            const basisTemp = getTemperatureBasis();
+
+            if (getTemperatureUnit() === 'F')
+                return adjustSGForTempF(og, readTemp, basisTemp);
+            return adjustSGForTempC(og, readTemp, basisTemp);
+        }
+
+        function getReverseTempCorrectedFG(fg) {
+            const readTemp = getnum("fgtemp");
+            const basisTemp = getTemperatureBasis();
+
+            if (getTemperatureUnit() === 'F')
+                return adjustSGForTempF(fg, readTemp, basisTemp);
+            return adjustSGForTempC(fg, readTemp, basisTemp);
+        }
+
+        // temperature adjustments
+        function getTempCorrectedOG() {
+            const readOG = getnum("og");
+            if (!performingTempCorrection()) return readOG;
+            const readTemp = getnum("ogtemp");
+            const basisTemp = getTemperatureBasis();
+
+            if (getTemperatureUnit() === 'F')
+                return adjustSGForTempF(readOG, basisTemp, readTemp);
+            return adjustSGForTempC(readOG, basisTemp, readTemp);
+        }
+
+        function getTempCorrectedFG() {
+            const readOF = getnum("fg");
+            if (!performingTempCorrection()) return readOF;
+            const readTemp = getnum("fgtemp");
+            const basisTemp = getTemperatureBasis();
+
+            if (getTemperatureUnit() === 'F')
+                return adjustSGForTempF(readOF, basisTemp, readTemp);
+            return adjustSGForTempC(readOF, basisTemp, readTemp);
+        }
+
+        function updateTemps() {
+            // update temperature symbol on form.
+            $(".show-temp-unit").html(getTemperatureSymbol());
+            $(".show-basis-temp").html(Number(getTemperatureBasis().toFixed(2)));
+            $("#ogtempcorrected").html(getTempCorrectedOG().toFixed(3));
+            $("#fgtempcorrected").html(getTempCorrectedFG().toFixed(3));
+        }
+
+        function getTemperatureBasis(unit) {
+            if (unit===undefined) unit=getTemperatureUnit();
+            const basis = getTemperatureBasisC();
+            if (unit === 'C')
+                return basis;
+            return CtoF(basis);
+        }
+
+        function CtoF(c) {
+            return c*1.8 + 32;
+        }
+
+        function FtoC(f) {
+            return (f-32)/1.8;
+        }
+
+        function getTemperatureBasisC() {
+            switch (getABVMethod()) {
+                case "BAUME":
+                    // fixme: Find out what the basis temp for Baume is
+                    return 20;
+                case "LINEAR":
+                    return FtoC(60);
+                case "DUNCANACTON":
+                    return FtoC(60);
+                default:
+                    return 20;
+            }
+        }
+
+        function getTemperatureUnit() {
+            return document.forms.calc.elements.tempunit.value;
+        }
+
+        function getTemperatureSymbol(tempunit) {
+            if (tempunit===undefined) tempunit = getTemperatureUnit();
+            if (tempunit==="F")
+                return "&#8457";
+            return "&#8451";
+        }
+
+        // adjust specific gravity for temperature (Farenheit)
+        // this is the same polynomial as used by VinoCalc https://www.vinolab.hr/calculator/hydrometer-temperature-correction-en31
+        // and other places. I just rearranged it a little.
+        function adjustSGForTempF(sg, ctF, rtF) {
+            const coeff = ((100130.346 - (rtF * 13.4722124) + (rtF*rtF * 0.204052596) - (rtF*rtF*rtF * 0.000232820948))
+                         / (100130.346 - (ctF * 13.4722124) + (ctF*ctF * 0.204052596) - (ctF*ctF*ctF * 0.000232820948)));
+            return (sg * coeff);
+        }
+
+        // adjust specific gravity for temperature (Celcius)
+        function adjustSGForTempC(sg, ctC, rtC) {
+            const coeff = (99900.5559846799 - (rtC * 2.03052997486) + (rtC*rtC * 0.5887137834) - (rtC*rtC*rtC * 0.001357811768736))
+                        / (99900.5559846799 - (ctC * 2.03052997486) + (ctC*ctC * 0.5887137834) - (ctC*ctC*ctC * 0.001357811768736));
+            return (sg * coeff);
+        }
+
+
+
+
+
+
+        // INIT
+
+        tempCorrectionToggle();
         updateCalculations();
 
         // interface stuff
