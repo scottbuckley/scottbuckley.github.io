@@ -11,15 +11,22 @@
         border-top-right-radius: 0.25rem !important;
         border-bottom-right-radius: 0.25rem !important;
     }
+
+    /*
+    .tempcorrectionon.form-text.d-none {
+        display:block !important;
+        visibility:hidden;
+    } */
 </style>
 <title>Mead Numbers</title>
 </head>
 <body>
+    
     <div class="form-box">
         <h1>Mead Numbers</h1>
         <form name="calc">
             <div class="form-group mb-2">
-                <label for="og">OG</label>
+                <label for="og">Original Gravity</label>
                 <div class="input-group">
                     <label class="input-group-text" for="targetog"><input class="form-check-input mt-0" type="radio" name="target" id="targetog" value="og" onchange="targetChanged(this);"></label>
                     <input class="form-control w-25" id="og" name="OG"
@@ -31,12 +38,12 @@
                         oninput="updateCalculations(this)" >
                     <span class="input-group-text tempcorrectionon show-temp-unit">&#8451</span>
                 </div>
-                <div class="tempcorrectionon">
+                <div class="tempcorrectionon form-text">
                     <span>=</span>&nbsp;<span id="ogtempcorrected">temp</span>&nbsp;<span>@</span>&nbsp;<span class="show-basis-temp">12345</span>&nbsp;<span class="show-temp-unit">&#8451</span>
                 </div>
             </div>
             <div class="form-group mb-2">
-                <label for="fg">FG</label>
+                <label for="fg">Final Gravity</label>
                 <div class="input-group">
                     <label class="input-group-text" for="targetfg"><input class="form-check-input mt-0" type="radio" name="target" id="targetfg" value="fg" onchange="targetChanged(this);"></label>
                     <input class="form-control w-25" id="fg" name="FG"
@@ -48,18 +55,81 @@
                         oninput="updateCalculations(this)" >
                     <span class="input-group-text tempcorrectionon show-temp-unit">&#8451</span>
                 </div>
-                <div class="tempcorrectionon">
+                <div class="tempcorrectionon form-text">
                     <span>=</span>&nbsp;<span id="fgtempcorrected">temp</span>&nbsp;<span>@</span>&nbsp;<span class="show-basis-temp">12345</span>&nbsp;<span class="show-temp-unit">&#8451</span>
                 </div>
             </div>
             <div class="form-group mb-2">
-                <label for="abv">ABV</label>
+                <label for="abv">Alcohol by Volume</label>
                 <div class="input-group">
                     <label class="input-group-text" for="targetabv"><input class="form-check-input mt-0" type="radio" name="target" id="targetabv" value="abv" checked  onchange="targetChanged(this);"></label>
                     <input class="form-control" id="abv" name="ABV" 
                         type="number" step="0.1" value="0.0" disabled="true"
                         oninput="updateCalculations(this);" >
                     <label class="input-group-text" for="abv">%</label>
+                </div>
+            </div>
+            
+            <!-- ^^^ inputs ^^^                   vvv outputs vvv -->
+            <!-- <hr class="hr hr-blurry" /> -->
+            <div class="accordion accordion-flush">
+                <div class="accordion-item">
+                    <button class="accordion-button p-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne">
+                        Delle Units
+                    </button>
+                    <div id="collapseOne" class="accordion-collapse collapse show">
+                        <div class="accordion-body">
+            <div class="form-group mb-2">
+                <label for="nafg">
+                    <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
+                       title="Non-alcohol final gravity"
+                       data-bs-content="Alcohol has a density less than water, so its presence reduces the specific gravity
+                       of your must. We can reliably calculate the specific gravity of the must minus the influence of alcohol's low
+                       density, given the ABV. We are actually calculating what the SG would be if we replaced the pure alcohol with pure water."></a>
+                    Non-alcohol FG
+                </label>
+                <input class="form-control" id="nafg" type="number" name="NAFG" value="0" disabled="true">
+            </div>
+            <div class="form-group mb-2">
+                <label for="rs">
+                    <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
+                       title="Approximate Residual sugars"
+                       data-bs-content="We calculate the residual sugars by converting the ABV-adjusted final gravity
+                       into Brix. We use a standard SG to Brix conversion, and then multiply again by the non-alcohol FG, as
+                       described at <a href='https://www.vinolab.hr/calculator/gravity-density-sugar-conversions-en19'>Vinolab</a>."></a>
+                       Approx. residual sugars
+                    </label>
+                <div class="input-group">
+                    <input class="form-control" id="rs" type="number" name="RS" value="0" disabled="true">
+                    <span class="input-group-text">%</span>
+                </div>
+            </div>
+            <div class="form-group mb-2">
+                <label for="delle">
+                    <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
+                       title="Approximate Delle units"
+                       data-bs-content="We calculate the Delle units from the ABV and the residual sugars."></a>
+                       Approx. Delle units
+                    </label>
+                <input class="form-control" id="delle" type="number" name="Delle" value="0" disabled="true">
+            </div>
+        </div>
+    </div>
+  </div></div>
+            <!-- <hr class="hr hr-blurry" /> -->
+            <div class="form-group mb-2">
+                <label for="delle">Gravity temperature correction</label>
+                <div class="input-group">
+                    <label class="input-group-text" for="tempcorrection"><input id="tempcorrection" class="form-check-input mt-0" type="checkbox" oninput="tempCorrectionToggle(this)"></label>
+                    <!-- Temp Correction Off -->
+                    <label class="input-group-text tempcorrectionoff" for="tempcorrection">Off</label>
+                    
+                    <!-- Temp Correction On -->
+                    <!-- <span class="input-group-text tempcorrectionon d-none">On</span> -->
+                    <label class="input-group-text tempcorrectionon" for="tempC">Celcius</label>
+                    <label class="input-group-text tempcorrectionon" for="tempC"><input checked class="form-check-input mt-0" type="radio" name="tempunit" id="tempC" value="C" onchange="updateCalculations();"></label>
+                    <label class="input-group-text tempcorrectionon" for="tempF">Farenheit</label>
+                    <label class="input-group-text tempcorrectionon" for="tempF"><input class="form-check-input mt-0" type="radio" name="tempunit" id="tempF" value="F" onchange="updateCalculations();"></label>
                 </div>
             </div>
             <div class="form-group mb-2">
@@ -86,55 +156,6 @@
                     <option value="LINEAR">Linear</option>
                     <option value="DUNCANACTON">Duncan & Acton</option>
                 </select>
-            </div>
-            <!-- ^^^ inputs ^^^                   vvv outputs vvv -->
-            <hr class="hr hr-blurry" />
-            <div class="form-group mb-2">
-                <label for="nafg">
-                    <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
-                       title="Non-alcohol final gravity"
-                       data-bs-content="Alcohol has a density less than water, so its presence reduces the specific gravity
-                       of your must. We can reliably calculate the specific gravity of the must minus the influence of alcohol's low
-                       density, given the ABV. We are actually calculating what the SG would be if we replaced the pure alcohol with pure water."></a>
-                    Non-alcohol FG
-                </label>
-                <input class="form-control" id="nafg" type="number" name="NAFG" value="0" disabled="true">
-            </div>
-            <div class="form-group mb-2">
-                <label for="rs">
-                    <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
-                       title="Approximate Residual sugars"
-                       data-bs-content="We calculate the residual sugars by converting the ABV-adjusted final gravity
-                       into Brix. We use a standard SG to Brix conversion, and then multiply again by the non-alcohol FG, as
-                       described at <a href='https://www.vinolab.hr/calculator/gravity-density-sugar-conversions-en19'>Vinolab</a>."></a>
-                       Approx. residual sugars
-                    </label>
-                <input class="form-control" id="rs" type="number" name="RS" value="0" disabled="true">
-            </div>
-            <div class="form-group mb-2">
-                <label for="delle">
-                    <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
-                       title="Approximate Delle units"
-                       data-bs-content="We calculate the Delle units from the ABV and the residual sugars."></a>
-                       Approx. Delle units
-                    </label>
-                <input class="form-control" id="delle" type="number" name="Delle" value="0" disabled="true">
-            </div>
-            <hr class="hr hr-blurry" />
-            <div class="form-group mb-2">
-                <label for="delle">Gravity temperature correction</label>
-                <div class="input-group">
-                    <label class="input-group-text" for="tempcorrection"><input id="tempcorrection" class="form-check-input mt-0" type="checkbox" oninput="tempCorrectionToggle(this)"></label>
-                    <!-- Temp Correction Off -->
-                    <span class="input-group-text tempcorrectionoff">Off</span>
-                    
-                    <!-- Temp Correction On -->
-                    <!-- <span class="input-group-text tempcorrectionon d-none">On</span> -->
-                    <label class="input-group-text tempcorrectionon" for="tempC">Celcius</label>
-                    <label class="input-group-text tempcorrectionon" for="tempC"><input checked class="form-check-input mt-0" type="radio" name="tempunit" id="tempC" value="C" onchange="updateCalculations();"></label>
-                    <label class="input-group-text tempcorrectionon" for="tempF">Farenheit</label>
-                    <label class="input-group-text tempcorrectionon" for="tempF"><input class="form-check-input mt-0" type="radio" name="tempunit" id="tempF" value="F" onchange="updateCalculations();"></label>
-                </div>
             </div>
         </form>
       </div>
@@ -614,6 +635,7 @@
         var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
             return new bootstrap.Popover(popoverTriggerEl, {html:true, container: 'body'});
         });
+
       </script>
 </body>
 </html>
