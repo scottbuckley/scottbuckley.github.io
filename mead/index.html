@@ -17,6 +17,9 @@
         <form name="calc">
             <h6 class="hrtext">gravity / abv</h6>
             <div class="form-group mb-2">
+                <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
+                    title="Original Gravity"
+                    data-bs-content="The gravity of your must before fermentation. Measure this with a hydrometer."></a>
                 <label for="og">Original Gravity</label>
                 <div class="input-group">
                     <label class="input-group-text" for="targetog"><input class="form-check-input mt-0" type="radio" name="target" id="targetog" value="og" onchange="targetChanged(this);"></label>
@@ -34,6 +37,9 @@
                 </div>
             </div>
             <div class="form-group mb-2">
+                <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
+                    title="Final Gravity"
+                    data-bs-content="The gravity of your must after fermentation. Measure this with a hydrometer."></a>
                 <label for="fg">Final Gravity</label>
                 <div class="input-group">
                     <label class="input-group-text" for="targetfg"><input class="form-check-input mt-0" type="radio" name="target" id="targetfg" value="fg" onchange="targetChanged(this);"></label>
@@ -51,6 +57,10 @@
                 </div>
             </div>
             <div class="form-group mb-2">
+                <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
+                    title="Alcohol by Volume"
+                    data-bs-content="The expected alcohol percentage of your final product, by volume.
+                    There are a number of different ways to make this estimation - you can change this with 'ABV Calculation Method' below."></a>
                 <label for="abv">Alcohol by Volume</label>
                 <div class="input-group">
                     <label class="input-group-text" for="targetabv"><input class="form-check-input mt-0" type="radio" name="target" id="targetabv" value="abv" checked  onchange="targetChanged(this);"></label>
@@ -77,10 +87,10 @@
                 <label for="rs">
                     <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
                        title="Approximate Residual sugars"
-                       data-bs-content="We calculate the residual sugars by converting the ABV-adjusted final gravity
-                       into Brix. We use a standard SG to Brix conversion, and then multiply again by the non-alcohol FG, as
-                       described at <a href='https://www.vinolab.hr/calculator/gravity-density-sugar-conversions-en19'>Vinolab</a>."></a>
-                       Approx residual sugars
+                       data-bs-content="We calculate the residual sugars by converting the alcohol-adjusted final gravity
+                       into Brix. We use a standard SG to Brix conversion, and then multiply again by the FG, as
+                       described at <a href='https://www.vinolab.hr/calculator/gravity-density-sugar-conversions-en19' target='_blank'>Vinolab</a>."></a>
+                       Approx Residual Sugars
                     </label>
                 <div class="input-group">
                     <input class="form-control" id="rs" type="number" name="RS" value="0" disabled="true">
@@ -91,8 +101,9 @@
                 <label for="delle">
                     <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
                        title="Approximate Delle units"
-                       data-bs-content="We calculate the Delle units from the ABV and the residual sugars."></a>
-                       Approx Delle units
+                       data-bs-content="We calculate Delle units from the ABV and the residual sugars, using the formula
+                       <code>4.5 * ABV + RS</code>."></a>
+                       Approx Delle Units
                     </label>
                 <input class="form-control" id="delle" type="number" name="Delle" value="0" disabled="true">
             </div>
@@ -104,15 +115,16 @@
                 viewport="container"
                 data-bs-content='There are various ways to approximate ABV from a given OG and FG.
                 <br><br>
-                Baume <code>145-145/(1+og-fg)</code> is used by <a href="http://meadcalc.freevar.com/">MeadCalc</a> and <a href="https://gotmead.com/blog/the-mead-calculator/">GotMead</a>.
+                Baume <code>145-145/(1+og-fg)</code> is used by <a href="http://meadcalc.freevar.com/" target="_blank">MeadCalc</a> and <a href="https://gotmead.com/blog/the-mead-calculator/" target="_blank">GotMead</a>.
+                This seems to be the most accepted formula for use with meads.
                 <br><br>
-                Linear <code>(og-fg)*131.25</code> is used by <a href="https://www.brewersfriend.com/abv-calculator/">Brewers Friend</a> "standard".
+                Linear <code>(og-fg)*131.25</code> is used by <a href="https://www.brewersfriend.com/abv-calculator/" target="_blank">Brewers Friend</a> "standard".
                 Interestingly, this formula is derived directly from the molecular weights of CO2 and Ethanol.
                 They use 0.8 as the density of gravity, which is only accurate at about 7C.
                 This implies that the true temperature basis would be 7C, but I assume it here to be 15.56C (60F), as there is no way that homebrewers everywhere have been using 7C (45F) with this method for years.
                 Ethanols density is 0.792 at 15.56C and 0.789 at 20C.
                 <br><br>
-                Duncan & Acton <code>(1000 * (og - fg)) / (7.75 - (3.75 * (og - k - 1)))</code> is used by <a href="https://fermcalc.com/">FermCalc</a>.
+                Duncan & Acton <code>(1000 * (og - fg)) / (7.75 - (3.75 * (og - k - 1)))</code> is used by <a href="https://fermcalc.com/" target="_blank">FermCalc</a>, and has a temperature basis of 15.56C (60F).
                 '></a>
                 <label for="abvmethod">ABV Calculation Method</label>
                 <select id="abvmethod" class="form-select"
@@ -123,7 +135,13 @@
                 </select>
             </div>
             <div class="form-group mb-2">
-                <label for="delle">Gravity temperature correction</label>
+                <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
+                    title="Temperature Correction for Gravity Readings"
+                    data-bs-content="The specific gravity of a liquid changes with temperature. Different hydrometers have different
+                    temperature bases, and different alcohol calculation methods have different temerature bases. If you enable gravity
+                    temperature correction here, you will be able to input a reading temperature for your gravity inputs, and the calculator
+                    will automatically adjust these to the base temperature of the chosen ABV calculation method."></a>
+                <label for="delle">Gravity Temperature Correction</label>
                 <div class="input-group">
                     <label class="input-group-text" for="tempOff"><input checked class="form-check-input mt-0" type="radio" name="tempunit" id="tempOff" value="OFF" onchange="tempCorrectionToggle(this);"></label>
                     <label class="input-group-text" for="tempOff">Off</label>

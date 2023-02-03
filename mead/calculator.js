@@ -103,7 +103,7 @@ function updateSecondary() {
     const fg = getMaybeTempCorrected("fg");
     const abv = getnum("abv");
     const nafg = updateNAFG(abv, fg);
-    updateRS(nafg);
+    updateRS(nafg, fg);
     updateDelle(abv);
 }
 
@@ -141,9 +141,10 @@ function updateNAFG(abv, fg) {
     return nafg;
 }
 
-function updateRS(nafg) {
+function updateRS(nafg, fg) {
     if (nafg === undefined) nafg = getnum("nafg");
-    const rs = BrixFromSG(nafg) * nafg;
+    if (fg === undefined) fg = getMaybeTempCorrected("fg");
+    const rs = BrixFromSG(nafg) * fg;
     setnum("rs", rs, 2);
     return rs;
 }
