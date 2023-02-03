@@ -1,19 +1,69 @@
-body {
+  body {
     background: #f7f7f7;
   }
   
   .form-box {
     max-width: 500px;
     margin: auto;
-    padding: 50px;
+    padding: 3em;
+    padding-top:2em;
     background: #ffffff;
     border: 10px solid #f2f2f2;
   }
   
-  h1, p {
+  h2 {
     text-align: center;
+    /* font-variant:small-caps; */
+    letter-spacing:.1rem;
   }
-  
-  input, textarea {
-    width: 100%;
+
+
+  /* input-group radius when stuff is hidden */
+  .form-group :has(+ .d-none):not(:has(~ :not(.d-none))) {
+      border-top-right-radius: 0.25rem !important;
+      border-bottom-right-radius: 0.25rem !important;
+  }
+  /* input-group spacer, with border radius fixes */
+  label.input-group-spacer {
+      min-width: 1px;
+      background: none;
+      padding: 0;
+      border: none;
+      border-radius: 0.25rem !important;
+  }
+  .form-group :has(+ .input-group-spacer) {
+      border-top-right-radius: 0.25rem !important;
+      border-bottom-right-radius: 0.25rem !important;
+  }
+  .form-group .input-group-spacer + * {
+      border-top-left-radius: 0.25rem !important;
+      border-bottom-left-radius: 0.25rem !important;
+  }
+  .hrtext {
+      overflow: hidden;
+      text-align: center;
+      font-variant: small-caps;
+      font-size:smaller;
+      letter-spacing:.15rem;
+      color:#777;
+      margin-top:1em;
+  }
+  .hrtext:before,
+  .hrtext:after {
+      background-color: #AAA;
+      content: "";
+      display: inline-block;
+      height: 1.5px;
+      position: relative;
+      vertical-align: middle;
+      width: 50%;
+  }
+  .hrtext:before {
+      right: 0.5em;
+      margin-left: -50%;
+  }
+  .hrtext:after {
+      left: 0.5em;
+      margin-right: -50%;
+      margin-left:-.15rem;
   }
