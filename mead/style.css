@@ -10,12 +10,27 @@
     background: #ffffff;
     border: 10px solid #f2f2f2;
   }
+  @media (pointer:none), (pointer:coarse) {
+    .form-box {
+        padding: 2em;
+    }
+
+    #igtc .input-group-text {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+      }
+  }
   
   h2 {
     text-align: center;
     /* font-variant:small-caps; */
     letter-spacing:.1rem;
   }
+
+  #igtc {
+    flex-wrap:nowrap;
+  }
+
 
 
   /* input-group radius when stuff is hidden */
@@ -27,7 +42,7 @@
   label.input-group-spacer {
       min-width: 1px;
       background: none;
-      padding: 0;
+      padding: 0 !important;
       border: none;
       border-radius: 0.25rem !important;
   }
