@@ -272,7 +272,7 @@ tr td[swatch="17"], #tbl tr.row td.cell[swatch="17"] {
   left: 1px;
   right: 1px;
   bottom: 1px;
-  border: 2px none #333;
+  border: 3pt none #333;
   z-index:-2;
 }
 #tbl tr.row td.cell[region="yes"][rgnup="no"]:before {
@@ -293,12 +293,12 @@ tr td[swatch="17"], #tbl tr.row td.cell[swatch="17"] {
   background-color:#fffe;
   border:0.5px dotted #0004;
   margin:auto;
-  top:-4px;
-  left:-4px;
+  top:-0.8vh;
+  left:-0.8vh;
   padding-left:1px;
   position:absolute;
   text-align:center;
-  font-size:1.5vh;
+  font-size:1.8vh;
 }
 #tbl tr.row td.cell[region="yes"][TL="yes"] div.caption:empty {
   display:none;
