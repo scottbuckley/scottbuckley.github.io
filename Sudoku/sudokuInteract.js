@@ -45,7 +45,7 @@
   // antiknight 1: ?antiknight=true&data=000010000000302000009000300020000040300000005040000060004000700000108000000090000
 
   // x-sudoku 1 (needs scc on diags): ?xsudoku=true&data=000000000001408300080020070070364050008209700040781090060090010002807500000000000
-  // x-sudoku 2: 
+  // x-sudoku 2:
 
 /*
      ######   #######  ##    ## ######## ####  ######
@@ -82,7 +82,7 @@
   const SETTHERMO = 4;
   const SETLINE = 5;
   const SETARROW = 6;
-  
+
   const NUM_COLOURS = 18;
 
   // input state
@@ -91,7 +91,7 @@
   var inputNum   = undefined;
 
   var ls = window.localStorage;
-  
+
 
 /*
     #### ##    ## #### ########
@@ -221,7 +221,7 @@
           .append(button)
           .addClass('btndiv');
           cont.append(btndiv);
-        
+
         // tell the start about these controls
         // (in case we want to manipulate them later)
         strat.button = button;
@@ -280,7 +280,7 @@
     });
   }
 
-  
+
 
   /* DISPLAY MODES */
   const DEFAULT_DISPLAY_MODE = "display_normal"
@@ -530,7 +530,7 @@ function setDblClick(element, cell) {
     this.addClass("selected");
     prevSelectedControl = this;
   }
-  
+
   function enableStrat(strat) {
     strat.enabled = true;
     if (strat.specialty) return;
@@ -636,7 +636,7 @@ function setDblClick(element, cell) {
     $("#tbl").find("td.selected").removeClass("selected");
   }
 
-  
+
   function hideVs() {
     for (var i=1; i<10; i++)
       $(`v${i}`).hide();
@@ -769,7 +769,7 @@ function setDblClick(element, cell) {
     // console.log(`edge has ${commaCount} commas`);
     // console.log(`edge has ${dashCount} dashes`);
     var delim = (commaCount > dashCount) ? "," : "-";
-    
+
     sudokuEdges = [[],[],[],[]];
     var data = data.split(delim);
     for (var i=0; i<data.length; i++) {
@@ -859,13 +859,19 @@ function setDblClick(element, cell) {
     var arrows = arrowListString.split(",");
     for (var i=0; i<arrows.length; i++) {
       var [base, shoulder, shaft] = arrows[i].split("|");
-      var baseCells  = base.match(/.{4}/g);
-      var shaftCells = shaft.match(/.{4}/g);
-      var arrow = {base: [], shoulder: sudokuCellsByPos[shoulder], shaft: []};
-      for (var t=0; t<baseCells.length; t++)
-        arrow.base.push(sudokuCellsByPos[baseCells[t]]);
-      for (var t=0; t<shaftCells.length; t++)
-        arrow.shaft.push(sudokuCellsByPos[shaftCells[t]]);
+      var baseCellRefs  = base.match(/.{4}/g);
+      var baseCells = baseCellRefs.map((r) => sudokuCellsByPos[r]);
+      var shoulderCell = undefined;
+      var shaftCells = [];
+
+      if (arrows[i].indexOf("|") !== -1) {
+        // this arrow has more than just a base
+        shoulderCell = sudokuCellsByPos[shoulder];
+        var shaftCellRefs = shaft.match(/.{4}/g);
+        shaftCells = shaftCellRefs.map((r) => sudokuCellsByPos[r]);
+      }
+
+      var arrow = {base: baseCells, shoulder: shoulderCell, shaft: shaftCells};
       out.push(arrow);
     }
     return out;
@@ -884,9 +890,13 @@ function setDblClick(element, cell) {
     for (var i=0; i<sudokuArrows.length; i++) {
       var arrow = sudokuArrows[i];
       var base = arrow.base.map((c)=>c.pos).join("");
-      var shoulder = arrow.shoulder.pos;
-      var shaft = arrow.shaft.map((c)=>c.pos).join("");
-      out.push([base, shoulder, shaft].join("|"));
+      if (arrow.shaft.length === 0) {
+        out.push(base)
+      } else {
+        var shoulder = arrow.shoulder.pos;
+        var shaft = arrow.shaft.map((c)=>c.pos).join("");
+        out.push([base, shoulder, shaft].join("|"));
+      }
     }
     return out.join(",");
   }
@@ -1142,7 +1152,7 @@ function regionsButton() {
 
   var input = "" + prompt("Enter a label for this region.", oldLabel);
   if (input==="null") return;
-  
+
   regionLabels[thisRegion] = input;
 
   cells.map(function(cell){
@@ -1342,7 +1352,7 @@ function refreshRegionLabels() {
     }
     tr.append($("<td>").addClass("corner"));
     table.append(tr);
-    
+
     // table (including edges)
     var lEdge = leftEdge();
     var rEdge = rightEdge();
@@ -1410,7 +1420,7 @@ function refreshRegionLabels() {
     for (var i=0; i<9; i++)
       cell[i] = true;
   }
-  
+
   function toggleCandidate(cell, v) {
     if (isSolved(cell)) return false;
     cell[v] = !cell[v];
@@ -1865,9 +1875,9 @@ function refreshRegionLabels() {
   }
 
   function canvKropkiDot(center, style, angle) {
-    
+
     var size = getSomeCellWidth()*0.15;
-    
+
     // the style here indicates which kropki dot will be drawn
     ctx.fillStyle = NOTATION_BASE_CLR;
     ctx.strokeStyle = "#FFF";
@@ -1907,7 +1917,7 @@ function refreshRegionLabels() {
       ctx.arc(center[0], center[1], size*0.6, 0, 2*Math.PI);
       ctx.fillStyle = "#666";
       ctx.fill();
-    } else {  
+    } else {
       ctx.beginPath();
       ctx.arc(center[0], center[1], size, 0, 2 * Math.PI);
       ctx.fill();
@@ -1938,7 +1948,7 @@ function refreshRegionLabels() {
                  middle[1]+rad*Math.sin(angle+pitch)];
     var right = [middle[0]+rad*Math.cos(angle-pitch),
                  middle[1]+rad*Math.sin(angle-pitch)];
-    
+
     ctx.beginPath();
     ctx.lineWidth = cellWidth * width;
     ctx.strokeStyle = style;
@@ -1988,6 +1998,6 @@ function drawGraph(nodes) {
       maybeDraw(pos, node.strong[s], "strong");
     for (var w=0; w<node.weak.length; w++)
       maybeDraw(pos, node.weak[w], "weak");
-    
+
   }
 }
