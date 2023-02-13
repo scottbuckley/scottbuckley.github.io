@@ -303,6 +303,7 @@
     }
   }
 
+  // update the drop down for "display mode" (whether or not to show box lines)
   function overrideDisplayMode(mode) {
     $("select#displaymode>option").each(function(index, t) {
       var opt = $(t);
@@ -338,6 +339,19 @@ function setCellsNot() {
 function setCellsSame() {
   setCellsSameActual(getSelectedCells());
 }
+
+function moveSelection(relnFn) {
+  var cells = getSelectedCells();
+  var cellsMoved = cells.map(relnFn);
+  var hasUndefined = cellsMoved.some(c => c === undefined);
+  if (!hasUndefined)
+    setSelectedCells(cellsMoved);
+}
+
+function moveSelectionUp()    { moveSelection(cellAbove); }
+function moveSelectionDown()  { moveSelection(cellBelow); }
+function moveSelectionLeft()  { moveSelection(cellLeft); }
+function moveSelectionRight() { moveSelection(cellRight); }
 
 function setCellsOnlyPropmt(cells) {
   if (cells.length===0) return;
@@ -627,6 +641,14 @@ function setDblClick(element, cell) {
       setCellsNot();
     } else if (code==="KeyM" && !modKey) {
       setCellsSame();
+    } else if (code==="ArrowUp" && !modKey) {
+      moveSelectionUp();
+    } else if (code==="ArrowDown" && !modKey) {
+      moveSelectionDown();
+    } else if (code==="ArrowLeft" && !modKey) {
+      moveSelectionLeft();
+    } else if (code==="ArrowRight" && !modKey) {
+      moveSelectionRight();
     }
     return true;
   }
@@ -636,6 +658,13 @@ function setDblClick(element, cell) {
     $("#tbl").find("td.selected").removeClass("selected");
   }
 
+  function setSelectedCells(cells) {
+    clearSelected();
+    cells.forEach(c => {
+      console.log(c);
+      c.td.addClass("selected");
+    });
+  }
 
   function hideVs() {
     for (var i=1; i<10; i++)
