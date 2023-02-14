@@ -63,6 +63,18 @@
 
   const NOTATION_BASE_CLR = "#BBB";
 
+  const SWATCH_COLORS = [
+    '#1bd56f', 
+    '#77eee7', 
+    '#4aa3e8', 
+    '#9dee77', 
+    '#ffb4ff', 
+    '#ac77ee', 
+    '#eee777', 
+    '#eeac77', 
+    '#ee777e'
+  ];
+
 
 /*
      ######  ########    ###    ######## ########
@@ -83,11 +95,11 @@
   const SETLINE = 5;
   const SETARROW = 6;
 
-  const NUM_COLOURS = 18;
+  const NUM_COLORS = 18;
 
   // input state
   var inputState = SETNOTHING;
-  var dragState  = undefined; // undefined = nothing. -1 = clear. 0-(NUM_COLOURS-1) = set swatch. -2 = select
+  var dragState  = undefined; // undefined = nothing. -1 = clear. 0-(NUM_COLORS-1) = set swatch. -2 = select
   var inputNum   = undefined;
 
   var ls = window.localStorage;
@@ -518,10 +530,18 @@ function setDblClick(element, cell) {
     }
   }
 
-  // a control button (confirm/candidate/colour) has been clicked
+  // a control button (confirm/candidate/color) has been clicked
   // ind:index of button, state:state for button, this:the td of the button
   var prevSelectedControl = undefined;
   function controlClicked(ind, state) {
+
+    // if we click on a color during some other modes, modify that mode.
+    if (state === SETCOLOR && inputState === SETLINE) {
+      setWorkingLineColor(ind);
+      refreshOverlay();
+      return;
+    }
+
     // deselect previous control
     if (prevSelectedControl) prevSelectedControl.removeClass("selected");
 
@@ -531,6 +551,10 @@ function setDblClick(element, cell) {
       inputNum = undefined;
       refreshHighlights();
       return;
+    }
+
+    if (inputState === SETCOLOR) {
+
     }
 
     // change the current state
@@ -661,7 +685,6 @@ function setDblClick(element, cell) {
   function setSelectedCells(cells) {
     clearSelected();
     cells.forEach(c => {
-      console.log(c);
       c.td.addClass("selected");
     });
   }
@@ -858,28 +881,57 @@ function setDblClick(element, cell) {
     }
   }
 
-  function getCellListExportString(cellLists) {
-    var out = [];
-    for (var i=0; i<cellLists.length; i++) {
-      var poses = cellLists[i].map((c)=>c.pos);
-      out.push(poses.join(""));
-    }
-    return out.join(",");
+  function getCellListsExportString(cellLists) {
+    return cellLists.map(getCellListExportString).join(",");
   }
 
-  function parseCellLists(cellListString) {
-    var out = [];
-    if (cellListString===undefined) return [];
-    var lists = cellListString.split(",");
-    for (var i=0; i<lists.length; i++) {
-      var poses = lists[i].match(/.{4}/g);
-      var list = [];
-      for (var t=0; t<poses.length; t++) {
-        list.push(sudokuCellsByPos[poses[t]]);
-      }
-      out.push(list);
+  function getCellListExportString(cellList) {
+    return cellList.map(c => c.pos).join("");
+  }
+
+  function not_undefined(x) { return (x !== undefined); }
+
+
+  function getColorAndCellsListExportString(colorAndCellsList) {
+    return colorAndCellsList.map(getColorAndCellsExportString).join(",");
+  }
+
+  function getColorAndCellsExportString(colorAndCells) {
+    if (colorAndCells.color === undefined)
+      return getCellListExportString(colorAndCells.cells);
+    return [swatchToChar(colorAndCells.color % 9), getCellListExportString(colorAndCells.cells)].join("|");
+  }
+
+  function parseColorAndCellsList(colorAndCellsListString) {
+    if (colorAndCellsListString === undefined) return [];
+    return colorAndCellsListString
+      .split(",")
+      .map(parseColorAndCells);
+  }
+
+  function parseColorAndCells(colorAndCellsString) {
+    var color = undefined;
+    var cellsString = colorAndCellsString;
+    if (colorAndCellsString.includes("|")) {
+      [color, cellsString] = colorAndCellsString.split("|");
+      color = swatchFromChar(color);
     }
-    return out;
+    return {color: color, cells: parseCells(cellsString)};
+  }
+
+  function parseCells(cellsString) {
+    if (cellsString===undefined) return undefined;
+    return cellsString
+      .match(/.{4}/g)
+      .map(p => sudokuCellsByPos[p]);
+  }
+
+  function parseCellsList(cellsListString) {
+    if (cellsListString===undefined) return [];
+    return cellsListString
+      .split(",")
+      .map(parseCells)
+      .filter(not_undefined);
   }
 
   function parseArrowList(arrowListString) {
@@ -907,11 +959,11 @@ function setDblClick(element, cell) {
   }
 
   function getThermosExportString() {
-    return getCellListExportString(sudokuThermos);
+    return getCellListsExportString(sudokuThermos);
   }
 
   function getLinesExportString() {
-    return getCellListExportString(sudokuLines);
+    return getColorAndCellsListExportString(sudokuLines);
   }
 
   function getArrowsExportString() {
@@ -958,7 +1010,7 @@ function setDblClick(element, cell) {
   }
 
   function parseThermos() {
-    sudokuThermos = parseCellLists(getQueryVariable('thermos'));
+    sudokuThermos = parseCellsList(getQueryVariable('thermos'));
   }
 
   function parseArrows() {
@@ -966,7 +1018,7 @@ function setDblClick(element, cell) {
   }
 
   function parseLines() {
-    sudokuLines = parseCellLists(getQueryVariable('lines'));
+    sudokuLines = parseColorAndCellsList(getQueryVariable('lines'));
   }
 
   function parseDisplayMode() {
@@ -992,9 +1044,14 @@ function setDblClick(element, cell) {
     else return output;
   }
 
+  function swatchToChar(swatch) {
+    if (swatch === undefined || swatch === NaN) return undefined;
+    return String.fromCharCode(65+swatch);
+  }
+
   function exportSwatch(cell) {
     if (cell.swatch === undefined) return '';
-    return 'c'+String.fromCharCode(65+cell.swatch);
+    return 'c'+swatchToChar(cell.swatch);
   }
 
   function exportRegion(cell) {
@@ -1563,7 +1620,7 @@ function refreshRegionLabels() {
         if (cell.swatch === inputNum) {
           saveUndoState(cell.pos+" blank");
           cell.swatch = undefined;
-          dragState = -1; // CLEARING COLOURS
+          dragState = -1; // CLEARING COLORS
         } else {
           saveUndoState(cell.pos+" "+zoneName(inputNum));
           cell.swatch = inputNum;
@@ -1598,7 +1655,7 @@ function refreshRegionLabels() {
       if (dragState === -1 && cell.swatch !== undefined) {
         saveUndoState(cell.pos+" blank");
         cell.swatch = undefined;
-      } else if (dragState >= 0 && dragState <= NUM_COLOURS) {
+      } else if (dragState >= 0 && dragState <= NUM_COLORS) {
         if (cell.swatch !== dragState) {
           saveUndoState(cell.pos+" "+zoneName(dragState));
           cell.swatch = dragState;
@@ -1801,9 +1858,9 @@ function refreshRegionLabels() {
     canvCircle(cells[0], 0.3);
   }
 
-  function clearEmptyLists(lists) {
+  function clearEmptyLists(lists, fn = (a => a)) {
     for (var i=lists.length-1; i>=0; i--) {
-      if (lists[i].length<1) {
+      if (fn(lists[i]).length<1) {
         lists.splice(i, 1);
       }
     }
@@ -1825,13 +1882,21 @@ function refreshRegionLabels() {
 
   function addLine() {
     controlClicked.call($("#lineButton"), 0, SETLINE);
-    if (inputState===SETLINE) sudokuLines.push([]);
-    else clearEmptyLines();
+    if (inputState===SETLINE)
+      // start a line
+      sudokuLines.push({cells: [], color: undefined});
+    else
+      // finish a line
+      finishLine();
   }
 
   function addCellToCurrentLine(cell) {
-    sudokuLines[sudokuLines.length-1].push(cell);
+    sudokuLines.at(-1).cells.push(cell);
     refreshOverlay();
+  }
+
+  function setWorkingLineColor(color) {
+    sudokuLines.at(-1).color = color;
   }
 
   function drawLines() {
@@ -1840,14 +1905,23 @@ function refreshRegionLabels() {
     }
   }
 
-  function drawLine(cells) {
+  function drawLine(line) {
+    var cells = line.cells;
     if (cells.length < 1) return;
-    canvLine(cells, 0.35, '#fff');
-    canvLine(cells, 0.3);
+    var color = NOTATION_BASE_CLR;
+    if (line.color !== undefined)
+      color = SWATCH_COLORS[line.color % 9];
+    canvLine(cells, 0.35, '#fff'); //outline
+    canvLine(cells, 0.3, color);
+  }
+
+  function finishLine() {
+    var mostRecentLine = sudokuLines[sudokuLines.length-1];
+    clearEmptyLines();
   }
 
   function clearEmptyLines() {
-    clearEmptyLists(sudokuLines);
+    clearEmptyLists(sudokuLines, l=>l.cells);
   }
 
 /*
