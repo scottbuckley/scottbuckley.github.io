@@ -143,6 +143,8 @@
 
     if (edge) initEdges(edge);
 
+    parseDescription();
+
     // get region labels from the URL
     parseRegionLabels();
 
@@ -553,10 +555,6 @@ function setDblClick(element, cell) {
       return;
     }
 
-    if (inputState === SETCOLOR) {
-
-    }
-
     // change the current state
     inputState = state;
     inputNum = ind;
@@ -649,6 +647,8 @@ function setDblClick(element, cell) {
       // undo. flash the button and perform an undo
       flashButton($("#undobutton"));
       undo();
+    } else if (code==="KeyD" && !modKey) {
+      descriptionButton();
     } else if (code==="KeyR" && !modKey) {
       regionsButton();
     } else if (code==="KeyL" && !modKey) {
@@ -794,6 +794,30 @@ function setDblClick(element, cell) {
     var input = "" + prompt("Enter 81 digits, like \"0814\"... 0 means unknown. Alternatively, enter a stateful export string provided by this app (containing commas and letters)");
     initSudoku(input);
     refresh();
+  }
+
+  function descriptionButton() {
+    var input = prompt("Enter a description (HTML is allowed)", getDescription());
+    if (input === null) return;
+    setDescription(input);
+    refreshHighlights();
+  }
+
+  function setDescription(html) {
+    $("#description").html(html);
+  }
+
+  function getDescription() {
+    return $("#description").html();
+  }
+
+  function getDescriptionExportString() {
+    return encodeURIComponent(getDescription());
+  }
+
+  function parseDescription() {
+    var descriptionHTML = getQueryVariable('desc');
+    setDescription(descriptionHTML);
   }
 
   function edgesButton() {
@@ -1069,7 +1093,7 @@ function setDblClick(element, cell) {
 
   function getStatefulExportString() {
     var output = [];
-    for (var r=0; r<9; r++) {undoStack
+    for (var r=0; r<9; r++) {
       for (var c=0; c<9; c++) {
         var cell = sudoku[r][c];
         var cellstring = "";
@@ -1139,6 +1163,9 @@ function setDblClick(element, cell) {
 
     if (getDisplayMode() !== DEFAULT_DISPLAY_MODE)
       URLentries.push(`display=${getDisplayMode()}`);
+
+    var description = getDescriptionExportString();
+    if (description) URLentries.push(`desc=${description}`);
 
     if (data)
       URLentries.push(`data=${data}`);
@@ -1549,6 +1576,14 @@ function refreshRegionLabels() {
     var labels = undoStack.map(d => d[0]).reverse();
     $("#history").html("History:<br>"+labels.join("<br>"));
   }
+
+  function spamUndoStack() {
+    for (var i=0; i<200; i++)
+      undoStack.push(["meow "+i, "meow"]);
+    refreshUndoLog();
+    setDescription("skdjfnksdnfksdnfksdnfkjnsdfkjnsdfkjnsdkf jnsdkjfnsdkfjnskdjfnskdjfnksdjfnksdjfnksjdnf skdjfnksdnfksdnfksdnfkjnsdfkjnsdfkjnsdkfjnsdkjfnsdkfjnskdjfn skdjfnksdjfnksdjfnksjdnf");
+  }
+  // setTimeout(spamUndoStack, 500);
 
   function saveUndoState(label, state=getStatefulExportString()) {
     // console.log(label);

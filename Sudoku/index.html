@@ -13,7 +13,10 @@
         <div id="solvers">
           <button onclick="javascript:autoButton(event);">SOLVE</button>
         </div>
-        <div id="historywrapper"><div id="history">History: </div></div>
+        <div id="leftwrapper">
+          <div id="description"></div>
+          <div id="historywrapper"><div id="history">History: </div></div>
+        </div>
         <div id="gridcont">
           <table id="tbl" class="noselect withboxes"><canvas id="cnv">meow</canvas></table>
         </div>
@@ -45,6 +48,7 @@
       </div>
       <div id="bottombuttons">
         <button onclick="javascript:importButton();">Import</button>
+        <button onclick="javascript:descriptionButton();">Set (D)escription</button>
         <button onclick="javascript:edgesButton();">Set Edges</button>
         <button onclick="javascript:regionsButton();">Set (R)egion</button>
         <button onclick="javascript:addThermo();" id="thermoButton">Add (T)hermo</button>
