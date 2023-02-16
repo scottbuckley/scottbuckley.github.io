@@ -190,9 +190,10 @@
   //  ######     ##    ##     ##    ##    ########
 
   // we store the sudoku in various ways simultaneously.
-  var sudoku = [];
-  var sudokuCols = [];
-  var sudokuBoxes = [];
+  var sudoku = [];       // list of rows
+  var sudokuCols = [];   // list of cols
+  var sudokuBoxes = [];  // list of boxes
+  var sudokuCells = [];  // list of cells (same order as flattened rows)
   var sudokuCellsByPos = [];      
   var sudokuCellsTL = []; // grouping by the sum of row and col
   var sudokuEdges = [[],[],[],[]];
@@ -4026,6 +4027,7 @@ function nonConsPairCells() {
     sudokuCols.groupingType="col";
     sudokuBoxes.groupingType="box";
 
+    // the TL list is used to more easily assign region labels
     for (var i=0; i<17; i++) {
       sudokuCellsTL.push([]);
       sudokuCellsTL[i].groupName = "TLSum " + (i+2);
@@ -4033,8 +4035,8 @@ function nonConsPairCells() {
     }
 
     // make all cells
-    for (var c=0; c<9; c++) {
-      for(var r=0; r<9; r++) {
+    for(var r=0; r<9; r++) {
+      for (var c=0; c<9; c++) {
         var b = boxNum(r,c);
 
         // make the cell and fill it with 'true'
@@ -4052,6 +4054,7 @@ function nonConsPairCells() {
         sudoku[r][c] = cell;
         sudokuCols[c][r] = cell;
         sudokuBoxes[b].push(cell);
+        sudokuCells.push(cell);
         sudokuCellsByPos[cell.pos] = cell;
         sudokuCellsTL[r+c].push(cell);
       }
