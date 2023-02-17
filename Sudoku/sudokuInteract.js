@@ -143,10 +143,14 @@ $(document).ready(function(){
 
     if (edge) initEdges(edge);
 
-    parseDescription();
+    parseSwatches();
+
+    parseRegions();
 
     // get region labels from the URL
     parseRegionLabels();
+
+    parseDescription();
 
     // get thermos
     parseThermos();
@@ -1104,7 +1108,10 @@ function makeExportLink() {
   if (data) URLentries.push(`data=${data}`);
 
   var colors = getSwatchesExportString();
-  if (colors) URLentries.push(`clr=${colors}`)
+  if (colors) URLentries.push(`clr=${colors}`);
+
+  var regions = getRegionsExportString();
+  if (regions) URLentries.push(`rgn=${regions}`)
 
   var flags = getFlagString();
   if (flags) URLentries.push(flags);
@@ -1139,8 +1146,16 @@ function makeExportLink() {
   $("#exportLink").attr("href", URL);
 }
 
-/* CELL / CANDIDATE VALUES EXPORT */
+/*
+   ___  .____  .     .          __    __     .    .     .     . .____    _____
+ .'   \ /      /     /          |     |     /|    /     /     / /       (
+ |      |__.   |     |           \    /    /  \   |     |     | |__.     `--.
+ |      |      |     |            \  /    /---'\  |     |     | |           |
+  `.__, /----/ /---/ /---/         \/   ,'      \ /---/  `._.'  /----/ \___.'
+*/
+
 function getB64StatefulExportString() {
+  if (noCellsOnBoard(c => getB64Cell(c)!=="0")) return undefined;
   return b64ListCompress(sudokuCells.map(getB64Cell)).join("");
 }
 
@@ -1180,18 +1195,19 @@ function getB64Cell(cell) {
 
 /* simple base64 encoding and decoding */
 const b64Chars="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_";
-function toB64(x, pad=0, dict=b64Chars) {
+function toB64(x, pad=0) {
   return x
   .toString(2)
   .split(/(?=(?:.{6})+(?!.))/g)
-  .map(v=>dict[parseInt(v,2)])
+  .map(v=>b64Chars[parseInt(v,2)])
   .join("")
   .padStart(pad,"0");
 }
-function fromB64(x, dict=b64Chars) {
+
+function fromB64(x) {
   return x
     .split("")
-    .reduce((s,v)=>s*64+dict.indexOf(v),0)
+    .reduce((s,v)=>s*64+b64Chars.indexOf(v),0)
 }
 
 
@@ -1218,7 +1234,7 @@ function listifyB64CellString(data) {
   return data.match(/[0-9]|.{2}/g);
 }
 
-function b64ListCompress(list, rptStart=640, dict=b64Chars) {
+function b64ListCompress(list, rptStart=640) {
   var out = [];
   var prevB64 = undefined;
   var repeatCount = 0;
@@ -1237,7 +1253,7 @@ function b64ListCompress(list, rptStart=640, dict=b64Chars) {
       out.push(prevB64);
     } else {
       // otherwise, add the repeat character.
-      out.push(toB64(rptStart+repeatCount, 2, dict));
+      out.push(toB64(rptStart+repeatCount, 2, b64Chars));
     }
     repeatCount = 0;
   };
@@ -1255,11 +1271,11 @@ function b64ListCompress(list, rptStart=640, dict=b64Chars) {
   return out;
 }
 
-function b64ListDecompress(list, rptStart=640, rptEnd=767, dict=b64Chars) {
+function b64ListDecompress(list, rptStart=640, rptEnd=767) {
   var out = [];
   var prevB64 = undefined;
   list.forEach(b64 => {
-    var val = fromB64(b64, dict);
+    var val = fromB64(b64, b64Chars);
     if (val >= rptStart && (rptEnd===-1 || val <= rptEnd)) {
       // repeat character
       const repeats = val-rptStart;
@@ -1305,38 +1321,37 @@ function getStatefulExportString() {
   return output.join(",");
 }
 
-/* SWATCHES EXPORT */
-const b64ColorChars="_ABCDEFGHIJKLMNOPQRSTUVWXYZ-0123456789abcdefghijklmnopqrstuvwxyz";
+/*    _____ .       __     .     _______   ___  __  __ .____    _____
+/*   (      /       |     /|    '   /    .'   \ |   |  /       (
+/*    `--.  |       |    /  \       |    |      |___|  |__.     `--.
+/*       |  |  /\   /   /---'\      |    |      |   |  |           |
+/*  \___.'  |,'  \,'  ,'      \     /     `.__, /   /  /----/ \___.'
+*/
+
 function getSwatchesExportString() {
-  if (!noSwatchesOnBoard())
-    return b64ListCompress(sudokuCells.map(cellToB64Swatch), 1756, b64ColorChars).join("");
-  // var inDecompressedList = b64ListDecompress(listifyB64ColorString(inString), 1756, -1, b64ColorChars).map(b64SwatchToValue);
+  if (noCellsOnBoard(c => c.swatch !== undefined)) return undefined;
+  return b64ListCompress(sudokuCells.map(cellToB64Swatch), fromB64("-0")).join("");
 }
 
-function noSwatchesOnBoard() {
-  for (var i=0; i<sudokuCells.length; i++)
-    if (sudokuCells[i].swatch !== undefined)
-      return false;
-  return true;
-}
-
-function listifyB64ColorString(data) {
-  return data.match(/[A-Z\_]|.{2}/g);
+function parseSwatches() {
+  var clr = getQueryVariable('clr');
+  if (clr === undefined) return;
+  var clrList = b64ListDecompress(listifyB64SingleCelledWithRepeats(clr, "-"), fromB64("-0"), -1).map(b64ToSwatchValue);
+  sudokuCells.map((c, i) => { c.swatch = clrList[i]; });
 }
 
 function cellToB64Swatch(cell) {
-  var swatch = 0;
-  if (cell.swatch !== undefined)
-    swatch = cell.swatch+1;
-  return toB64(swatch, 1, b64ColorChars);
+  if (cell.swatch === undefined) return toB64(0);
+  return toB64(cell.swatch+1);
 }
 
-function b64SwatchToValue(b64) {
-  var val = fromB64(b64, b64ColorChars);
+function b64ToSwatchValue(b64) {
+  var val = fromB64(b64);
   if (val===0) return undefined;
   return val-1;
 }
 
+/* old stuff */
 function swatchToChar(swatch) {
   if (swatch === undefined || swatch === NaN) return undefined;
   return String.fromCharCode(65+swatch);
@@ -1347,11 +1362,6 @@ function exportSwatch(cell) {
   return 'c'+swatchToChar(cell.swatch);
 }
 
-function exportRegion(cell) {
-  if (cell.region === undefined) return '';
-  return 'r'+cell.region;
-}
-
 function swatchFromChar(char) {
   if (char===undefined) return undefined;
   if (char==='') return undefined;
@@ -1359,6 +1369,79 @@ function swatchFromChar(char) {
   if (char > 'Z') return undefined;
   return char.charCodeAt(0)-65;
 }
+/* end old stuff (only here for legacy undo stuff) */
+
+
+
+
+/* GENERIC HELPERS for swatches and regions (for now) */
+function noCellsOnBoard(fn) {
+  for (var i=0; i<sudokuCells.length; i++)
+    if (fn(sudokuCells[i])) return false;
+  return true;
+}
+// combine elements of an array when `fn` matches on them
+// (combine using joinfn)
+Object.defineProperty(Array.prototype, 'pinch', {
+  value: function(fn, joinfn=(a, b)=>{return a+b; }) {
+    // return this;
+    return this.reduce((l, e) => {
+      if (l.length>1 && fn(l[l.length-1], e))
+        l[l.length-1] = joinfn(l[l.length-1], e);
+        // l[l.length-1] += e;
+      else l.push(e);
+      return l;
+    }, []);
+  }
+});
+
+// given a list of B64 chars, split this into a list of single characters,
+// but group into two chars when 
+function listifyB64SingleCelledWithRepeats(data, repeatStartChar) {  
+  var repeatStartVal = fromB64(repeatStartChar);
+  return data
+    .split("")
+    .pinch((a, b) => (a.length===1 && (fromB64(a) >= repeatStartVal)));
+}
+
+
+/*  .___  .____    ___   _   ___   __    _   _____
+/*  /   \ /      .'   \  | .'   `. |\   |   (
+/*  |__-' |__.   |       | |     | | \  |    `--.
+/*  |  \  |      |    _  | |     | |  \ |       |
+/*  /   \ /----/  `.___| /  `.__.' |   \|  \___.'
+*/
+
+function getRegionsExportString() {
+  if (noCellsOnBoard(c => c.region !== undefined)) return undefined;
+  return b64ListCompress(sudokuCells.map(cellToB64Region), fromB64("-0")).join("");
+}
+
+function parseRegions() {
+  var rgn = getQueryVariable('rgn');
+  if (rgn === undefined) return;
+  var rgnList = b64ListDecompress(listifyB64SingleCelledWithRepeats(rgn, "-"), fromB64("-0"), -1).map(b64ToRegionValue);
+  sudokuCells.map((c, i) => { c.region = rgnList[i]; });
+  refreshRegionLabels();
+}
+
+function cellToB64Region(cell) {
+  if (cell.region === undefined) return toB64(0);
+  return toB64(cell.region+1);
+}
+
+function b64ToRegionValue(b64) {
+  var val = fromB64(b64);
+  if (val===0) return undefined;
+  return val-1;
+}
+
+/* deprecated for export, still used for undo for now */
+function exportRegion(cell) {
+  if (cell.region === undefined) return '';
+  return 'r'+cell.region;
+}
+/* end deprecated */
 
 
 
