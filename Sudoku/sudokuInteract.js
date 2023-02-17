@@ -827,8 +827,16 @@ function getDescription() {
   return $("#description").html();
 }
 
+function encodeURIComponentPlus(s) {
+  return encodeURIComponent(s).replaceAll("+", "%2B").replaceAll("%20", "+");
+}
+
+function decodeURIComponentPlus(s) {
+  return decodeURIComponent(s.replaceAll("+", "%20"));
+}
+
 function getDescriptionExportString() {
-  return encodeURIComponent(getDescription());
+  return encodeURIComponentPlus(getDescription());
 }
 
 function parseDescription() {
@@ -1082,7 +1090,7 @@ function getQueryVariable(variable, decode=true) {
   for (var i=0;i<vars.length;i++) {
     var pair = vars[i].split("=");
     if(pair[0] == variable) {
-      if (decode) return decodeURIComponent(pair[1]);
+      if (decode) return decodeURIComponentPlus(pair[1]);
       return pair[1];
     }
   }
