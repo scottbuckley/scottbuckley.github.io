@@ -703,7 +703,6 @@ function showVs() {
     $(`v${i}`).show();
 }
 
-// const statefulRegexp = /^!?[0-9]*(c[A-I])?(,!?[0-9]*(c[A-I])?)+$/
 const regularRegexp  = /^[0-9]+$/;
 const b64Regexp = /^[0-9A-Za-z\-\_]+$/;
 function importSudokuData(data) {
@@ -1112,6 +1111,9 @@ function getQueryVariable(variable, decode=true) {
 function makeExportLink() {
   var URLentries = [];
 
+  // var meow = get81ExportString();
+  // if (meow) URLentries.push(`meow=${meow}`);
+
   var data = getB64StatefulExportString();
   if (data) URLentries.push(`data=${data}`);
 
@@ -1229,7 +1231,7 @@ function b64ToStatefulString(b64) {
   }
   var val = fromB64(b64);
   if (val < 768) return "0"; // this should never happen
-  var bitsString = (val-768).toString(2);
+  var bitsString = (val-768).toString(2).padStart(9);
   var out = "";
   for (var v=0; v<9; v++) {
     if (bitsString[8-v]==="1")
@@ -1453,6 +1455,30 @@ function exportRegion(cell) {
 
 
 
+const b81Chars="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_!#$%()*+;=?@^{|}~";
+function toB81(x, pad=0) {
+  if (x<81) return b81Chars[x];
+  return toB81(Math.floor(x/81)) + toB81(x % 81);
+}
+
+function fromB81(x) {
+  return x
+    .split("")
+    .reduce((s,v)=>s*81+b81Chars.indexOf(v),0)
+}
+
+function cellToB81Pos(cell) {
+  return toB81(cell.ind)
+}
+
+function get81ExportString() {
+  return sudokuCells
+    .filter(c => c.swatch === 1)
+    .map(cellToB81Pos)
+    .join("");
+}
+
+
 // if a test file is loaded, parse all sudokus in it and attempt to complete them.
 function testFileLoaded() {
   var total      = 0;
@@ -1499,6 +1525,7 @@ function makeSq() {
 
   refreshOverlay();
 }
+
 
 /*
     ########  ########  ######   ####  #######  ##    ##  ######

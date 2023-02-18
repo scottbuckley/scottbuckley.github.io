@@ -4045,6 +4045,7 @@ function nonConsPairCells() {
           cell.push(true);
         }
         // record its position on the board
+        cell['ind'] = r*9 + c;
         cell['row'] = r;
         cell['col'] = c;
         cell['box'] = b;
