@@ -520,7 +520,7 @@ function setEdgeBehaviour(td, edgeind, ind) {
     var input = maybeIntify(input);
     sudokuEdges[edgeind][ind] = input;
     sandwichStaticFinished = false;
-    refreshTable();
+    refresh();
   });
   // why the fuck is this backwards lol
   // edit a year later: still don't know.
