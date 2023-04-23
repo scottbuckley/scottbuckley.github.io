@@ -98,9 +98,9 @@ $(document).ready(function(){
   const NUM_COLORS = 18;
 
   // input state
-  var inputState = SETNOTHING;
+  // var inputState = SETNOTHING;
   var dragState  = undefined; // undefined = nothing. -1 = clear. 0-(NUM_COLORS-1) = set swatch. -2 = select
-  var inputNum   = undefined;
+  // var inputNum   = undefined;
 
   var ls = window.localStorage;
 
@@ -143,7 +143,8 @@ $(document).ready(function(){
 
     if (edge) initEdges(edge);
 
-    parseSwatches();
+    // parseSwatches();
+    parseMeow();
 
     parseRegions();
 
@@ -548,8 +549,16 @@ function controlClicked(ind, state) {
     return;
   }
 
+  var deselectPrevious = true;
+  if (inputState === SETCOLOR) {
+    // we were previously on "color".
+    if (state === SETLINE) {
+      deselectPrevious = false;
+    }
+  }
+
   // deselect previous control
-  if (prevSelectedControl) prevSelectedControl.removeClass("selected");
+  if (prevSelectedControl && deselectPrevious) prevSelectedControl.removeClass("selected");
 
   // pressing the selected button again turns the controls off
   if (inputState===state && inputNum===ind) {
@@ -839,7 +848,7 @@ function getDescriptionExportString() {
 }
 
 function parseDescription() {
-  var descriptionHTML = getQueryVariable('desc');
+  var descriptionHTML = getQueryVariable('desc', true, true);
   setDescription(descriptionHTML);
 }
 
@@ -1083,14 +1092,16 @@ function flashButton(btn) {
   }, flashDelay);
 }
 
-function getQueryVariable(variable, decode=true) {
-  var query = window.location.search.substring(1);
+function getQueryVariable(variable, decode=true, decodePlus=false) {
+  var query = window.location.search.substring(1) + window.location.hash;
   var vars = query.split("&");
   for (var i=0;i<vars.length;i++) {
     var pair = vars[i].split("=");
+    var rest = pair.slice(1).join("=");
     if(pair[0] == variable) {
-      if (decode) return decodeURIComponentPlus(pair[1]);
-      return pair[1];
+      if (decodePlus) return decodeURIComponentPlus(rest);
+      if (decode) return decodeURIComponent(rest);
+      return rest;
     }
   }
   return undefined;
@@ -1111,14 +1122,14 @@ function getQueryVariable(variable, decode=true) {
 function makeExportLink() {
   var URLentries = [];
 
-  // var meow = get81ExportString();
-  // if (meow) URLentries.push(`meow=${meow}`);
+  var meow = get81ExportString();
+  if (meow) URLentries.push(`meow=${meow}`);
 
   var data = getB64StatefulExportString();
   if (data) URLentries.push(`data=${data}`);
 
-  var colors = getSwatchesExportString();
-  if (colors) URLentries.push(`clr=${colors}`);
+  // var colors = getSwatchesExportString();
+  // if (colors) URLentries.push(`clr=${colors}`);
 
   var regions = getRegionsExportString();
   if (regions) URLentries.push(`rgn=${regions}`)
@@ -1338,6 +1349,7 @@ function getStatefulExportString() {
 /*  \___.'  |,'  \,'  ,'      \     /     `.__, /   /  /----/ \___.'
 */
 
+
 function getSwatchesExportString() {
   if (noCellsOnBoard(c => c.swatch !== undefined)) return undefined;
   return b64ListCompress(sudokuCells.map(cellToB64Swatch), fromB64("-0")).join("");
@@ -1454,8 +1466,8 @@ function exportRegion(cell) {
 /* end deprecated */
 
 
-
-const b81Chars="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_!#$%()*+;=?@^{|}~";
+const b81Chars="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_+*^!.;$@~(){}[]<>";
+const spareChars = "#%&',/:=?`|\\\"";
 function toB81(x, pad=0) {
   if (x<81) return b81Chars[x];
   return toB81(Math.floor(x/81)) + toB81(x % 81);
@@ -1476,6 +1488,29 @@ function get81ExportString() {
     .filter(c => c.swatch === 1)
     .map(cellToB81Pos)
     .join("");
+}
+
+//   _______ .____    _____  _______ _ __    _   ___
+//  '   /    /       (      '   /    | |\   |  .'   \
+//      |    |__.     `--.      |    | | \  |  |
+//      |    |           |      |    | |  \ |  |    _
+//      /    /----/ \___.'      /    / |   \|   `.___|
+
+
+function parseMeow() {
+  var meow = getQueryVariable('meow');
+  if (meow === undefined) return;
+  console.log(meow);
+  var meowCells = meow.split("").map(getB81Cell);
+  console.log(meowCells);
+  meowCells.map(c => {
+    c.swatch = 1;
+  });
+  console.log(meowCells);
+}
+
+function getB81Cell(b81) {
+  return sudokuCells[fromB81(b81)];
 }
 
 
@@ -2207,11 +2242,15 @@ function clearEmptyThermos() {
 */
 
 function addLine() {
+  var newLineColor = undefined;
+  if (inputState === SETCOLOR) {
+    newLineColor = inputNum;
+  }
   controlClicked.call($("#lineButton"), 0, SETLINE);
   if (inputState===SETLINE)
     // start a line
-    sudokuLines.push({cells: [], color: undefined});
-  else
+    sudokuLines.push({cells: [], color: newLineColor});
+  else 
     // finish a line
     finishLine();
 }
