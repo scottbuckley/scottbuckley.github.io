@@ -123,10 +123,8 @@ function checkSelectMultiple(e) {
 }
 
 function canvasMouseUp(e) {
-  console.log("meow");
-  $("#accordion").append("<div>"+e.changedTouches.lengh+"</div>");
-  $("#accordion").append("<div>"+JSON.stringify(e.touches)+"</div>");
-  console.log(e);
+  // console.log(e.touches.length);
+  if (e.touches && e.touches.length > 0) return;
   if (e.which !== 1 && e.type !== "touchend") return;
   dragAction = DRAG_NOTHING;
 }
