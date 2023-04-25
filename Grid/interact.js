@@ -6,7 +6,7 @@ const gridHeight = 10;
 
 const cells = [];
 const cellsCR = []
-var cands = ["O", "M", "G", "W", "T", "F", 7, 8, 9];
+var cands = [1, 2, 3, "W", "T", "F", 7, 8];
 var regions3x3 = true;
 
 // little configs
@@ -38,6 +38,7 @@ function setupCells() {
 }
 
 function onReady() {
+  createCandidteTool();
   setupCells();
   setupCanvas();
   onResize();
@@ -54,14 +55,26 @@ function setupCanvas() {
 
   $(cnv).off("touchstart").on("touchstart", canvasMouseDown);
   $(cnv).off("touchmove").on("touchmove", canvasMouseMove);
+  $(cnv).off("touchend").on("touchend", canvasMouseUp);
 }
 
 function onResize() {
+  resizeCanvasContainer();
   resizeCanvas();
   drawEverything();
 }
 
+function isMobilePortrait() {
+  return $("div#toplevel").css("flex-direction") === "column-reverse";
+}
 
+function resizeCanvasContainer() {
+  if (isMobilePortrait()) {
+    // resize grid container to appropriate aspect
+    var grid = $("div#grid");
+    grid.css("flex-basis", grid.width()*gridHeight/gridWidth+"px");
+  }
+}
 
 // CLICK DRAG ETS ON CANVAS
 var dragAction = 0;
@@ -69,12 +82,18 @@ const DRAG_NOTHING = 0;
 const DRAG_SELECT = 1;
 const DRAG_DESELECT = 2;
 function canvasMouseDown(e) {
-  if (e.type === "touchstart") {
-    e.preventDefault(); // prevent mousedown from also being called
-  } else if (e.which !== 1) return;
+  if (e.which !== 1 && e.type !== "touchstart") return;
   for (cell of getClickedCells(getClickedCoords(getCursorPositions(e)))) {
-    if (cell===undefined) return;
-    if (checkSelectMultiple(e)) {
+    if (cell===undefined) {
+      clearSelectedCells(true);
+      return;
+    }
+    e.preventDefault(); // prevent mousedown from also being called
+    if (dragAction === DRAG_DESELECT) {
+      cell.selected = false;
+    } else if (dragAction === DRAG_SELECT) {
+      cell.selected = true;
+    } else if (checkSelectMultiple(e)) {
       // multi-selection mode
       if (cell.selected) {
         cell.selected = false;
@@ -83,15 +102,14 @@ function canvasMouseDown(e) {
         cell.selected = true;
         dragAction = DRAG_SELECT;
       }
-      needsRedraw = true;
     } else {
       // single selection mode
       clearSelectedCells(false);
       cell.selected = true;
       dragAction = DRAG_SELECT;
-      needsRedraw = true;
     }
   }
+  needsRedraw = true;
 }
 
 function clearSelectedCells(redraw = true) {
@@ -105,20 +123,16 @@ function checkSelectMultiple(e) {
 }
 
 function canvasMouseUp(e) {
-  if (e.which !== 1) return;
+  if (e.which !== 1 && e.type !== "touchend") return;
   dragAction = DRAG_NOTHING;
 }
 
 function canvasMouseMove(e) {
-  if (e.type === "touchmove") {
-    e.preventDefault(); // prevent mousedown from also being called
-  } else if (e.which !== 1) return;
-  console.log('move');
-  console.log(e);
-  console.log(e.changedTouches);
+  if (e.which !== 1 && e.type !== "touchmove") return;
   for ([x, y, xr, yr] of getClickedCoords(getCursorPositions(e))) {
-    console.log("meow");
-    console.log(x, y);
+    // if (e.type === "touchmove")
+      // e.preventDefault(); // prevent mousedown from also being called
+
     // ignore this action if we are right in the corner of a cell.
     var a = Math.abs(xr+yr-1);
     var b = Math.abs(xr-yr);
@@ -183,5 +197,28 @@ function onKeyDown(e) {
 function onKeyUp(e) {
   if (e.which === 16) { // SHIFT
     $("#opt_select_multiple").prop("checked", false);
+  }
+}
+
+
+// candidate tool
+function createCandidteTool() {
+  var cont = $("#cand_tool");
+  cont.empty();
+  var numRows = Math.round(Math.sqrt(cands.length));
+  var numCols = Math.ceil(cands.length/numRows);
+  var itemWidth = cont.innerWidth()/numCols;
+
+  cont
+    .css("font-size", itemWidth*0.4)
+    .css("line-height", (itemWidth*0.9)+"px")
+
+  for (cand of cands) {
+    var candElement = $("<div>");
+    candElement
+      .text(cand)
+      .addClass("cand_tool_cand")
+      .width(itemWidth-2);
+    cont.append(candElement);
   }
 }

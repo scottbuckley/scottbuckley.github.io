@@ -17,6 +17,7 @@ function resizeCanvas() {
   var [displayWidth, displayHeight, startX, startY, cellSize]
     = getGridDimensions(gridWidth+1, gridHeight+1,
                         window.devicePixelRatio * cnv.clientWidth, window.devicePixelRatio * cnv.clientHeight);
+  Cell.size = cellSize;
   Cell.gridWidth = gridWidth;
   Cell.gridHeight = gridHeight;
   Cell.displayWidth = displayWidth;
@@ -25,7 +26,6 @@ function resizeCanvas() {
   Cell.displayStartY = startY+cellSize/2;
   Cell.displayEndX = Cell.displayStartX + Cell.displayWidth - Cell.size;
   Cell.displayEndY = Cell.displayStartY + Cell.displayHeight - Cell.size;
-  Cell.size = cellSize;
 }
 
 function drawEverything() {

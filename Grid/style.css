@@ -9,6 +9,7 @@ div#toplevel {
 div#accordion {
     /* border: 1px solid blue; */
     width: 25%;
+    padding: 2ex;
 }
 
 div#grid {
@@ -21,4 +22,38 @@ canvas#canv {
     border: 1px solid black;
     width: 100%;
     height: 100%;
+}
+
+/* mobile stuff */
+@media only screen and (max-device-width : 640px) and (orientation : portrait) {    
+    div#toplevel {
+        flex-direction: column-reverse;
+    }
+    div#grid {
+        flex-grow: 0;
+    }
+    div#accordion {
+        flex-grow: 1;
+    }
+}
+
+div#cand_tool {
+    border:1px solid #BBB;
+    height: 15vw;
+    width: 15vw;
+    display:flex;
+    flex-flow: row wrap;
+    justify-content: center;
+}
+
+div.cand_tool_cand {
+    border: 0.2ex solid #999;
+    border-width: 10%;
+    margin: 1px;
+    text-align: center;
+    border-radius: 40%;
+}
+
+div.cand_tool_cand:hover {
+    background-color: #EEE;
 }
