@@ -15,10 +15,8 @@ function resizeCanvas() {
   cnv.height = window.devicePixelRatio * cnv.clientHeight;
 
   var [displayWidth, displayHeight, startX, startY, cellSize]
-      = getGridDimensions(
-          gridWidth+1, gridHeight+1,
-          window.devicePixelRatio * cnv.clientWidth, window.devicePixelRatio * cnv.clientHeight
-        );
+    = getGridDimensions(gridWidth+1, gridHeight+1,
+                        window.devicePixelRatio * cnv.clientWidth, window.devicePixelRatio * cnv.clientHeight);
   Cell.size = cellSize;
   Cell.gridWidth = gridWidth;
   Cell.gridHeight = gridHeight;
@@ -169,19 +167,19 @@ function drawCellCandidates(cell) {
 
   var candLocs = distributeCandidates(numCands);
   for (var i=0; i<numCands; i++) {
-    var candLabel = Cell.cands[i];
+    var cand = Cell.cands[i];
     var [px, py] = candLocs[i];
-    if (cell.canBe(i)) {
+    if (cell.canBe(cand)) {
       if (cell.candIsHighlit(i)) {
         // this candidate is highlit
         ctx.font = boldFont;
         ctx.fillStyle = "#000E";
-        ctx.fillText(candLabel, ...cell.displayPointXY(px, py+yOffset));
+        ctx.fillText(cand, ...cell.displayPointXY(px, py+yOffset));
       } else {
         // remaining candidate
         ctx.font = font;
         ctx.fillStyle = "#0008";
-        ctx.fillText(candLabel, ...cell.displayPointXY(px, py+yOffset));
+        ctx.fillText(cand, ...cell.displayPointXY(px, py+yOffset));
       }
     } else {
       // disqualified candidate

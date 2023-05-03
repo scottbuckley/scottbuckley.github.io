@@ -89,18 +89,3 @@ const distributeCandidates = memoise(1, function(count, padding=0.15) {
   }
   return out;
 });
-
-
-// type "checks"
-const performTypeChecks = true;
-function ensureInt(v) {
-  if (!performTypeChecks) return;
-  if (Number.isInteger(v)) return;
-  throw new Error("Input should be numeric. Are you passing a candidate character instead of its index?");
-}
-
-function ensureNumber(v) {
-  if (!performTypeChecks) return;
-  if (Number.isFinite(v)) return;
-  throw new Error("Input should be numeric. Are you passing a candidate character instead of its index?");
-}

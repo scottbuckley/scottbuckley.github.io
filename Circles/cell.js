@@ -21,19 +21,18 @@ class Cell {
 
   #row;
   #col;
-  #solved;
+  
 
   #cands = [];
 
   constructor(r, c) {
     this.#row = r;
     this.#col = c;
-    this.#solved = false;
 
     this.selected = false;
 
     this.#cands = [];
-    for (var c=0; c<Cell.cands.length; c++) {
+    for (c of Cell.cands) {
       this.#cands[c] = true;
     }
   }
@@ -50,37 +49,8 @@ class Cell {
     return this.col + (this.row0 * Cell.gridWidth);
   }
 
-  // check candidates
-
   canBe(c) {
-    ensureInt(c);
     return !!this.#cands[c];
-  }
-
-  canBeOrSolved(c) {
-    ensureInt(c);
-    if (this.#solved) return true;
-    return this.canBe(c);
-  }
-
-  candIsHighlit(ind) {
-    ensureInt(ind);
-    return false;
-  }
-
-  // modify candidates
-
-  setCand(c, b) {
-    ensureInt(c);
-    this.#cands[c] = b;
-  }
-
-  eliminateCand(c) {
-    this.setCand(c, false);
-  }
-
-  allowCand(c) {
-    this.setCand(c, true);
   }
 
   // display stuff
@@ -95,8 +65,11 @@ class Cell {
     return [Cell.displayStartX + this.col0*Cell.size + Cell.size*(x/max),
             Cell.displayStartY + this.row0*Cell.size + Cell.size*(y/max)];
   }
-  
   get displayCenterXY() { return this.displayPointXY(0.5, 0.5); }
+
+  candIsHighlit(ind) {
+    return false;
+  }
 
   get cellAbove() {
     return this.cellRelative(0, -1);
@@ -125,15 +98,4 @@ class Cell {
     return Cell.nothingCell;
   }
 
-}
-
-
-
-
-
-// external cell utility functions
-function cellsAllHoldProperty(cs, P) {
-  for (cell of cs)
-    if (!P(cell)) return false;
-  return true;
 }

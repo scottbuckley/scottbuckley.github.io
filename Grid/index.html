@@ -14,10 +14,24 @@
 <div id="toplevel">
     <div id="accordion">
         <div id="cand_tool"></div>
-        <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="" id="opt_select_multiple">
-            <label class="form-check-label" for="opt_select_multiple">Select Multiple</label>
-          </div>
+        <form id="opt_form">
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="opt_cand_tool_function" id="opt_cand_tool_toggle" value="toggle" checked>
+                <label class="form-check-label" for="opt_cand_tool_toggle">
+                    Toggle
+                </label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="opt_cand_tool_function" id="opt_cand_tool_highlight" value="highlight">
+                <label class="form-check-label" for="opt_cand_tool_highlight">
+                    Highlight
+                </label>
+            </div>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" value="" id="opt_select_multiple">
+                <label class="form-check-label" for="opt_select_multiple">Select Multiple</label>
+            </div>
+        </form>
     </div>
     <div id="grid">
         <canvas id="canv"></canvas>
