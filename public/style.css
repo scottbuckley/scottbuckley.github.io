@@ -1,0 +1,13 @@
+/* custom selector to treat differently an image whos alt starts with "profile picture" */
+.markdown-body img[alt ^= "profile picture" i] {
+  width: 200px;
+  margin-right: 1em;
+  border-radius: 2em;
+  border: 0.6ex solid var(--color-canvas-subtle);
+  float: left;
+}
+
+div#content.markdown-body {
+  width: 800px;
+  margin: 2em auto;
+}
