@@ -10,7 +10,7 @@ Currently I live and work in Sydney, Australia, at [Trustworthy Systems](https:/
 I like writing programs, writing proofs, solving puzzles, tasting fermented things, woodworking, traveling, 3D printing, and lots of other things.
 
 ## Relevant links
-You might be looking for my [email address](mailto:scott@buck.ly), or my [CV](/public/cv_norefs.pdf), or my [LinkedIn](https://www.linkedin.com/in/scott-buckley-6b3a7a212/), or my [publications](https://scholar.google.com/citations?user=qXSb3woAAAAJ), or my [Github](https://github.com/scottbuckley), or my [Sudoku solver](/Sudoku/), or my [Mastodon profile](https://aus.social/@DrWraith), or my [3D printing designs](https://www.thingiverse.com/mrwraith2).
+You might be looking for my [email address](mailto:scott@buck.ly), or my [CV](/public/cv_norefs.pdf), or my [LinkedIn](https://www.linkedin.com/in/scott-buckley-6b3a7a212/), or my [publications](https://scholar.google.com/citations?user=qXSb3woAAAAJ), or my [Github](https://github.com/scottbuckley), or my [Sudoku solver](/Sudoku/), or my [Mastodon profile](https://aus.social/@DrWraith), or my [3D printing designs](https://www.thingiverse.com/mrwraith2), or even my (very few) [YouTube videos](https://www.youtube.com/@drwraith8850).
 
 ## Other stuff hosted here
 This is just the landing page for my Github Pages [repo](https://github.com/scottbuckley/scottbuckley.github.io), which contains the following sub-repos:
