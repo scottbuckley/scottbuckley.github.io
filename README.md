@@ -1,6 +1,6 @@
 <!-- ![Profile picture of a very handsome computer scientist](/public/profile_pic_mongoose.jpg) -->
 
-![Profile picture of a very handsome computer scientist](/public/profile_pic_mongoose.jpg)
+![Profile picture of a very handsome computer scientist](/public/profile_pic_mongoose_500.jpg)
 ## Scott Buckley
 
 I am, among other things, a computer scientist.
