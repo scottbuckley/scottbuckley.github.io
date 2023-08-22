@@ -1,0 +1,74 @@
+<html>
+  <head>
+    <script src="jquery-3.4.1.min.js"></script>
+    <title>Big Link</title>
+    <style type="text/css">
+      #status {
+        text-align: center;
+        vertical-align:middle;
+        font-family: 'Verdana', sans-serif;
+        font-size: larger;
+        margin-top: 5em;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="status">Loading URL...</div>
+  </body>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.2.0/firebase-app.js"
+    import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.2.0/firebase-database.js"
+
+    // CONFIG
+    const app = initializeApp({
+      apiKey: "AIzaSyAEzmR9ZvWyDSYQhFgWflXByfLPl6TJNMA",
+      authDomain: "big-link-90293.firebaseapp.com",
+      databaseURL: "https://big-link-90293-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "big-link-90293",
+      storageBucket: "big-link-90293.appspot.com",
+      messagingSenderId: "994558879671",
+      appId: "1:994558879671:web:46c6b50fd94735912fea32"
+    });
+
+    // INIT
+    $(function() {
+      readURL(url => {
+        setLink(url, true);
+      });
+    });
+
+    function setLink(url, autoredirect=false) {
+      $("#status").html(`<a href="${url}">${url}</a>`);
+      if (autoredirect)
+        setTimeout((() => goToURL(url)), 1000);
+    }
+
+    function goToURL(url) {
+      window.location.href = url;
+    }
+
+    function reportError(errorText) {
+      $("#status").text(errorText);
+      console.error(errorText);
+    }
+
+    // OTHER STUFF
+
+    function readURL(fn = console.log) {
+      const dbref = ref(getDatabase(), 'biglink/URL');
+      get(dbref).then(snapshot => {
+        if (snapshot.exists()) fn(snapshot.val())
+        else reportError("Something went wrong :(");
+      }).catch(reportError);
+    }
+
+    // function writeURL(URL) {
+    //   const dbref = ref(getDatabase(), 'biglink/URL');
+    //   return set(dbref, URL);
+    // }
+
+    // make this function available to events
+    window.readURL = readURL;
+
+  </script>
+</html>
