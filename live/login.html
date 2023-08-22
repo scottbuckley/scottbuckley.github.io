@@ -17,7 +17,7 @@
   </body>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.2.0/firebase-app.js"
-    import { getAuth, signInWithRedirect, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.2.0/firebase-auth.js"
+    import { getAuth, signInWithRedirect, GoogleAuthProvider, getRedirectResult } from "https://www.gstatic.com/firebasejs/10.2.0/firebase-auth.js"
 
     // CONFIG
     const app = initializeApp({
@@ -30,13 +30,41 @@
       appId: "1:994558879671:web:46c6b50fd94735912fea32"
     });
 
+    const auth = getAuth();
+    var signin = true;
     // INIT
     $(function() {
-      signIn();
+      setTimeout(() => { if (signin) signIn(); }, 5000);
     });
 
+    function checkSignedIn() {
+      getRedirectResult(auth)
+        .then((result) => {
+          signin = false;
+          // This gives you a Google Access Token. You can use it to access Google APIs.
+          const credential = GoogleAuthProvider.credentialFromResult(result);
+          const token = credential.accessToken;
+
+          // The signed-in user info.
+          const user = result.user;
+          console.log(user);
+          // IdP data available using getAdditionalUserInfo(result)
+          // ...
+        }).catch((error) => {
+          // Handle Errors here.
+          const errorCode = error.code;
+          const errorMessage = error.message;
+          // The email of the user's account used.
+          const email = error.customData.email;
+          // The AuthCredential type that was used.
+          const credential = GoogleAuthProvider.credentialFromError(error);
+          // ...
+          console.log(error);
+        });
+
+    }
+    
     function signIn() {
-      const auth = getAuth();
       const provider = new GoogleAuthProvider();
       signInWithRedirect(auth, provider);
     }
