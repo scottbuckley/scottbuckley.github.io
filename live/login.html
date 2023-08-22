@@ -17,7 +17,7 @@
   </body>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.2.0/firebase-app.js"
-    import { getAuth, signInWithRedirect, FacebookAuthProvider } from "https://www.gstatic.com/firebasejs/10.2.0/firebase-auth.js"
+    import { getAuth, signInWithRedirect, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.2.0/firebase-auth.js"
 
     // CONFIG
     const app = initializeApp({
@@ -37,7 +37,7 @@
 
     function signIn() {
       const auth = getAuth();
-      const provider = new FacebookAuthProvider();
+      const provider = new GoogleAuthProvider();
       signInWithRedirect(auth, provider);
     }
     window.signIn = signIn
