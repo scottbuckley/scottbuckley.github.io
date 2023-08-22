@@ -34,7 +34,8 @@
     var signin = true;
     // INIT
     $(function() {
-      setTimeout(() => { if (signin) signIn(); }, 5000);
+      checkSignedIn();
+      // setTimeout(() => { if (signin) signIn(); }, 5000);
     });
 
     function checkSignedIn() {
@@ -61,8 +62,8 @@
           // ...
           console.log(error);
         });
-
     }
+    window.csi = checkSignedIn;
     
     function signIn() {
       const provider = new GoogleAuthProvider();
