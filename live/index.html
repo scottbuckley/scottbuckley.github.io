@@ -33,14 +33,14 @@
     // INIT
     $(function() {
       readURL(url => {
-        setLink(url, true);
+        setLink(url, false);
       });
     });
 
     function setLink(url, autoredirect=false) {
       $("#status").html(`<a href="${url}">${url}</a>`);
       if (autoredirect)
-        setTimeout((() => goToURL(url)), 1000);
+        setTimeout((() => goToURL(url)), 500);
     }
 
     function goToURL(url) {
