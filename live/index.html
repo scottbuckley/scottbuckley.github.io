@@ -39,6 +39,8 @@
       });
     });
 
+    const auth = getAuth();
+
     function fetchAuthState() {
       onAuthStateChanged(auth, (user) => {
         if (user) {
@@ -68,7 +70,6 @@
     // OTHER STUFF
 
     function readURL(fn = console.log) {
-      const auth = getAuth();
       const dbref = ref(getDatabase(), 'biglink/URL');
       get(dbref).then(snapshot => {
         if (snapshot.exists()) fn(snapshot.val())
