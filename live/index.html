@@ -17,7 +17,7 @@
   </body>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.2.0/firebase-app.js"
-    import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.2.0/firebase-database.js"
+    import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.2.0/firebase-database.js"
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.2.0/firebase-auth.js"
 
     // CONFIG
@@ -51,10 +51,6 @@
       if (autoredirect) setTimeout((() => goToURL(url)), 500);
     }
 
-    function writeURL() {
-      console.log("writing URL now");
-    }
-
     function goToURL(url) {
       window.location.href = url;
     }
@@ -74,10 +70,17 @@
       }).catch(reportError);
     }
 
-    // function writeURL(URL) {
-    //   const dbref = ref(getDatabase(), 'biglink/URL');
-    //   return set(dbref, URL);
-    // }
+    function writeURL() {
+      const newURL = prompt("New URL");
+      if (newURL) {
+        const dbref = ref(getDatabase(), 'biglink/URL');
+        set(dbref, newURL)
+          .then(console.log)
+          .catch(console.error);
+      } else {
+        console.log("URL write cancelled.");
+      }
+    }
 
     // make this function available to events
     window.readURL = readURL;
