@@ -33,29 +33,28 @@
 
     // INIT
     $(function() {
-      fetchAuthState();
       readURL(url => {
-        setLink(url, false);
+        getURL(url, false);
       });
+      $("body").on("dblclick",() => runIfAuthed(writeURL()))
     });
 
     const auth = getAuth();
 
-    function fetchAuthState() {
+    function runIfAuthed(fnA, fnB=(()=>undefined)) {
       onAuthStateChanged(auth, (user) => {
-        if (user) {
-          const uid = user.uid;
-          console.log ("signed in! ", uid);
-        } else {
-          console.log("not signed in");
-        }
+        if (user) fnA(user.uid);
+        else      fnB();
       });
     }
 
-    function setLink(url, autoredirect=false) {
+    function getURL(url, autoredirect=false) {
       $("#status").html(`<a href="${url}">${url}</a>`);
-      if (autoredirect)
-        setTimeout((() => goToURL(url)), 500);
+      if (autoredirect) setTimeout((() => goToURL(url)), 500);
+    }
+
+    function writeURL() {
+      console.log("writing URL now");
     }
 
     function goToURL(url) {
