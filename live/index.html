@@ -1,7 +1,7 @@
 <html>
   <head>
     <script src="jquery-3.4.1.min.js"></script>
-    <title>Big Link</title>
+    <title>Live URL</title>
     <style type="text/css">
       #status {
         text-align: center;
@@ -16,36 +16,30 @@
     <div id="status">Loading URL...</div>
   </body>
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.2.0/firebase-app.js"
-    import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.2.0/firebase-database.js"
+    // FIREBASE
+    import { initializeApp }               from "https://www.gstatic.com/firebasejs/10.2.0/firebase-app.js"
+    import { getDatabase, ref, get, set }  from "https://www.gstatic.com/firebasejs/10.2.0/firebase-database.js"
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.2.0/firebase-auth.js"
 
-    // CONFIG
+    // FIREBASE INIT
     const app = initializeApp({
       apiKey: "AIzaSyAEzmR9ZvWyDSYQhFgWflXByfLPl6TJNMA",
       authDomain: "big-link-90293.firebaseapp.com",
-      databaseURL: "https://big-link-90293-default-rtdb.asia-southeast1.firebasedatabase.app",
       projectId: "big-link-90293",
       storageBucket: "big-link-90293.appspot.com",
       messagingSenderId: "994558879671",
-      appId: "1:994558879671:web:46c6b50fd94735912fea32"
+      appId: "1:994558879671:web:46c6b50fd94735912fea32",
+      databaseURL: "https://big-link-90293-default-rtdb.asia-southeast1.firebasedatabase.app"
     });
+    const auth = getAuth();
 
-    // INIT
+    // PAGE INIT
     $(function() {
       readURL(url => showURL(url, false));
       $("body").on("dblclick",() => runIfAuthed(writeURL))
     });
 
-    const auth = getAuth();
-
-    function runIfAuthed(fnA, fnB=(()=>undefined)) {
-      onAuthStateChanged(auth, (user) => {
-        if (user) fnA(user.uid);
-        else      fnB();
-      });
-    }
-
+    // INTERFACE
     function showURL(url, autoredirect=false) {
       $("#status").html(`<a href="${url}">${url}</a>`);
       if (autoredirect) setTimeout((() => goToURL(url)), 500);
@@ -60,8 +54,7 @@
       console.error(errorText);
     }
 
-    // OTHER STUFF
-
+    // DATABASE
     function readURL(fn = console.log) {
       const dbref = ref(getDatabase(), 'biglink/URL');
       get(dbref).then(snapshot => {
@@ -75,15 +68,19 @@
       if (newURL) {
         const dbref = ref(getDatabase(), 'biglink/URL');
         set(dbref, newURL)
-          .then(console.log)
-          .catch(console.error);
+          .then(() => showURL(newURL))
+          .catch(reportError);
       } else {
         console.log("URL write cancelled.");
       }
     }
 
-    // make this function available to events
-    window.readURL = readURL;
-
+    // AUTH
+    function runIfAuthed(fnA, fnB=(()=>undefined)) {
+      onAuthStateChanged(auth, (user) => {
+        if (user) fnA(user.uid);
+        else      fnB();
+      });
+    }
   </script>
 </html>
