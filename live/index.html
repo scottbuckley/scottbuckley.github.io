@@ -18,7 +18,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.2.0/firebase-app.js"
     import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.2.0/firebase-database.js"
-    import { getAuth } from "https://www.gstatic.com/firebasejs/10.2.0/firebase-auth.js"
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.2.0/firebase-auth.js"
 
     // CONFIG
     const app = initializeApp({
@@ -33,10 +33,22 @@
 
     // INIT
     $(function() {
+      fetchAuthState();
       readURL(url => {
         setLink(url, false);
       });
     });
+
+    function setAuthState() {
+      onAuthStateChanged(auth, (user) => {
+        if (user) {
+          const uid = user.uid;
+          console.log ("signed in! ", uid);
+        } else {
+          console.log("not signed in");
+        }
+      });
+    }
 
     function setLink(url, autoredirect=false) {
       $("#status").html(`<a href="${url}">${url}</a>`);
