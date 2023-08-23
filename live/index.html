@@ -33,10 +33,8 @@
 
     // INIT
     $(function() {
-      readURL(url => {
-        getURL(url, false);
-      });
-      $("body").on("dblclick",() => runIfAuthed(writeURL()))
+      readURL(url => setURL(url, false));
+      $("body").on("dblclick",() => runIfAuthed(writeURL))
     });
 
     const auth = getAuth();
@@ -48,7 +46,7 @@
       });
     }
 
-    function getURL(url, autoredirect=false) {
+    function setURL(url, autoredirect=false) {
       $("#status").html(`<a href="${url}">${url}</a>`);
       if (autoredirect) setTimeout((() => goToURL(url)), 500);
     }
