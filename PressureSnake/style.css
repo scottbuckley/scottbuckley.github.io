@@ -1,0 +1,71 @@
+div#toplevel {
+    /* border: 1px solid red; */
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-wrap: nowrap;
+}
+
+div#accordion {
+    /* border: 1px solid blue; */
+    width: 25%;
+    padding: 2ex;
+}
+
+div#grid {
+    /* border: 1px solid green; */
+    flex-grow: 2;
+    flex-basis: 0;
+}
+
+canvas#canv {
+    border: 1px solid black;
+    width: 100%;
+    height: 100%;
+}
+
+/* mobile stuff */
+@media only screen and (max-device-width : 640px) and (orientation : portrait) {    
+    div#toplevel {
+        flex-direction: column-reverse;
+    }
+    div#grid {
+        flex-grow: 0;
+    }
+    div#accordion {
+        flex-grow: 1;
+        width: 100% !important;
+    }
+
+    div#cand_tool {
+        height: 50vw !important;
+        width: 50vw !important;
+    }
+}
+
+div#cand_tool {
+    border:1px solid #BBB;
+    height: 15vw;
+    width: 15vw;
+    display: flex;
+    flex-flow: column;
+    justify-content: space-between;
+}
+
+div.cand_tool_row {
+    display:flex;
+    flex-flow: row;
+    justify-content: center;
+}
+
+div.cand_tool_cand {
+    border: 0.2ex solid #999;
+    text-align: center;
+    border-radius: 40%;
+    /* margin: 0.1ex; */
+    margin: 0 0.1ex 0 0.1ex;
+}
+
+div.cand_tool_cand:hover {
+    background-color: #EEE;
+}
