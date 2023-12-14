@@ -1,12 +1,8 @@
 "use strict";
-// class NothingCell {
-//   constructor() {
-//     this.selected = false
-//   }
-// }
 class Cell {
     constructor(r, c) {
         this.selected = false;
+        this.env = 0 /* Env.Empty */;
         this.row = r;
         this.col = c;
     }
@@ -254,7 +250,14 @@ function resizeCanvasContainer() {
         grid.css("flex-basis", grid.width() * gridHeight / gridWidth + "px");
     }
 }
-var dragAction = "nothing";
+// CLICK DRAG ETS ON CANVAS
+var DragType;
+(function (DragType) {
+    DragType[DragType["Nothing"] = 0] = "Nothing";
+    DragType[DragType["Select"] = 1] = "Select";
+    DragType[DragType["Deselect"] = 2] = "Deselect";
+})(DragType || (DragType = {}));
+var dragAction = DragType.Nothing;
 function canvasMouseDown(e) {
     if (e.type === "mousedown" && e.button !== 0)
         return;
@@ -263,28 +266,28 @@ function canvasMouseDown(e) {
         clearSelectedCells(true);
     for (var cell of clickedCells) {
         e.preventDefault(); // prevent mousedown from also being called
-        if (dragAction === "deselect") {
+        if (dragAction === DragType.Deselect) {
             cell.selected = false;
         }
-        else if (dragAction === "select") {
+        else if (dragAction === DragType.Select) {
             cell.selected = true;
         }
         else if (checkSelectMultiple(e)) {
             // multi-selection mode
             if (cell.selected) {
                 cell.selected = false;
-                dragAction = "deselect";
+                dragAction = DragType.Deselect;
             }
             else {
                 cell.selected = true;
-                dragAction = "select";
+                dragAction = DragType.Select;
             }
         }
         else {
             // single selection mode
             clearSelectedCells(false);
             cell.selected = true;
-            dragAction = "select";
+            dragAction = DragType.Select;
         }
     }
     needsRedraw = true;
@@ -304,7 +307,7 @@ function canvasMouseUp(e) {
         return;
     if (e.button !== 0)
         return;
-    dragAction = "nothing";
+    dragAction = DragType.Nothing;
 }
 function canvasMouseMove(e) {
     if (e.type === "mousemove" && e.button != 0)
@@ -324,11 +327,11 @@ function canvasMouseMove(e) {
         var cell = getClickedCell(x, y);
         if (cell === undefined)
             return;
-        if (dragAction === "select" && cell.selected === false) {
+        if (dragAction === DragType.Select && cell.selected === false) {
             cell.selected = true;
             needsRedraw = true;
         }
-        else if (dragAction === "deselect" && cell.selected === true) {
+        else if (dragAction === DragType.Deselect && cell.selected === true) {
             cell.selected = false;
             needsRedraw = true;
         }
@@ -402,6 +405,13 @@ function getSelectedCells() {
 const isClearKey = (k) => (k === " ");
 const isSelectMultipleKey = (k) => (k === "Shift");
 const isWallKey = (k) => (k === "w" || k === "W");
+function memo2(fn) {
+    return function (...x) { return fn(...x); };
+}
+function foo(a, b) {
+    return true;
+}
+var foo2 = memo2(foo);
 function memo(fn) {
     // not yet sure which kind of cache we will use
     const constCache = new Array();

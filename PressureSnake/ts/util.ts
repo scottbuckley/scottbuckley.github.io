@@ -1,5 +1,15 @@
 type ArrayTail<T extends any[]> = T extends [T[0], ...infer TT] ? TT : never
 
+function memo2<T,U>(fn: (...a: T[]) => U):(...z: T[]) => U {
+    return function(...x:T[]):U {return fn(...x)}
+}
+
+function foo(a:string, b:number):boolean {
+    return true
+}
+
+var foo2 : (x:string, y:number)=>boolean = memo2(foo)
+
 function memo<T extends any[],U>(fn:(...a:T)=>U) {
     type restT = ArrayTail<T>
     // not yet sure which kind of cache we will use

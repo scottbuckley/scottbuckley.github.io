@@ -75,8 +75,10 @@ function resizeCanvasContainer() {
 }
 
 // CLICK DRAG ETS ON CANVAS
-type dragType = "nothing" | "select" | "deselect"
-var dragAction : dragType = "nothing";
+enum DragType {
+  Nothing, Select, Deselect
+}
+var dragAction : DragType = DragType.Nothing;
 
 function canvasMouseDown(e:JQuery.MouseDownEvent|JQuery.TouchStartEvent) {
   if (e.type==="mousedown" && e.button !== 0) return
@@ -86,24 +88,24 @@ function canvasMouseDown(e:JQuery.MouseDownEvent|JQuery.TouchStartEvent) {
 
   for (var cell of clickedCells) {
     e.preventDefault(); // prevent mousedown from also being called
-    if (dragAction === "deselect") {
+    if (dragAction === DragType.Deselect) {
       cell.selected = false;
-    } else if (dragAction === "select") {
+    } else if (dragAction === DragType.Select) {
       cell.selected = true;
     } else if (checkSelectMultiple(e)) {
       // multi-selection mode
       if (cell.selected) {
         cell.selected = false;
-        dragAction = "deselect";
+        dragAction = DragType.Deselect;
       } else {
         cell.selected = true;
-        dragAction = "select";
+        dragAction = DragType.Select;
       }
     } else {
       // single selection mode
       clearSelectedCells(false);
       cell.selected = true;
-      dragAction = "select";
+      dragAction = DragType.Select;
     }
   }
   needsRedraw = true;
@@ -122,7 +124,7 @@ function checkSelectMultiple(e:JQuery.MouseEventBase|JQuery.TouchEventBase):bool
 function canvasMouseUp(e:JQuery.MouseUpEvent|JQuery.TouchEndEvent) {
   if (e.type === "touchend" && e.touches.length > 0) return
   if (e.button !==0) return
-  dragAction = "nothing";
+  dragAction = DragType.Nothing;
 }
 
 function canvasMouseMove(e:JQuery.MouseMoveEvent|JQuery.TouchMoveEvent) {
@@ -142,10 +144,10 @@ function canvasMouseMove(e:JQuery.MouseMoveEvent|JQuery.TouchMoveEvent) {
     var cell = getClickedCell(x, y);
     if (cell === undefined) return;
     
-    if (dragAction === "select" && cell.selected === false) {
+    if (dragAction === DragType.Select && cell.selected === false) {
       cell.selected = true;
       needsRedraw = true;
-    } else if (dragAction === "deselect" && cell.selected === true) {
+    } else if (dragAction === DragType.Deselect && cell.selected === true) {
       cell.selected = false;
       needsRedraw = true;
     }

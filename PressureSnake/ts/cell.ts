@@ -1,14 +1,9 @@
-// class NothingCell {
-//   constructor() {
-//     this.selected = false
-//   }
-// }
+const enum Env {
+  Empty, Wall
+}
+
 class Cell {
-
-  selected : boolean = false
-
   static nothingCell:Cell
-
   static gridWidth:cellCount
   static gridHeight:cellCount
   static displayWidth:canvMeasure
@@ -18,9 +13,12 @@ class Cell {
   static displayEndX:canvMeasure
   static displayEndY:canvMeasure
   static size:canvMeasure
-
+  
   readonly row: cellCoord
   readonly col: cellCoord
+
+  selected : boolean = false
+  env : Env = Env.Empty;
 
   constructor(r:cellCoord, c:cellCoord) {
     this.row = r
