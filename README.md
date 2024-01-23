@@ -5,7 +5,7 @@
 
 I am, among other things, a computer scientist.
 
-Currently I live and work in Sydney, Australia, at [Trustworthy Systems](https://trustworthy.systems/).
+Currently I live and work in Brussels, Belgium, at [ULB](https://www.ulb.be/en).
 
 I like writing programs, writing proofs, solving puzzles, tasting fermented things, woodworking, traveling, 3D printing, and lots of other things.
 
