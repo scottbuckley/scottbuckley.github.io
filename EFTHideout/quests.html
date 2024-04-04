@@ -1,12 +1,14 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <meta charset="utf-8" />
   <head>
-    <title>Quests Graph</title>
+    <title>Quests</title>
     <link rel="stylesheet" type="text/css" href="font/MyFontsWebfontsKit.css">
-    <link rel="stylesheet" type="text/css" href="hideoutstyle.css">
-    <script src="d3.v6.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="quests_style.css">
+    <!-- <script src="d3.v6.min.js"></script> -->
+    <script src="extra.js"></script>
+    <script src="d3.v7.js"></script>
+    <!-- <script type="module" src="d3_custom_collide.js"></script> -->
     <!-- <script src="cola.min.js"></script> -->
   </head>
   <body>
@@ -15,19 +17,53 @@
     var width  = window.document.documentElement.clientWidth-50,
         height = window.document.documentElement.clientHeight;
 
-    var nodeRadius = 30;
-    var nodeSpacing = 90;
-    var hexScale = nodeRadius/10;
+    var defaultRadius = 15;
+    var smallRadius = 10;
     var mouseOverScale = 1.5;
+    const collisionBuffer = 5;
     var store = window.localStorage;
+    const linkLength = 60;
+
+    const innerRadius = 200;
+
+    const trader_icon_size = defaultRadius*2;
 
     var simulation = d3.forceSimulation()
-      .force("link", d3.forceLink().id((n)=>n.id))
-      .force("charge", d3.forceManyBody())
-      .force("center", d3.forceCenter().strength(0.25))
-      .force("collision", d3.forceCollide().radius(nodeRadius*1.25).strength(0.75))
-      .on("tick", tick);
-
+      .force("link", d3.forceLink().id((n)=>n.id).strength(0.5).distance((l)=>{
+        if (l.target.distance_from_goal===0) return innerRadius;
+        return linkLength;
+      }))
+      .force("charge", d3.forceManyBody().strength(-30).distanceMax(200))
+      // .force("center", d3.forceCenter().strength(0.1))
+      
+      // collision between center and secondary ancestors
+      .force("collision", d3.forceCollide().strength(1).filter((n)=>n.dist_from_goal!==1).radius((n) => {
+        if (n.dist_from_goal === 0) return innerRadius + smallRadius*3;
+        return n.radius+collisionBuffer;
+      }))
+      .force("coll2", d3.forceCollide().strength(1).filter((n)=>n.dist_from_goal===1).radius(smallRadius+collisionBuffer/2))
+      // radial force to keep main parents in a ring
+      .force("radial", d3.forceRadial(innerRadius).strength((n) => {
+        if (n.dist_from_goal === 1) return 3;
+        return 0;
+      }))
+      // .force("x", d3.forceX())
+      // .force("y", d3.forceY())
+      ;
+    const endTime = 2000;
+    const linkStartStrength = 0.6;
+    const linkFinalStrength = 0;
+    const linkStrengthDelta = linkFinalStrength - linkStartStrength;
+    var transitionTimer = d3.timer(elapsed => {
+      var dt = elapsed / endTime;
+      if (dt > 1.0) {
+        simulation.force("link").strength(linkFinalStrength);
+        transitionTimer.stop();
+      } else {
+        simulation.force("link").strength(linkStartStrength + dt*linkStrengthDelta);
+        // simulation.force("link").strength(linkStartStrength + Math.pow(dt, 3)*linkStrengthDelta);
+      }
+    });
 
     var svg = d3.select("body").append("svg")
         .attr("width", width)
@@ -36,34 +72,133 @@
     svg = d3.select("svg");
     
     // GLOBAL
-    var graph;
+    var graph = {nodes:[], links:[]};
     var gnodes = svg.selectAll(".gnode");
     var paths = svg.selectAll(".path");
     var markers;
     var deletedGraph = {nodes:[], links:[]};
 
-    function getNodeId(n) {
-      if (n.level===undefined)
-        return n.type;
-      else
-        return `${n.type}_${n.level}`;
+    function getQuest(qid) {
+      var candidate = graph.allQuests[qid];
+      if (candidate.idx === qid) return candidate;
+      for (var i=1; i<=5; i++) {
+        candidate = graph.allQuests[qid+i];
+        if (candidate.idx === qid) return candidate;
+        candidate = graph.allQuests[qid-i];
+        if (candidate.idx === qid) return candidate;
+      }
+      console.error(`Couldn't find quest id ${qid} anywhere near index ${qid}.`);
+      return undefined;
     }
+
     // helper to process JSON links (so we don't have to write stuff by index)
-    d3.json("hideout2.json").then(function (graph_) {
-      console.log("meow");
-      graph = graph_;
-      
-      // process named links
-      graph.nodes.forEach(function (n, i) {
-        n.id = getNodeId(n); // give the node an id from its type and level
-        n.height = n.width = nodeRadius*2.5;
-        n.built = (store[`built_${n.id}`]==="true");
-        n.prettyName = prettyNodeName(n);
+    d3.json("quests.json").then(function (graph_) {
+      graph.parents = [];
+      graph.children = [];
+      graph.nodes = [];
+      graph.allQuests = [];
+      graph.links = [];
+      graph.traders = new Set();
+
+      // consider all quests, build parent/children relationships, do some basic
+      // prep on the nodes.
+      graph_.forEach((n, i) => {
+        graph.allQuests[n.id] = n;
+        n.idx = n.id;
+        n.id = "q" + n.id;
+        n.completed = (store[`qc_${n.idx}`]==="true");
+
+        // set default radii
+        n.collisionRadius = defaultRadius*1.5;
+        n.radius = defaultRadius;
+
+        graph.traders.add(n.giver);
+
+        // dependencies
+        if (graph.parents[n.idx] === undefined) graph.parents[n.idx] = [];
+        n.require.quests.forEach((req) => {
+          graph.parents[n.idx].push(req);
+          if (graph.children[req] === undefined) graph.children[req] = [];
+          graph.children[req].push(n.idx);
+        });
+
+        graph.getParents = (idx) => { return graph.parents[idx]; };
+        graph.getChildren = (idx) => { return graph.children[idx] || []; };
+
+        graph.getParentNodes = (n) => { return graph.parents[n.idx].map(getQuest); };
+        graph.getChildNodes = (n) => { return graph.children[n.idx].map(getQuest); };
       });
 
+      const max_quest_id = 450;
+      const starting_quest = 195;
 
+      // set up stuff for the focused quest, and its immediate ancestors
+      var threshold = [];
+      var primary_node = graph.allQuests[starting_quest];
+      primary_node.fx = 0;
+      primary_node.fy = 0;
+      primary_node.dist_from_goal = 0;
+      graph.nodes.push(primary_node);
+      threshold.push(primary_node);
+
+      // set up which quests we will actually display, and calculate
+      // the (max) distance from the goal for each node
+      var node;
+      var already_visited = [];
+      while (node = threshold.shift()) {
+        if (already_visited[node.idx]) continue;
+        already_visited[node.idx] = true;
+
+        graph.getParents(node.idx).forEach((idx) => {
+          var par = graph.allQuests[idx];
+          if (par.dist_from_goal) par.dist_from_goal = Math.max(par.dist_from_goal, node.dist_from_goal+1);
+          else par.dist_from_goal = node.dist_from_goal+1;
+          
+          graph.nodes.push(par);
+          threshold.push(par);
+          graph.links.push({
+            "source": par.id,
+            "target": node.id
+          });
+        });
+      }
+
+      graph.nodes.forEach((n, i) => {
+        if (n.dist_from_goal === 0) {
+          n.radius = defaultRadius*3;
+          n.collisionRadius = 200;
+        } else if (n.dist_from_goal === 1) {
+          n.radius = smallRadius;
+          n.collisionRadius = n.radius * 1.2;
+        }
+      });
+      
+      // give all the displayed quests initial positions
+      var ring_nodes = graph.getParents(starting_quest).map(getQuest);
+      allocateRadialPositions(ring_nodes, innerRadius, graph.getParentNodes, graph.getChildNodes, getQuest);
+      
+      
+      var curRadius = innerRadius;
+      var pushParentsAway = function(node, curRad, theta){
+        graph.getParents(node.idx).forEach((p) => {
+          var parnode = getQuest(p);
+          parnode.x = node.x * 1.1;
+          parnode.y = node.y * 1.1;
+          
+          pushParentsAway(parnode, curRad+50, theta);
+        });
+      };
+
+
+      ring_nodes.forEach((parnode, i) => {
+        pushParentsAway(parnode, curRadius+50);
+      });
+      
+
+
+      var defs = svg.append('svg:defs');
       //define a few markers
-      svg.append('svg:defs').selectAll('marker')
+      defs.selectAll('marker')
          .data(['normal', 'red', 'green']).enter()
          .append('svg:marker')
           .attr('id', (t)=>`end-arrow-${t}`)
@@ -74,40 +209,52 @@
           .attr('orient', 'auto')
           .append('svg:path')
             .attr('d', 'M0,-5L10,0L0,5');
+      
+      //load trader images
+      graph.traders.forEach(function(d, i) {
+        defs.append("svg:pattern")
+          .attr("id", "trader_icon_" + d)
+          .attr("width", trader_icon_size) 
+          .attr("height", trader_icon_size)
+          .attr("patternUnits", "userSpaceOnUse")
+          .attr("patternTransform", `translate(${defaultRadius}, ${defaultRadius})`)
+          .append("svg:image")
+          .attr("xlink:href", getTraderIcon(d))
+          .attr("width", trader_icon_size)
+          .attr("height", trader_icon_size)
+          .attr("x", 0)
+          .attr("y", 0);
+      });
 
       buildGraph(true);
-      
 
       d3.select("body")
             .on("click", outsideClick)
             .on("keydown", keyDown);
+      
+
+      // for (var i=0; i<50; i++) simulation.tick();
+      simulation.on("tick", tick);
     });
 
-
-
-    var getIcon = function(n) {
-      return `icons/${n.type}.png`;
-    };
-
-    function prettyNodeType(type) {
-      if (type==="BoozeGenerator") return "Booze Generator";
-      if (type==="NutritionUnit")  return "Nutrition Unit";
-      if (type==="ScavCase")       return "Scav Case";
-      if (type==="ShootingRange")  return "Shooting Range";
-      if (type==="IntelligenceCenter") return "Intelligence Center";
-      if (type==="BitcoinFarm")    return "Bitcoin Farm";
-      if (type==="RestSpace")      return "Rest Space";
-      return type;
+    function tradername(traderid) {
+      if (traderid === 0) return "prapor";
+      if (traderid === 1) return "therapist";
+      if (traderid === 2) return "skier";
+      if (traderid === 3) return "peacekeeper";
+      if (traderid === 4) return "mechanic";
+      if (traderid === 5) return "ragman";
+      if (traderid === 6) return "jaeger";
+      if (traderid === 7) return "fence";
+      console.log("haven't prepared for trader id", traderid);
+      return "unknown";
     }
 
-    function prettyNodeName(n) {
-      if (n.level===undefined)
-        return prettyNodeType(n.type);
-      return `${prettyNodeType(n.type)} Level ${n.level}`;
+    function getTraderIcon(traderid) {
+      return `img/traders/${tradername(traderid)}.jpg`;
     }
 
-    function buildGraph(first = false) {
-
+    function buildGraph() {
       // build (add and remove) paths
       svg.selectAll(".path")
          .data(graph.links)
@@ -138,41 +285,29 @@
             .on("end", dragended));
 
       gnodes.append("title")
-        .text((n)=>n.prettyName);
+        .text((n)=>n.title);
 
-      gnodes.append("polygon")
-            .attr("class", "hex")
-            .attr("points", normalHex)
-            .attr("transform", `scale(${hexScale})`)
+      gnodes.append("circle")
+            .attr("r", (n)=>n.radius)
+            .attr("class", "questnode")
+            .style("fill", (n)=>`url(#trader_icon_${n.giver})`)
+            .on("mouseover", mouseover)
+            .on("mouseout", mouseout)
+            .on("click", nodeClick)
+            .on("dblclick", nodeDblClick);
 
-      gnodes.append("image")
-            .attr("class", "image")
-            .attr("xlink:href", getIcon)
-            .attr("transform", `scale(${hexScale/4})`)
-            .attr("x", -25)
-            .attr("y", -25)
-            .attr("height", 50)
-            .attr("width", 50);
-      
+      const relLevelTextSize=20;
       // add level (text) to the nodes that have a level
-      gnodes.filter((n)=>n.level!==undefined)
+      gnodes.filter((n)=>n.require.level !== undefined)
             .append("text")
             .attr("class", "level")
-            .text((n) => "0"+n.level)
-            .attr("x", nodeRadius/2)
-            .attr("y", nodeRadius/2)
-            .attr("transform", `scale(${hexScale/3})`);
+            .text((n) => n.require.level)
+            // .attr("x", relLevelTextSize*0.66)
+            // .attr("y", relLevelTextSize*0.66)
+            .attr("x", 0)
+            .attr("y", 0)
+            .attr("transform", `scale(${smallRadius/relLevelTextSize})`);
       
-      gnodes.append("polygon")
-          .attr("class", "nodeCover")
-          .attr("points", normalHex)
-          .attr("transform", `scale(${hexScale})`)
-          .on("mouseover", mouseover)
-          .on("mouseout", mouseout)
-          .on("click", nodeClick)
-          .on("dblclick", nodeDblClick)
-          
-
       // exit (delete DOM elements for nodes that are gone)
       svg.selectAll(".gnode")
         .data(graph.nodes, (n)=>n.id)
@@ -186,14 +321,20 @@
         n.index = i;
       });
 
-
       simulation.nodes(graph.nodes);
       simulation.force("link").links(graph.links);
-
       simulation.alpha(0.5).restart();
     };
 
     function tick() {
+      // draw all nodes (after moving them back into the view box)
+      gnodes.attr("transform", function (d) {
+        keepInBox(d, -width/2+d.radius, width/2 - d.radius, -height/2+d.radius, height/2 - d.radius);
+        // d.x = Math.max(-width/2+defaultRadius, Math.min(width/2 - defaultRadius, d.x));
+        // d.y = Math.max(-height/2+defaultRadius, Math.min(height/2 - defaultRadius, d.y));
+        return `translate(${d.x}, ${d.y})`;
+      });
+
       // draw directed edges with proper padding from node centers
       paths.attr('d', function (d) {
             var deltaX = d.target.x - d.source.x,
@@ -201,8 +342,8 @@
                 dist = Math.sqrt(deltaX * deltaX + deltaY * deltaY),
                 normX = deltaX / dist,
                 normY = deltaY / dist,
-                sourcePadding = nodeRadius,
-                targetPadding = nodeRadius + 2,
+                sourcePadding = d.source.radius,
+                targetPadding = d.target.radius + 2,
                 sourceX = d.source.x + (sourcePadding * normX),
                 sourceY = d.source.y + (sourcePadding * normY),
                 targetX = d.target.x - (targetPadding * normX),
@@ -210,10 +351,6 @@
             return 'M' + sourceX + ',' + sourceY + 'L' + targetX + ',' + targetY;
         });
 
-        
-        gnodes.attr("transform", function (d) {
-            return `translate(${d.x}, ${d.y})`;
-        });
 
     }
 
@@ -222,6 +359,14 @@
         paths.classed("red",   (l) => l.target.selected && !l.source.built);
         paths.classed("green", (l) => l.target.selected &&  l.source.built);
       }
+
+      // gnodes.style("opacity", (n)=>n.focus);
+      // paths.style("opacity", (l)=>{
+      //   if (l.target.focus>0)
+      //     return l.source.focus;
+      //   return 0;
+      // });
+
     }
 
     function updateBuiltStatus() {
@@ -231,15 +376,8 @@
     function nodeDblClick(n) {
     //   n.built = !n.built;
     
-
     //   var hex = d3.select(`polygon#hex${n.id}`);
     //   hex.classed("built", n.built);
-    }
-
-    function setSelected(b) {
-      return function(n) {
-        n.selected = b; return b;
-      }
     }
 
     function filterInPlace(a, condition, removed=function(){}) {
@@ -260,9 +398,9 @@
     }
 
     function restoreGraph() {
-      deletedGraph.nodes.forEach((n)=>graph.nodes.push(n));
+      deletedGraph.forEach((n)=>graph.nodes.push(n));
       deletedGraph.links.forEach((l)=>graph.links.push(l));
-      deletedGraph.nodes = [];
+      deletedGraph = [];
       deletedGraph.links = [];
       buildGraph();
     }
@@ -274,7 +412,7 @@
     }
 
     function deleteNodesCond(cond) {
-      filterInPlace2(graph.nodes, cond, (rn)=>deletedGraph.nodes.push(rn));
+      filterInPlace2(graph.nodes, cond, (rn)=>deletedGraph.push(rn));
       filterInPlace2(graph.links, (l)=>{
         return (cond(l.source) || cond(l.target));
       }, (rl)=>deletedGraph.links.push(rl));
@@ -287,8 +425,6 @@
     function deleteNodes(ns) {
       ns.forEach((n) => deleteNode(n));
     }
-
-
 
     function getParents(n) {
       var pars = [];
@@ -319,10 +455,30 @@
       buildGraph();
     }
 
+    function decreaseFocus(oldval) {
+      return oldval-0.2;
+    }
+    
+    function focusAux(n, val) {
+      n.focus = val;
+      val = decreaseFocus(val);
+      n.getParents().map((p)=>{
+        if (p.focus===0)
+          focusAux(p, val);
+      });
+    }
+
+    function focus(n) {
+      console.log(n);
+      // set all focus to zero
+      // graph.nodes.forEach((n)=>n.focus=0);
+      // focusAux(n, 1);
+      
+    }
 
 
     function getSelectedNode() {
-      for (var i=0; i<graph.nodes.length; i++) {
+      for (var i=0; i<graph.length; i++) {
         if (graph.nodes[i].selected) return graph.nodes[i];
       }
     }
@@ -334,6 +490,7 @@
     }
 
     function keyDown(e) {
+      simulation.stop();
       if (event.code==="KeyB") {
         if (n = getSelectedNode()) {
           toggleBuilt(n);
@@ -354,41 +511,53 @@
       }
     }
     
+    function setSelected(n) {
+      var g = d3.select(n.g);
+      if (g.classed("selected")) {
+        // already selected. unselect
+        g.classed("selected", setNodeSelectedFn(false));
+      } else {
+        // not selected. unselect everything else and select this.
+        gnodes.classed("selected", setNodeSelectedFn(false));
+        g.classed("selected", setNodeSelectedFn(true));
+      }
+    }
+
+    function setNodeSelectedFn(b) {
+      return function(n) {
+        n.selected = b; return b;
+      }
+    }
+
     function nodeClick(e, n) {
       // this click shouldn't also register on the background
       e.stopPropagation();
-
-      var thisGNode = d3.select(this.parentNode);
-      if (thisGNode.classed("selected")) {
-        // already selected. unselect
-        thisGNode.classed("selected", setSelected(false));
-      } else {
-        // not selected. unselect everything else and select this.
-        gnodes.classed("selected", setSelected(false));
-        thisGNode.classed("selected", setSelected(true));
-      }
-      updateNodeDisplays();
+      console.log(n);
+      // setSelected(n);
+      // focus(n);
+      // updateNodeDisplays();
     }
 
     function outsideClick() {
-      gnodes.classed("selected", setSelected(false));
+      // gnodes.classed("selected", setNodeSelectedFn(false));
+      // graph.nodes.forEach((n)=>n.focus=1);
       updateNodeDisplays();
     }
 
     function mouseover(e, n) {
       e.stopPropagation();
-      d3.select(n.g).select("polygon.hex")
+      d3.select(n.g).select("circle.questnode")
         .transition()
         .duration(250)
-        .attr("transform", `scale(${hexScale*mouseOverScale})`);
+        .attr("transform", `scale(${mouseOverScale})`);
     }
 
     function mouseout(e, n) {
       e.stopPropagation();
-      d3.select(n.g).select("polygon.hex")
+      d3.select(n.g).select("circle.questnode")
         .transition()
         .duration(250)
-        .attr("transform", `scale(${hexScale})`);
+        .attr("transform", `scale(1)`);
     }
 
     function dragstarted(e, d) {
@@ -403,7 +572,7 @@
     }
 
     function dragended(e, d) {
-      if (!e.active) simulation.alphaTarget(0.01);
+      // if (!e.active) simulation.alphaTarget(0.01);
       d.fx = null;
       d.fy = null;
     }
