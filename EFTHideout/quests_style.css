@@ -32,26 +32,6 @@ g.selected .nodeCover {
   marker-end:url(#end-arrow-normal);
 }
 
-.path.red {
-  stroke: red;
-  marker-end:url(#end-arrow-red);
-}
-
-.path.green {
-  stroke: green;
-  marker-end:url(#end-arrow-green);
-}
-
-marker#end-arrow-red {
-  fill:red;
-  stroke:red;
-}
-
-marker#end-arrow-green {
-  fill:green;
-  stroke:green;
-}
-
 .level {
     fill: black;
     font-family: Bender-Black;

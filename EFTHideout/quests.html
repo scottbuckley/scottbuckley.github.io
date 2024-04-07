@@ -8,6 +8,7 @@
     <!-- <script src="d3.v6.min.js"></script> -->
     <script src="extra.js"></script>
     <script src="d3.v7.js"></script>
+    <script src="d3.bounding.js"></script>
     <!-- <script type="module" src="d3_custom_collide.js"></script> -->
     <!-- <script src="cola.min.js"></script> -->
   </head>
@@ -16,43 +17,46 @@
     // CONFIG
     var width  = window.document.documentElement.clientWidth-50,
         height = window.document.documentElement.clientHeight;
+    
+    const loadFromLocalStorage = false;
 
+    const largeRadius = 25;
     var defaultRadius = 15;
     var smallRadius = 10;
     var mouseOverScale = 1.5;
     const collisionBuffer = 5;
     var store = window.localStorage;
-    const linkLength = 60;
+
+    const linkLength = 40;
+    const linkStartStrength = 0.6;
+    const linkFinalStrength = 0.05;
 
     const innerRadius = 200;
 
     const trader_icon_size = defaultRadius*2;
 
     var simulation = d3.forceSimulation()
-      .force("link", d3.forceLink().id((n)=>n.id).strength(0.5).distance((l)=>{
-        if (l.target.distance_from_goal===0) return innerRadius;
-        return linkLength;
+      .force("link", d3.forceLink().id((n)=>n.id).strength(0.5).distance(linkLength))
+      .force("charge", d3.forceManyBody().distanceMax(200).strength((n)=>{
+        if (n.complDist===0) return -100;
+        return -20;
       }))
-      .force("charge", d3.forceManyBody().strength(-30).distanceMax(200))
+
+      .force("bounding", boundingBox(-width/2, width/2, -height/2, height/2, 20, 0.25))
       // .force("center", d3.forceCenter().strength(0.1))
       
       // collision between center and secondary ancestors
       .force("collision", d3.forceCollide().strength(1).filter((n)=>n.dist_from_goal!==1).radius((n) => {
-        if (n.dist_from_goal === 0) return innerRadius + smallRadius*3;
+        if (n.dist_from_goal === 0) return innerRadius + smallRadius;
         return n.radius+collisionBuffer;
       }))
-      .force("coll2", d3.forceCollide().strength(1).filter((n)=>n.dist_from_goal===1).radius(smallRadius+collisionBuffer/2))
+      .force("coll2", d3.forceCollide().strength(0.9).filter((n)=>n.dist_from_goal===1).radius(n=>n.radius+collisionBuffer))
       // radial force to keep main parents in a ring
       .force("radial", d3.forceRadial(innerRadius).strength((n) => {
-        if (n.dist_from_goal === 1) return 3;
+        if (n.dist_from_goal === 1) return 1;
         return 0;
-      }))
-      // .force("x", d3.forceX())
-      // .force("y", d3.forceY())
-      ;
-    const endTime = 2000;
-    const linkStartStrength = 0.6;
-    const linkFinalStrength = 0;
+      }));
+    const endTime = 1000;
     const linkStrengthDelta = linkFinalStrength - linkStartStrength;
     var transitionTimer = d3.timer(elapsed => {
       var dt = elapsed / endTime;
@@ -106,11 +110,11 @@
         graph.allQuests[n.id] = n;
         n.idx = n.id;
         n.id = "q" + n.id;
-        n.completed = (store[`qc_${n.idx}`]==="true");
+        if (loadFromLocalStorage)
+          n.completed = (store[`completed_${n.gameId}`] === "Y");
 
         // set default radii
-        n.collisionRadius = defaultRadius*1.5;
-        n.radius = defaultRadius;
+        // n.radius = defaultRadius;
 
         graph.traders.add(n.giver);
 
@@ -129,52 +133,64 @@
         graph.getChildNodes = (n) => { return graph.children[n.idx].map(getQuest); };
       });
 
-      const max_quest_id = 450;
       const starting_quest = 195;
 
       // set up stuff for the focused quest, and its immediate ancestors
       var threshold = [];
-      var primary_node = graph.allQuests[starting_quest];
+      var primary_node = getQuest(starting_quest);
       primary_node.fx = 0;
       primary_node.fy = 0;
       primary_node.dist_from_goal = 0;
-      graph.nodes.push(primary_node);
+      // graph.nodes.push(primary_node);
       threshold.push(primary_node);
 
       // set up which quests we will actually display, and calculate
-      // the (max) distance from the goal for each node
+      // the (max) distance from the goal for each node, as well as
+      // the (min) distance
+      
+
       var node;
       var already_visited = [];
       while (node = threshold.shift()) {
         if (already_visited[node.idx]) continue;
         already_visited[node.idx] = true;
+        if (node.completed) continue;
+        graph.nodes.push(node);
 
         graph.getParents(node.idx).forEach((idx) => {
           var par = graph.allQuests[idx];
           if (par.dist_from_goal) par.dist_from_goal = Math.max(par.dist_from_goal, node.dist_from_goal+1);
           else par.dist_from_goal = node.dist_from_goal+1;
           
-          graph.nodes.push(par);
+          if (par.completed) return;
           threshold.push(par);
           graph.links.push({
-            "source": par.id,
-            "target": node.id
+            "source": par,
+            "target": node
           });
         });
       }
 
-      graph.nodes.forEach((n, i) => {
-        if (n.dist_from_goal === 0) {
-          n.radius = defaultRadius*3;
-          n.collisionRadius = 200;
-        } else if (n.dist_from_goal === 1) {
-          n.radius = smallRadius;
-          n.collisionRadius = n.radius * 1.2;
-        }
-      });
+
+      computeDistToCompletable(graph);
+      for (var node of graph.nodes) {
+        if (node.dist_from_goal === 0) node.radius = defaultRadius*3;
+        else if (node.complDist === 0) node.radius = largeRadius;
+        else node.radius = smallRadius;
+      }
+
+      // graph.nodes.forEach((n, i) => {
+      //   if (n.dist_from_goal === 0) {
+      //     n.radius = defaultRadius*3;
+      //     n.collisionRadius = 200;
+      //   } else if (n.dist_from_goal === 1) {
+      //     n.radius = smallRadius;
+      //     n.collisionRadius = n.radius * 1.2;
+      //   }
+      // });
       
       // give all the displayed quests initial positions
-      var ring_nodes = graph.getParents(starting_quest).map(getQuest);
+      var ring_nodes = graph.getParents(starting_quest).map(getQuest).filter(n=>!n.completed);
       allocateRadialPositions(ring_nodes, innerRadius, graph.getParentNodes, graph.getChildNodes, getQuest);
       
       
@@ -195,17 +211,15 @@
       });
       
 
-
+      // here we do the one-time setup for svg elements
       var defs = svg.append('svg:defs');
       //define a few markers
       defs.selectAll('marker')
-         .data(['normal', 'red', 'green']).enter()
+         .data(['normal']).enter()
          .append('svg:marker')
           .attr('id', (t)=>`end-arrow-${t}`)
           .attr('viewBox', '0 -5 10 10')
           .attr('refX', 6)
-          .attr('markerWidth', 3)
-          .attr('markerHeight', 3)
           .attr('orient', 'auto')
           .append('svg:path')
             .attr('d', 'M0,-5L10,0L0,5');
@@ -225,6 +239,12 @@
           .attr("x", 0)
           .attr("y", 0);
       });
+
+      // add a circle showing innerRadius
+      svg.append("circle")
+        .attr("r", innerRadius)
+        .attr("fill", "none")
+        .attr("stroke", "black");
 
       buildGraph(true);
 
@@ -302,11 +322,13 @@
             .append("text")
             .attr("class", "level")
             .text((n) => n.require.level)
-            // .attr("x", relLevelTextSize*0.66)
-            // .attr("y", relLevelTextSize*0.66)
-            .attr("x", 0)
-            .attr("y", 0)
-            .attr("transform", `scale(${smallRadius/relLevelTextSize})`);
+            .attr("x", relLevelTextSize*0.66)
+            .attr("y", relLevelTextSize*0.66)
+            .attr("transform",n=>`scale(${n.radius/relLevelTextSize})`)
+            .on("mouseover", mouseover)
+            .on("mouseout", mouseout)
+            .on("click", nodeClick)
+            .on("dblclick", nodeDblClick);
       
       // exit (delete DOM elements for nodes that are gone)
       svg.selectAll(".gnode")
@@ -322,28 +344,27 @@
       });
 
       simulation.nodes(graph.nodes);
-      simulation.force("link").links(graph.links);
-      simulation.alpha(0.5).restart();
+      simulation.force("link").links(graph.links.filter(l=>{
+        return l.target.dist_from_goal !== 0;
+      }));
+      simulation.alphaTarget(0.5).restart();
     };
 
     function tick() {
       // draw all nodes (after moving them back into the view box)
       gnodes.attr("transform", function (d) {
-        keepInBox(d, -width/2+d.radius, width/2 - d.radius, -height/2+d.radius, height/2 - d.radius);
-        // d.x = Math.max(-width/2+defaultRadius, Math.min(width/2 - defaultRadius, d.x));
-        // d.y = Math.max(-height/2+defaultRadius, Math.min(height/2 - defaultRadius, d.y));
         return `translate(${d.x}, ${d.y})`;
       });
 
       // draw directed edges with proper padding from node centers
       paths.attr('d', function (d) {
-            var deltaX = d.target.x - d.source.x,
+            let deltaX = d.target.x - d.source.x,
                 deltaY = d.target.y - d.source.y,
                 dist = Math.sqrt(deltaX * deltaX + deltaY * deltaY),
                 normX = deltaX / dist,
                 normY = deltaY / dist,
-                sourcePadding = d.source.radius,
-                targetPadding = d.target.radius + 2,
+                sourcePadding = 0,
+                targetPadding = d.target.radius + 7,
                 sourceX = d.source.x + (sourcePadding * normX),
                 sourceY = d.source.y + (sourcePadding * normY),
                 targetX = d.target.x - (targetPadding * normX),
@@ -374,8 +395,9 @@
     }
 
     function nodeDblClick(n) {
-    //   n.built = !n.built;
-    
+      n.completed = true;
+      console.log("dblclicked");
+      buildGraph();
     //   var hex = d3.select(`polygon#hex${n.id}`);
     //   hex.classed("built", n.built);
     }
@@ -490,7 +512,6 @@
     }
 
     function keyDown(e) {
-      simulation.stop();
       if (event.code==="KeyB") {
         if (n = getSelectedNode()) {
           toggleBuilt(n);
@@ -508,6 +529,8 @@
         }
       } else if (event.code==="Escape") {
         restoreGraph();
+      } else if (event.code==="KeyI") {
+        importTTProgress();
       }
     }
     
@@ -531,8 +554,8 @@
 
     function nodeClick(e, n) {
       // this click shouldn't also register on the background
-      e.stopPropagation();
-      console.log(n);
+      // e.stopPropagation();
+      // console.log(n);
       // setSelected(n);
       // focus(n);
       // updateNodeDisplays();

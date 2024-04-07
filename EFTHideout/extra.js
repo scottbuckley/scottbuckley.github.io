@@ -1,4 +1,93 @@
 
+// returns a promise
+function importTTProgress() {
+    // let impString = prompt("Paste the progress JSON you got from TarkovTravker.io here");
+    // let progress = JSON.parse(impString);
+    return d3.json("progress_example.json").then(applyTTProgress);
+}
+
+// returns a promise
+function applyTTProgress(progress) {
+    return d3.json("quests.json").then(function (g) {
+        let completedTasks = progress.data.tasksProgress.filter(t=>t.complete).map(t=>t.id);
+        for (let task of g) {
+            let gId = task.gameId;
+            let completed = (completedTasks.includes(gId));
+            store[`completed_${gId}`] = completed ? "Y" : "N";
+            // getQuest(task.id).completed = completed;
+        }
+    });
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function computeDistToCompletable(graph) {
+    return computeDistsToParentWithProp(graph, n => {
+        return graph.getParentNodes(n).filter(p=>!p.completed).length===0;
+    }, "complDist");
+}
+
+// sets the 'label' property on each node to:
+// 0, if 'prop' holds.
+// n, if the nth ancestor of this node holds the property.
+// Infinity if no ancestor holds this property.
+function computeDistsToParentWithProp(graph, prop, label) {
+    let visited = new Array(graph.nodes.length);
+    let calculateDist = (node) => {
+        // don't recalculate if it already exists.
+        let idx = node.idx;
+        if (visited[idx]) return node[label];
+        visited[idx] = true;
+
+        // prop holds here
+        if (prop(node)) return node[label] = 0;
+
+        // calculate dists on parents
+        let parDists = graph.getParentNodes(node)
+                            .map(calculateDist);
+        
+        // return the minimum ()
+        return node[label] = Math.min(...parDists) + 1;
+    };
+
+    graph.nodes.forEach(calculateDist);
+}
+
+
+
+
+
+
+
+
+
+
+// Custom force to put all nodes in a box
+function boundaryForce(xLeft, xRight, yTop, yBottom) {
+    const radius = 500;
+
+    for (let node of nodes) {
+        // Of the positions exceed the box, set them to the boundary position.
+        // You may want to include your nodes width to not overlap with the box.
+        node.x = Math.max(-radius, Math.min(radius, node.x));
+        node.y = Math.max(-radius, Math.min(radius, node.y));
+    }
+}
+
 function keepInBox(node, xLeft, xRight, yTop, yBottom) {
     if (node.x < xLeft) {
         node.x = xLeft;
