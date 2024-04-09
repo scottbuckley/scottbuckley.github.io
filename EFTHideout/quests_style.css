@@ -19,9 +19,27 @@ g.built polygon.hex {
   stroke-width:2px;
 }
 
+/* #letters {
+  padding: 10px;
+  width: 960px;
+  position: absolute;
+  bottom: 0;
+} */
+
 g.selected .nodeCover {
   stroke:black;
   opacity:50%;
+}
+
+text.titleText {
+  /* font-family: 'Amatic SC', Arial, Helvetica, sans-serif; */
+  font-family: 'Bender', Arial, Helvetica, sans-serif;
+  /* fill: red; */
+}
+
+path.outline {
+  fill:none;
+  stroke:black;
 }
 
 .path {
@@ -34,7 +52,7 @@ g.selected .nodeCover {
 
 .level {
     fill: black;
-    font-family: Bender-Black;
+    font-family: 'Bender-Black';
     font-size: 20px;
     fill:#FFF;
     stroke:#000;

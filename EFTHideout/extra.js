@@ -24,7 +24,19 @@ function applyTTProgress(progress) {
 
 
 
-
+function generateTextArc(radius) {
+    const wings_angle = 15*Math.PI/180;
+    const arc_start_x = - radius * Math.cos(wings_angle);
+    const arc_start_y = radius * Math.sin(wings_angle);
+    const wing_length = radius*8;
+    const wing_span_x = wing_length * Math.sin(wings_angle);
+    const wing_span_y = wing_length * Math.cos(wings_angle);
+    return `M${arc_start_x-wing_span_x},${arc_start_y-wing_span_y}
+            L${arc_start_x},${arc_start_y}
+            A${radius},${radius} 0 0,0 ${-arc_start_x},${arc_start_y}
+            l${wing_span_x},${-wing_span_y}`;
+    // return `M0,${-radius} a${radius},${radius} 0 1,0 0,${radius*2} a${radius},${radius} 0 1,0 0,-${radius*2}`;
+}
 
 
 

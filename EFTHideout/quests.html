@@ -9,8 +9,6 @@
     <script src="extra.js"></script>
     <script src="d3.v7.js"></script>
     <script src="d3.bounding.js"></script>
-    <!-- <script type="module" src="d3_custom_collide.js"></script> -->
-    <!-- <script src="cola.min.js"></script> -->
   </head>
   <body>
   <script>
@@ -18,7 +16,7 @@
     var width  = window.document.documentElement.clientWidth-50,
         height = window.document.documentElement.clientHeight;
     
-    const loadFromLocalStorage = false;
+    const loadFromLocalStorage = true;
 
     const largeRadius = 25;
     var defaultRadius = 15;
@@ -41,16 +39,15 @@
         if (n.complDist===0) return -100;
         return -20;
       }))
-
       .force("bounding", boundingBox(-width/2, width/2, -height/2, height/2, 20, 0.25))
       // .force("center", d3.forceCenter().strength(0.1))
       
       // collision between center and secondary ancestors
-      .force("collision", d3.forceCollide().strength(1).filter((n)=>n.dist_from_goal!==1).radius((n) => {
+      .force("collision", d3.forceCollide().strength(0.8).filter((n)=>n.dist_from_goal!==1).radius((n) => {
         if (n.dist_from_goal === 0) return innerRadius + smallRadius;
         return n.radius+collisionBuffer;
       }))
-      .force("coll2", d3.forceCollide().strength(0.9).filter((n)=>n.dist_from_goal===1).radius(n=>n.radius+collisionBuffer))
+      .force("coll2", d3.forceCollide().strength(0.8).filter((n)=>n.dist_from_goal===1).radius(n=>n.radius+collisionBuffer))
       // radial force to keep main parents in a ring
       .force("radial", d3.forceRadial(innerRadius).strength((n) => {
         if (n.dist_from_goal === 1) return 1;
@@ -77,7 +74,7 @@
     
     // GLOBAL
     var graph = {nodes:[], links:[]};
-    var gnodes = svg.selectAll(".gnode");
+    var allGNodes = svg.selectAll(".gnode");
     var paths = svg.selectAll(".path");
     var markers;
     var deletedGraph = {nodes:[], links:[]};
@@ -95,6 +92,16 @@
       return undefined;
     }
 
+
+    function setNodeRadii() {
+      computeDistToCompletable(graph);
+      for (let node of graph.nodes) {
+        if (node.dist_from_goal === 0) node.radius = defaultRadius*3;
+        else if (node.complDist === 0) node.radius = largeRadius;
+        else node.radius = smallRadius;
+      }
+    }
+    var arcD = generateTextArc(defaultRadius*1.5);
     // helper to process JSON links (so we don't have to write stuff by index)
     d3.json("quests.json").then(function (graph_) {
       graph.parents = [];
@@ -171,13 +178,12 @@
         });
       }
 
+      
+      
 
-      computeDistToCompletable(graph);
-      for (var node of graph.nodes) {
-        if (node.dist_from_goal === 0) node.radius = defaultRadius*3;
-        else if (node.complDist === 0) node.radius = largeRadius;
-        else node.radius = smallRadius;
-      }
+      setNodeRadii();
+      
+      
 
       // graph.nodes.forEach((n, i) => {
       //   if (n.dist_from_goal === 0) {
@@ -193,22 +199,19 @@
       var ring_nodes = graph.getParents(starting_quest).map(getQuest).filter(n=>!n.completed);
       allocateRadialPositions(ring_nodes, innerRadius, graph.getParentNodes, graph.getChildNodes, getQuest);
       
-      
-      var curRadius = innerRadius;
       var pushParentsAway = function(node, curRad, theta){
-        graph.getParents(node.idx).forEach((p) => {
-          var parnode = getQuest(p);
-          parnode.x = node.x * 1.1;
-          parnode.y = node.y * 1.1;
-          
-          pushParentsAway(parnode, curRad+50, theta);
-        });
+        for (let parnode of graph.getParentNodes(node)) {
+          let theta = Math.atan2(node.y, node.x);
+          parnode.x = curRad * Math.cos(theta);
+          parnode.y = curRad * Math.sin(theta);
+          pushParentsAway(parnode, curRad+10, theta);
+        }
       };
 
-
       ring_nodes.forEach((parnode, i) => {
-        pushParentsAway(parnode, curRadius+50);
+        pushParentsAway(parnode, innerRadius+20);
       });
+
       
 
       // here we do the one-time setup for svg elements
@@ -224,6 +227,9 @@
           .append('svg:path')
             .attr('d', 'M0,-5L10,0L0,5');
       
+      var pathOutline = defs.append("path")
+        .attr("id", "textPath")
+        .attr("d", arcD);
       //load trader images
       graph.traders.forEach(function(d, i) {
         defs.append("svg:pattern")
@@ -241,12 +247,13 @@
       });
 
       // add a circle showing innerRadius
-      svg.append("circle")
-        .attr("r", innerRadius)
-        .attr("fill", "none")
-        .attr("stroke", "black");
-
+      // svg.append("circle")
+      //   .attr("r", innerRadius)
+      //   .attr("fill", "none")
+      //   .attr("stroke", "black");
+      
       buildGraph(true);
+      
 
       d3.select("body")
             .on("click", outsideClick)
@@ -274,7 +281,8 @@
       return `img/traders/${tradername(traderid)}.jpg`;
     }
 
-    function buildGraph() {
+    function buildGraph(first_time = false) {
+
       // build (add and remove) paths
       svg.selectAll(".path")
          .data(graph.links)
@@ -291,8 +299,10 @@
 
       paths = svg.selectAll(".path")
 
+
+
       // build (add and remove) nodes
-      gnodes = svg.selectAll(".gnode")
+      let newGNodes = svg.selectAll(".gnode")
         .data(graph.nodes, (n)=>n.id)
         .enter()//.each(function(n){console.log("adding", n);})
         .append("g")
@@ -304,31 +314,54 @@
             .on("drag", dragged)
             .on("end", dragended));
 
-      gnodes.append("title")
+      newGNodes.append("title")
         .text((n)=>n.title);
 
-      gnodes.append("circle")
-            .attr("r", (n)=>n.radius)
-            .attr("class", "questnode")
-            .style("fill", (n)=>`url(#trader_icon_${n.giver})`)
-            .on("mouseover", mouseover)
-            .on("mouseout", mouseout)
-            .on("click", nodeClick)
-            .on("dblclick", nodeDblClick);
+      newGNodes.append("circle")
+        .attr("r", defaultRadius)
+        .attr("class", "questnode")
+        .attr("id", n=>n.id)
+        .attr("transform", n=>`scale(${n.radius/defaultRadius})`)
+        .style("fill", (n)=>`url(#trader_icon_${n.giver})`)
+        .on("mouseover", mouseover)
+        .on("mouseout", mouseout)
+        .on("click", nodeClick)
+        .on("dblclick", nodeDblClick);
+      
+      newGNodes.append("text")
+        .classed("titleText", true)
+        .append("textPath")
+          .attr("xlink:href", "#textPath")
+          .attr("text-anchor", "middle")
+          .attr("startOffset", "50%")
+          .attr("dominant-baseline", "hanging")
+          .text((n)=>n.title);
+      
+      // d3plus.textwrap()
+      //   .select('text.wrap');
+      // var tt = d3.select("text.wrap");
+      // console.log(tt);
+      // new d3plus.TextBox()
+      //   .data(tt.data())
+      //   .text("meow meow meow")
+      //   .render();
+
 
       const relLevelTextSize=20;
       // add level (text) to the nodes that have a level
-      gnodes.filter((n)=>n.require.level !== undefined)
-            .append("text")
-            .attr("class", "level")
-            .text((n) => n.require.level)
-            .attr("x", relLevelTextSize*0.66)
-            .attr("y", relLevelTextSize*0.66)
-            .attr("transform",n=>`scale(${n.radius/relLevelTextSize})`)
-            .on("mouseover", mouseover)
-            .on("mouseout", mouseout)
-            .on("click", nodeClick)
-            .on("dblclick", nodeDblClick);
+      newGNodes.filter((n)=>n.require.level !== undefined)
+        .append("text")
+        .attr("class", "level")
+        .text((n) => n.require.level)
+        // .attr("x", relLevelTextSize*0.66)
+        .attr("y", relLevelTextSize*0.66)
+        .attr("x", 0)
+        // .attr("y", 0)
+        .attr("transform",n=>`scale(${n.radius/relLevelTextSize})`)
+        .on("mouseover", mouseover)
+        .on("mouseout", mouseout)
+        .on("click", nodeClick)
+        .on("dblclick", nodeDblClick);
       
       // exit (delete DOM elements for nodes that are gone)
       svg.selectAll(".gnode")
@@ -336,7 +369,19 @@
         .exit()
           .remove();
 
-      gnodes = svg.selectAll(".gnode");
+      allGNodes = svg.selectAll(".gnode");
+
+      // update the radius on everything
+      allGNodes.select("circle")
+        .transition()
+          .duration(300)
+          .attr("transform", n=>`scale(${n.radius/defaultRadius})`);
+      
+      // also update the level text size
+      allGNodes.select("text")
+        .transition()
+          .duration(300)
+          .attr("transform",n=>`scale(${n.radius/relLevelTextSize})`);
 
       graph.nodes.forEach(function(n, i) {
         n.g = d3.select(`g#${n.id}`).node();
@@ -352,7 +397,7 @@
 
     function tick() {
       // draw all nodes (after moving them back into the view box)
-      gnodes.attr("transform", function (d) {
+      allGNodes.attr("transform", function (d) {
         return `translate(${d.x}, ${d.y})`;
       });
 
@@ -391,15 +436,18 @@
     }
 
     function updateBuiltStatus() {
-      gnodes.classed("built", (n) => n.built);
+      allGNodes.classed("built", (n) => n.built);
     }
 
-    function nodeDblClick(n) {
+    function nodeDblClick(e, n) {
       n.completed = true;
       console.log("dblclicked");
+      console.log(n.id);
+      deleteNode(n);
+      setNodeRadii();
       buildGraph();
-    //   var hex = d3.select(`polygon#hex${n.id}`);
-    //   hex.classed("built", n.built);
+      // var hex = d3.select(`polygon#hex${n.id}`);
+      // hex.classed("built", n.built);
     }
 
     function filterInPlace(a, condition, removed=function(){}) {
@@ -419,6 +467,23 @@
       return a;
     }
 
+    function filterInPlaceNeg(a, condition, removed=function(){}) {
+      let i = 0, j = 0;
+
+      while (i < a.length) {
+        const val = a[i];
+        var keep = !condition(val, i, a);
+        if (keep)
+          a[j++] = val;
+        else
+          removed(a[i]);
+        i++;
+      }
+
+      a.length = j;
+      return a;
+    }
+
     function restoreGraph() {
       deletedGraph.forEach((n)=>graph.nodes.push(n));
       deletedGraph.links.forEach((l)=>graph.links.push(l));
@@ -427,15 +492,16 @@
       buildGraph();
     }
 
-    function filterInPlace2(a, condition, removed=function(){}) {
-      return filterInPlace(a, function(){
-        return !condition(...arguments);
-      }, removed)
-    }
+    // function filterInPlace2(a, condition, removed=function(){}) {
+    //   return filterInPlace(a, function(){
+    //     return !condition(...arguments);
+    //   }, removed)
+    // }
 
     function deleteNodesCond(cond) {
-      filterInPlace2(graph.nodes, cond, (rn)=>deletedGraph.push(rn));
-      filterInPlace2(graph.links, (l)=>{
+      // filterInPlace(graph.nodes, cond, (rn)=>deletedGraph.push(rn));
+      filterInPlaceNeg(graph.nodes, cond);
+      filterInPlaceNeg(graph.links, l => {
         return (cond(l.source) || cond(l.target));
       }, (rl)=>deletedGraph.links.push(rl));
     }
@@ -541,7 +607,7 @@
         g.classed("selected", setNodeSelectedFn(false));
       } else {
         // not selected. unselect everything else and select this.
-        gnodes.classed("selected", setNodeSelectedFn(false));
+        allGNodes.classed("selected", setNodeSelectedFn(false));
         g.classed("selected", setNodeSelectedFn(true));
       }
     }
@@ -555,7 +621,7 @@
     function nodeClick(e, n) {
       // this click shouldn't also register on the background
       // e.stopPropagation();
-      // console.log(n);
+      console.log(n);
       // setSelected(n);
       // focus(n);
       // updateNodeDisplays();
@@ -569,18 +635,20 @@
 
     function mouseover(e, n) {
       e.stopPropagation();
+      let newScale = mouseOverScale * n.radius/defaultRadius;
       d3.select(n.g).select("circle.questnode")
         .transition()
         .duration(250)
-        .attr("transform", `scale(${mouseOverScale})`);
+        .attr("transform", `scale(${newScale})`);
     }
 
     function mouseout(e, n) {
       e.stopPropagation();
+      let newScale = n.radius/defaultRadius;
       d3.select(n.g).select("circle.questnode")
         .transition()
         .duration(250)
-        .attr("transform", `scale(1)`);
+        .attr("transform", `scale(${newScale})`);
     }
 
     function dragstarted(e, d) {
