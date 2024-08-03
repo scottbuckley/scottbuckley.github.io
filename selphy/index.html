@@ -1,0 +1,132 @@
+<html>
+  <head>
+    <title>Selphy image adjuster</title>
+    <style>
+      canvas { display: block; border: 1px solid black; }
+    </style>
+  </head>
+  <body>
+    <input type='file' id="fileUpload" />
+    <canvas id="canvas" width="300" height="200"></canvas>
+    <img id="save_image" width="100%" />
+    <script>
+
+      // 4x6 inches at 300dpi
+      const printer_dpi = 300;
+      const print_wdth = printer_dpi * 6;
+      const print_hght = printer_dpi * 4;
+
+      // in percent of total
+      var border_left = 0.65;
+      var border_right = 1.65;
+      var border_top = 0.5;
+      var border_bottom = 0.25;
+
+      const canvas_preview_scale = 0.3;
+
+
+      const EL = (sel) => document.querySelector(sel);
+      const canv = EL("#canvas");
+      const ctx = EL("#canvas").getContext("2d");
+      const save_image = EL("#save_image");
+      
+      canv.style.width  = print_wdth * canvas_preview_scale;
+      canv.style.height = print_hght * canvas_preview_scale;
+      canv.width  = print_wdth;
+      canv.height = print_hght;
+      
+      function placeImageOnCanvas(img_w, img_h, canv_w, canv_h) {
+
+        var x_zero = canv_w * (border_left/100);
+        var y_zero = canv_h * (border_top/100);
+        canv_w = canv_w * ((100 - (border_left + border_right))/100);
+        canv_h = canv_h * ((100 - (border_top + border_bottom))/100);
+
+        var rotate = false;
+        // if (img_h > img_w) {
+        //   rotate = true;
+        //   var temp = img_h;
+        //   img_h = img_w;
+        //   img_w = temp;
+        // }
+
+        const canv_aspect = canv_w / canv_h;
+        const img_aspect = img_w / img_h;
+
+        var draw_w = 100;
+        var draw_h = 100;
+        var draw_x = 0;
+        var draw_y = 0;
+        
+
+        if (img_aspect < canv_aspect) {
+          // taller: fit touches top and bottom
+          draw_w = canv_h * img_aspect;
+          draw_h = canv_h;
+
+          const w_diff = canv_w - draw_w;
+
+          draw_x = x_zero + w_diff/2;
+          draw_y = y_zero;
+        } else {
+          // wider: fit touches left and right
+          draw_w = canv_w;
+          draw_h = canv_w / img_aspect;
+
+          const h_diff = canv_h - draw_h;
+
+          draw_x = x_zero;
+          draw_y = y_zero + h_diff/2;
+        }
+        return [draw_x, draw_y, draw_w, draw_h, rotate]
+      }
+
+      function drawTestBoxes() {
+        for (var i=0; i<=15; i++) {
+          border_left = i;
+          border_right = i;
+          border_top = i;
+          border_bottom = i;
+          var [x, y, w, h, rotate] = placeImageOnCanvas(canv.width, canv.height, canv.width, canv.height);
+          if ((i % 5) == 0) {
+            ctx.strokeStyle = 'red';
+          } else {
+            ctx.strokeStyle = 'black';
+          }
+          ctx.beginPath();
+          ctx.rect(x, y, w, h);
+          ctx.stroke();
+          ctx.closePath();
+        }
+        var i = 18
+        border_left = i;
+        border_right = i;
+        border_top = i;
+        border_bottom = i;
+      }
+
+      function readImage() {
+        if (!this.files || !this.files[0]) return;
+        
+        const FR = new FileReader();
+        FR.addEventListener("load", (evt) => {
+          const img = new Image();
+          img.addEventListener("load", () => {
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+            // drawTestBoxes();
+            var [x, y, w, h, rotate] = placeImageOnCanvas(img.width, img.height, canv.width, canv.height);
+            ctx.drawImage(img, x, y, w, h);
+
+            save_image.src = canv.toDataURL();
+          });
+          img.src = evt.target.result;
+        });
+        FR.readAsDataURL(this.files[0]);
+      }
+
+      EL("#fileUpload").addEventListener("change", readImage);
+    </script>
+  </body>
+</html>

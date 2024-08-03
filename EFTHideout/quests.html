@@ -92,7 +92,6 @@
       return undefined;
     }
 
-
     function setNodeRadii() {
       computeDistToCompletable(graph);
       for (let node of graph.nodes) {
@@ -101,7 +100,9 @@
         else node.radius = smallRadius;
       }
     }
-    var arcD = generateTextArc(defaultRadius*1.5);
+
+    importTTProgress(store);
+
     // helper to process JSON links (so we don't have to write stuff by index)
     d3.json("quests.json").then(function (graph_) {
       graph.parents = [];
@@ -229,7 +230,7 @@
       
       var pathOutline = defs.append("path")
         .attr("id", "textPath")
-        .attr("d", arcD);
+        .attr("d", generateTextArc(defaultRadius*1.5));
       //load trader images
       graph.traders.forEach(function(d, i) {
         defs.append("svg:pattern")

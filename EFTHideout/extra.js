@@ -1,9 +1,24 @@
 
 // returns a promise
-function importTTProgress() {
+function importTTProgress(store, callback=()=>{}) {
+    var api_token = store['tarkovTravker_API_token'];
+    if (!api_token) {
+        let new_token = prompt("You need a TarkovTracker API token to import progress (which you can find in TarkovTracker's settings page). Paste it here.");
+        if (new_token) {
+            store['tarkovTravker_API_token'] = new_token;
+            api_token = new_token;
+        } else return;
+    }
+
     // let impString = prompt("Paste the progress JSON you got from TarkovTravker.io here");
     // let progress = JSON.parse(impString);
-    return d3.json("progress_example.json").then(applyTTProgress);
+    d3.json("https://tarkovtracker.io/api/v2/progress", {
+        headers: {Authorization: `Bearer ${api_token}`}
+      }).then(function (result) {
+        console.info("Retrieved quest progress from TarkovTracker.");
+        applyTTProgress(result);
+        callback(result);
+      });
 }
 
 // returns a promise
