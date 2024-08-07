@@ -35,6 +35,14 @@
       canv.width  = print_wdth;
       canv.height = print_hght;
       
+      function drawImage(image, x, y, w, h){
+        ctx.save();
+        ctx.translate(h, 0);
+        ctx.rotate(Math.PI/2);
+        ctx.drawImage(image, x, -y, w, h);
+        ctx.restore();
+      }
+
       function placeImageOnCanvas(img_w, img_h, canv_w, canv_h) {
 
         var x_zero = canv_w * (border_left/100);
@@ -43,12 +51,12 @@
         canv_h = canv_h * ((100 - (border_top + border_bottom))/100);
 
         var rotate = false;
-        // if (img_h > img_w) {
-        //   rotate = true;
-        //   var temp = img_h;
-        //   img_h = img_w;
-        //   img_w = temp;
-        // }
+        if (img_h > img_w) {
+          rotate = true;
+          var temp = img_h;
+          img_h = img_w;
+          img_w = temp;
+        }
 
         const canv_aspect = canv_w / canv_h;
         const img_aspect = img_w / img_h;
@@ -115,9 +123,13 @@
             ctx.fillStyle = 'white';
             ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-            // drawTestBoxes();
             var [x, y, w, h, rotate] = placeImageOnCanvas(img.width, img.height, canv.width, canv.height);
-            ctx.drawImage(img, x, y, w, h);
+
+            if (rotate) {
+              drawImage(img, y, x, h, w);
+            } else {
+              ctx.drawImage(img, x, y, w, h);
+            }
 
             save_image.src = canv.toDataURL();
           });
