@@ -2,12 +2,23 @@
   <head>
     <title>Selphy image adjuster</title>
     <style>
-      canvas { display: block; border: 1px solid black; }
+      body {
+        width:80%;
+        margin: auto;
+      }
+      canvas {
+        display: block;
+        border: 1px solid black;
+        width:100%;
+      }
+      #save_image {
+        /* border:1px dashed black; */
+      }
     </style>
   </head>
   <body>
     <input type='file' id="fileUpload" />
-    <canvas id="canvas" width="300" height="200"></canvas>
+    <canvas id="canvas"></canvas>
     <img id="save_image" width="100%" />
     <script>
 
@@ -16,30 +27,31 @@
       const print_wdth = printer_dpi * 6;
       const print_hght = printer_dpi * 4;
 
+      const draw_border = true;
+
       // in percent of total
-      var border_left = 0.65;
-      var border_right = 1.65;
-      var border_top = 0.5;
-      var border_bottom = 0.25;
+      var border_left   = 2.8;
+      var border_right  = 3.8;
+      var border_top    = 2.7;
+      var border_bottom = 2.5;
 
       const canvas_preview_scale = 0.3;
-
 
       const EL = (sel) => document.querySelector(sel);
       const canv = EL("#canvas");
       const ctx = EL("#canvas").getContext("2d");
       const save_image = EL("#save_image");
       
-      canv.style.width  = print_wdth * canvas_preview_scale;
-      canv.style.height = print_hght * canvas_preview_scale;
+      // canv.style.width  = print_wdth * canvas_preview_scale;
+      // canv.style.height = print_hght * canvas_preview_scale;
       canv.width  = print_wdth;
       canv.height = print_hght;
       
       function drawImage(image, x, y, w, h){
         ctx.save();
-        ctx.translate(h, 0);
-        ctx.rotate(Math.PI/2);
-        ctx.drawImage(image, x, -y, w, h);
+        ctx.translate(0, w);
+        ctx.rotate(-Math.PI/2);
+        ctx.drawImage(image, -x, y, w, h);
         ctx.restore();
       }
 
@@ -124,6 +136,14 @@
             ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
             var [x, y, w, h, rotate] = placeImageOnCanvas(img.width, img.height, canv.width, canv.height);
+
+            if(draw_border) {
+              ctx.strokeStyle="black";
+              ctx.beginPath();
+              ctx.rect(0, 0, canv.width, canv.height);
+              ctx.stroke();
+              ctx.closePath();
+            }
 
             if (rotate) {
               drawImage(img, y, x, h, w);
