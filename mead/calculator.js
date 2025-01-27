@@ -100,9 +100,11 @@ function updateCalculations(el) {
 }
 
 function updateSecondary() {
+    const og = getMaybeTempCorrected("og");
     const fg = getMaybeTempCorrected("fg");
     const abv = getnum("abv");
     const nafg = updateNAFG(abv, fg);
+    const onethird = updateOneThird(og, fg);
     updateRS(nafg, fg);
     updateDelle(abv);
 }
@@ -131,6 +133,14 @@ function updateABV(og, fg) {
     const abv = ABVFromSGs(og, fg);
     setnum("abv", abv, 2);
     return abv;
+}
+
+function updateOneThird(og, fg) {
+    if (og === undefined) og = getMaybeTempCorrected("og");
+    if (fg === undefined) fg = getMaybeTempCorrected("fg");
+    const onethird = calculateOneThirdBreak(og, fg);
+    setnum("onethird", onethird, 4);
+    return onethird;
 }
 
 function updateNAFG(abv, fg) {
@@ -276,6 +286,10 @@ function adjustForAlcohol(sg, abv) {
     return diluteBackToVolume;
     this simplifies to the following */
     return sg + 0.00211 * abv;
+}
+
+function calculateOneThirdBreak(og, fg) {
+    return og - ((og - fg)/3);
 }
 
 
