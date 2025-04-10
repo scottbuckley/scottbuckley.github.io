@@ -5,7 +5,7 @@
 
 I am, among other things, a computer scientist.
 
-Currently I live in Sydney and work remotely for [ULB](https://www.ulb.be/en) in Brussels, Belgium.
+Currently I live in Sydney and work in blockchain verification research at UNSW.
 
 I like writing programs, writing proofs, solving puzzles, tasting fermented things, woodworking, traveling, 3D printing, and lots of other things.
 
