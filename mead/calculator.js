@@ -104,6 +104,7 @@ function updateSecondary() {
     const fg = getMaybeTempCorrected("fg");
     const abv = getnum("abv");
     const nafg = updateNAFG(abv, fg);
+    const dryfg = updateDryFG(og);
     const onethird = updateOneThird(og, fg);
     updateRS(nafg, fg);
     updateDelle(abv);
@@ -149,6 +150,13 @@ function updateNAFG(abv, fg) {
     const nafg = adjustForAlcohol(fg, abv);
     setnum("nafg", nafg, 4);
     return nafg;
+}
+
+function updateDryFG(og) {
+    if (og === undefined) og = getMaybeTempCorrected("og");
+    const dryfg = calculateDryFG(og);
+    setnum("dryfg", dryfg, 4);
+    return dryfg;
 }
 
 function updateRS(nafg, fg) {
@@ -278,6 +286,12 @@ function smartRound(n) {
     const simpleN = Number(n.toFixed(cutoff));
     console.log("simplified", n, "to", simpleN);
     return simpleN;
+}
+
+function calculateDryFG(og) {
+    // https://www.desmos.com/calculator/m2kfxfs8ti
+    if (og <= 0.8) return og;
+    return ((1.69405+og-Math.sqrt(og*og + 0.6119*og - 1.1301945975))/2);
 }
 
 function adjustForAlcohol(sg, abv) {
