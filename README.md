@@ -5,7 +5,7 @@
 
 I am, among other things, a computer scientist.
 
-Currently I live in Sydney and work in blockchain verification research at UNSW.
+Currently I am living in Sydney and being a full-time dad to my little boy Boon. I have also been doing my own research into smart contract auditing and blockchain verification, which is a field in which I'd like to continue working, in the future.
 
 I like writing programs, writing proofs, solving puzzles, tasting fermented things, woodworking, traveling, 3D printing, and lots of other things.
 
