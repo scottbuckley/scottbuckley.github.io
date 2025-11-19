@@ -16,6 +16,7 @@
         <h2>Mead Numbers</h2>
         <form name="calc">
             <h6 class="hrtext">gravity / abv</h6>
+            <!-- OG -->
             <div class="form-group mb-2">
                 <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
                     title="Original Gravity"
@@ -36,6 +37,7 @@
                     <span>=</span>&nbsp;<span id="ogtempcorrected">temp</span>&nbsp;<span>@</span>&nbsp;<span class="show-basis-temp">12345</span>&nbsp;<span class="show-temp-unit">&#8451</span>
                 </div>
             </div>
+            <!-- FG -->
             <div class="form-group mb-2">
                 <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
                     title="Final Gravity"
@@ -46,6 +48,12 @@
                     <input class="form-control w-25" id="fg" name="FG"
                         type="number" step="0.001" value="1.040"
                         oninput="updateCalculations(this);" >
+                    <label for="dry" class="input-group-text labelabovecheckboxcontainer">
+                        <!-- <div class="input-group-text labelabovecheckboxcontainer"> -->
+                            <label class="labelabovecheckbox" for="dry">Dry</label>
+                            <input class="labelabovecheckbox" type="checkbox" id="dry" name="Dry" aria-label="Ferment completely dry">
+                        <!-- </div> -->
+                    </label>
                     <span class="input-group-text tempcorrectionon">@</span>
                     <input class="form-control tempcorrectionon" id="fgtemp" name="FGTemp"
                         type="number" step="0.1" placeholder="Temp" value="20"
@@ -56,6 +64,7 @@
                     <span>=</span>&nbsp;<span id="fgtempcorrected">temp</span>&nbsp;<span>@</span>&nbsp;<span class="show-basis-temp">12345</span>&nbsp;<span class="show-temp-unit">&#8451</span>
                 </div>
             </div>
+            <!-- ABV -->
             <div class="form-group mb-2">
                 <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
                     title="Alcohol by Volume"
@@ -71,7 +80,26 @@
                 </div>
             </div>
             <!-- ^^^ inputs ^^^                   vvv outputs vvv -->
-            <h6 class="hrtext">delle</h6>
+            <h6 class="hrtext">sugars</h6>
+            <div class="form-group mb-2">
+                <label for="onethird">
+                    <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
+                       title="1/3 Sugar Break"
+                       data-bs-content="Assuming fermentation starts at the stated OG and reaches the stated FG, this is the SG
+                       at which 1/3 of the sugars will have been fermented."></a>
+                    1/3 Break
+                </label>
+                <input class="form-control" id="onethird" type="number" name="ONETHIRD" value="0" disabled="true">
+            </div>
+            <div class="form-group mb-2">
+                <label for="dryfg">
+                    <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"
+                       title="FG if fermented dry"
+                       data-bs-content="This is what the FG would be if you fermented all the sugar away."></a>
+                    FG if fermented dry
+                </label>
+                <input class="form-control" id="dryfg" type="number" name="DRYFG" value="0" disabled="true">
+            </div>
             <div class="form-group mb-2">
                 <label for="nafg">
                     <a tabindex="0" class="bi bi-info-circle" role="button" data-bs-toggle="popover" data-bs-trigger="focus"

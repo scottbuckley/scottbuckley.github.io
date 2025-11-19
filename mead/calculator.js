@@ -100,9 +100,12 @@ function updateCalculations(el) {
 }
 
 function updateSecondary() {
+    const og = getMaybeTempCorrected("og");
     const fg = getMaybeTempCorrected("fg");
     const abv = getnum("abv");
     const nafg = updateNAFG(abv, fg);
+    const dryfg = updateDryFG(og);
+    const onethird = updateOneThird(og, fg);
     updateRS(nafg, fg);
     updateDelle(abv);
 }
@@ -133,12 +136,27 @@ function updateABV(og, fg) {
     return abv;
 }
 
+function updateOneThird(og, fg) {
+    if (og === undefined) og = getMaybeTempCorrected("og");
+    if (fg === undefined) fg = getMaybeTempCorrected("fg");
+    const onethird = calculateOneThirdBreak(og, fg);
+    setnum("onethird", onethird, 4);
+    return onethird;
+}
+
 function updateNAFG(abv, fg) {
     if (abv === undefined) abv = getnum("abv");
     if (fg === undefined)  fg = getMaybeTempCorrected("fg");
     const nafg = adjustForAlcohol(fg, abv);
     setnum("nafg", nafg, 4);
     return nafg;
+}
+
+function updateDryFG(og) {
+    if (og === undefined) og = getMaybeTempCorrected("og");
+    const dryfg = calculateDryFG(og);
+    setnum("dryfg", dryfg, 4);
+    return dryfg;
 }
 
 function updateRS(nafg, fg) {
@@ -270,12 +288,22 @@ function smartRound(n) {
     return simpleN;
 }
 
+function calculateDryFG(og) {
+    // https://www.desmos.com/calculator/m2kfxfs8ti
+    if (og <= 0.8) return og;
+    return ((1.69405+og-Math.sqrt(og*og + 0.6119*og - 1.1301945975))/2);
+}
+
 function adjustForAlcohol(sg, abv) {
     /* const removeEthanol = (sg*100 - 0.789*abv) / (100-abv);
     const diluteBackToVolume = (removeEthanol*(100-abv) + abv) / 100;
     return diluteBackToVolume;
     this simplifies to the following */
     return sg + 0.00211 * abv;
+}
+
+function calculateOneThirdBreak(og, fg) {
+    return og - ((og - fg)/3);
 }
 
 

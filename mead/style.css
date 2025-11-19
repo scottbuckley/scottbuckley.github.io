@@ -82,3 +82,18 @@
       margin-right: -50%;
       margin-left:-.15rem;
   }
+
+  label.labelabovecheckbox {
+    overflow: hidden;
+    text-align: center;
+    text-transform: lowercase;
+    font-variant: small-caps;
+    font-size: x-small;
+    color:#777;
+  }
+  .labelabovecheckboxcontainer {
+    display:flex;
+    flex-direction: column;
+    padding-top:0;
+    padding-bottom:0;
+  }
