@@ -48,17 +48,17 @@
                     <input class="form-control w-25" id="fg" name="FG"
                         type="number" step="0.001" value="1.040"
                         oninput="updateCalculations(this);" >
-                    <label for="dry" class="input-group-text labelabovecheckboxcontainer">
-                        <!-- <div class="input-group-text labelabovecheckboxcontainer"> -->
-                            <label class="labelabovecheckbox" for="dry">Dry</label>
-                            <input class="labelabovecheckbox" type="checkbox" id="dry" name="Dry" aria-label="Ferment completely dry">
-                        <!-- </div> -->
-                    </label>
+                    
                     <span class="input-group-text tempcorrectionon">@</span>
                     <input class="form-control tempcorrectionon" id="fgtemp" name="FGTemp"
                         type="number" step="0.1" placeholder="Temp" value="20"
                         oninput="updateCalculations(this)" >
                     <span class="input-group-text tempcorrectionon show-temp-unit">&#8451</span>
+                    <!-- <label for="dry" class="input-group-text labelabovecheckboxcontainer">
+                            <label class="labelabovecheckbox" for="dry">Dry</label>
+                            <input class="labelabovecheckbox" type="checkbox" id="dry" name="dry" aria-label="Theoretical lowest FG"
+                                onchange="dryFGToggle(this);">
+                    </label> -->
                 </div>
                 <div class="tempcorrectionon form-text">
                     <span>=</span>&nbsp;<span id="fgtempcorrected">temp</span>&nbsp;<span>@</span>&nbsp;<span class="show-basis-temp">12345</span>&nbsp;<span class="show-temp-unit">&#8451</span>
